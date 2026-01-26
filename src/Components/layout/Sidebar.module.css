@@ -1,13 +1,13 @@
 .sidebar {
   width: 100%;
-  height: 100%;
+  height: 100dvh; /* ✅ mejor que 100vh en mobile */
+  min-height: 0;
   background: #4b0016;
   color: #fff;
   display: flex;
   flex-direction: column;
   padding: 14px 14px 12px;
-  position: relative;
-  overflow: hidden;
+  overflow: hidden; /* ✅ el sidebar no scrollea completo */
 }
 
 /* TOP */
@@ -17,7 +17,6 @@
   gap: 10px;
 }
 
-/* Título */
 .title {
   margin: 0;
   text-align: center;
@@ -27,22 +26,20 @@
   letter-spacing: 0.2px;
 }
 
-/* Logo */
 .logoWrap {
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   padding: 2px 0;
 }
 
 .logo {
   width: 160px;
   height: auto;
-  opacity: 0.95;
   object-fit: contain;
+  opacity: 0.95;
 }
 
-/* Separador dorado */
 .goldLine {
   height: 2px;
   width: 100%;
@@ -50,13 +47,11 @@
   opacity: 0.9;
 }
 
-/* Usuario */
 .userRow {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 4px;
-  font-size: 15px;
   min-width: 0;
 }
 
@@ -67,27 +62,26 @@
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  opacity: 0.95;
   flex: 0 0 26px;
+  opacity: 0.95;
 }
 
 .userName {
   font-weight: 600;
   opacity: 0.95;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* SCROLL AREA */
+/* SCROLL SOLO MENÚ */
 .scrollArea {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 0; /* ✅ CRÍTICO */
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 10px;
-  display: flex;
-  flex-direction: column;
 }
 
 /* NAV */
@@ -97,25 +91,29 @@
   min-width: 0;
 }
 
+/* Items unificados (links + buttons) */
 .item,
-.itemBtn {
+.itemBtn,
+.bottomBtn {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 10px;
+  padding: 10px;
   border-radius: 12px;
-  text-decoration: none;
   color: #fff;
+  text-decoration: none;
   background: transparent;
   border: none;
   cursor: pointer;
   font-size: 16px;
   min-width: 0;
+  justify-content: flex-start;
 }
 
 .item:hover,
-.itemBtn:hover {
+.itemBtn:hover,
+.bottomBtn:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -124,31 +122,27 @@
   outline: 1px solid rgba(182, 138, 42, 0.45);
 }
 
+/* Icono consistente */
 .icon {
   width: 26px;
   height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
   flex: 0 0 26px;
+  font-size: 18px;
+  text-align: center;
 }
 
 .label {
   flex: 1;
-  text-align: left;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Catálogos */
-.group {
-  display: grid;
-  gap: 8px;
-}
-
+/* ---- Catálogos (estructura button + left + chev) ---- */
 .left {
   display: inline-flex;
   align-items: center;
@@ -157,6 +151,7 @@
   min-width: 0;
 }
 
+/* (Si usas chevron en tu componente) */
 .chev {
   display: inline-flex;
   align-items: center;
@@ -169,6 +164,7 @@
   transform: rotate(180deg);
 }
 
+/* SUBMENÚ */
 .submenu {
   display: none;
   padding-left: 36px;
@@ -180,10 +176,10 @@
 }
 
 .subItem {
-  text-decoration: none;
-  color: rgba(255, 255, 255, 0.9);
   padding: 8px 10px;
   border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
   font-size: 14px;
 }
 
@@ -191,31 +187,14 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* BOTTOM */
+/* BOTTOM FIJO */
 .bottom {
+  flex: 0 0 auto;
   margin-top: auto;
   padding-top: 14px;
   display: grid;
   gap: 10px;
-}
-
-.bottomBtn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 10px;
-  border-radius: 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: #fff;
-  font-size: 16px;
-  min-width: 0;
-}
-
-.bottomBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: #4b0016;
 }
 
 /* =========================
@@ -225,12 +204,16 @@
   padding: 12px;
 }
 
+/* TOP más compacto y centrado */
 .collapsed .top {
-  gap: 8px;
+  gap: 10px;
+  align-items: center;
 }
 
+/* Logo centrado */
 .collapsed .logoWrap {
   padding: 0;
+  justify-content: center;
 }
 
 .collapsed .logo {
@@ -241,29 +224,43 @@
 .collapsed .label,
 .collapsed .userName,
 .collapsed .title,
-.collapsed .chev,
 .collapsed .submenu,
-.collapsed .goldLine {
+.collapsed .goldLine,
+.collapsed .chev {
   display: none;
 }
 
-/* Centrar filas de iconos con misma distancia */
+/* Ajuste del scroll en colapsado */
+.collapsed .scrollArea {
+  padding-top: 8px;
+}
+
+/* ✅ Todos los botones/links igual que "Agregar usuario" */
 .collapsed .item,
 .collapsed .itemBtn,
 .collapsed .bottomBtn {
+  width: 100%;
   justify-content: center;
+  gap: 0;
   padding: 12px 0;
   border-radius: 14px;
 }
 
+/* ✅ Iconos centrados y consistentes */
 .collapsed .icon {
+  width: 26px;
+  height: 26px;
   margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* ✅ FIX: usuario alineado como los demás íconos */
+/* ✅ Usuario centrado */
 .collapsed .userRow {
   justify-content: center;
-  padding: 12px 0;
+  padding: 10px 0;
+  gap: 0;
 }
 
 .collapsed .userIcon {
@@ -272,4 +269,16 @@
   font-size: 18px;
   flex: 0 0 26px;
   margin: 0 auto;
+}
+
+/* ✅ FIX: Catálogos (left) no debe ocupar todo en colapsado */
+.collapsed .left {
+  flex: 0; 
+  justify-content: center;
+  gap: 0;
+}
+
+/* Bottom un poco más compacto en colapsado */
+.collapsed .bottom {
+  padding-top: 10px;
 }

@@ -7,10 +7,11 @@ import {
   FiFileText,
   FiChevronDown,
   FiUser,
+  FiUserPlus,
   FiLogOut,
   FiSun,
-  FiX,
 } from "react-icons/fi";
+
 import LogoPresi from "../../assets/images/logoRGB.png";
 
 type Role = "PRESIDENCIA" | "TESORERIA" | "ADQUISICIONES" | "ADMIN";
@@ -30,16 +31,10 @@ type MenuItem = {
 
 type SidebarProps = {
   collapsed?: boolean;
-
-  onNavigate?: () => void; // cerrar drawer móvil al navegar
-  showCloseButton?: boolean; // X arriba (solo móvil)
-  onClose?: () => void;
-
-  /** ✅ click en fondo del sidebar para colapsar/expandir (solo desktop) */
+  onNavigate?: () => void;
   onBackgroundToggle?: () => void;
 };
 
-/** ✅ Solo bloquea si tocaste un botón o link */
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   return !!target.closest("button, a");
@@ -48,16 +43,14 @@ function isInteractiveTarget(target: EventTarget | null) {
 export default function Sidebar({
   collapsed = false,
   onNavigate,
-  showCloseButton = false,
-  onClose,
   onBackgroundToggle,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { name, role } = getUser();
+  const { name } = getUser(); // role ya no se usa para mostrar el botón
   const [catalogsOpen, setCatalogsOpen] = useState(false);
 
   const menu: MenuItem[] = useMemo(() => {
-    const common: MenuItem[] = [
+    const base: MenuItem[] = [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
       {
         label: "Catálogos",
@@ -73,33 +66,27 @@ export default function Sidebar({
         to: "/adquisiciones/registrar",
         icon: <FiFileText />,
       },
+      // ✅ Visible para TODOS
+      {
+        label: "Agregar usuario",
+        to: "/usuarios/nuevo",
+        icon: <FiUserPlus />,
+      },
     ];
 
-    if (role === "TESORERIA") {
-      return [
-        { label: "Inicio", to: "/home", icon: <FiHome /> },
-        {
-          label: "Registrar Adquisición",
-          to: "/adquisiciones/registrar",
-          icon: <FiFileText />,
-        },
-      ];
-    }
-
-    return common;
-  }, [role]);
+    return base;
+  }, []);
 
   const handleLogout = () => {
     onNavigate?.();
-    localStorage.removeItem("presidencia_session");
-    localStorage.removeItem("role");
-    localStorage.removeItem("user_name");
+    localStorage.clear();
     navigate("/login", { replace: true });
   };
 
-  const toggleTheme = () => alert("Modo claro (pendiente)");
+  const toggleTheme = () => {
+    document.body.classList.toggle("light-theme");
+  };
 
-  // ✅ Si está colapsado y el usuario toca "Catálogos", lo abrimos y expandimos primero (opcional, pero se siente pro)
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
     setCatalogsOpen((v) => !v);
@@ -109,35 +96,20 @@ export default function Sidebar({
     <aside
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
       onMouseDownCapture={(e) => {
-        if (!onBackgroundToggle) return; // móvil: no colapsar aquí (solo drawer)
-        if (isInteractiveTarget(e.target)) return; // si tocaste botón/link, no togglear
-        onBackgroundToggle(); // ✅ toggle por fondo
+        if (!onBackgroundToggle) return;
+        if (isInteractiveTarget(e.target)) return;
+        onBackgroundToggle();
       }}
     >
-      {/* Top */}
+      {/* TOP */}
       <div className={styles.top}>
-        {/* Solo móvil: botón X */}
-        {showCloseButton && (
-          <div className={styles.topRow}>
-            <button
-              type="button"
-              className={styles.closeBtn}
-              onClick={onClose}
-              aria-label="Cerrar menú"
-            >
-              <FiX />
-            </button>
-          </div>
-        )}
-
-        {/* Título solo expandido */}
         {!collapsed && (
           <h1 className={styles.title}>
             Sistema de
             <br />
             digitalización de
             <br />
-            polizas de egresos
+            pólizas de egresos
           </h1>
         )}
 
@@ -157,14 +129,11 @@ export default function Sidebar({
         <div className={styles.goldLine} />
       </div>
 
-      {/* Scroll Area */}
+      {/* SCROLL SOLO MENÚ */}
       <div className={styles.scrollArea}>
-        {/* Nav */}
         <nav className={styles.nav}>
           {menu.map((item) => {
-            const hasChildren = !!item.children?.length;
-
-            if (hasChildren) {
+            if (item.children) {
               return (
                 <div key={item.label} className={styles.group}>
                   <button
@@ -196,7 +165,7 @@ export default function Sidebar({
                         catalogsOpen ? styles.submenuOpen : ""
                       }`}
                     >
-                      {item.children!.map((c) => (
+                      {item.children.map((c) => (
                         <NavLink
                           key={c.to}
                           to={c.to}
@@ -231,30 +200,31 @@ export default function Sidebar({
             );
           })}
         </nav>
+      </div>
 
-        {/* Bottom */}
-        <div className={styles.bottom}>
-          <button
-            type="button"
-            className={styles.bottomBtn}
-            onClick={() => {
-              onNavigate?.();
-              toggleTheme();
-            }}
-          >
-            <span className={styles.icon}>
-              <FiSun />
-            </span>
-            {!collapsed && <span className={styles.label}>Modo claro</span>}
-          </button>
+      {/* BOTTOM FIJO */}
+      <div className={styles.bottom}>
+        <button
+          type="button"
+          className={styles.bottomBtn}
+          onClick={toggleTheme}
+        >
+          <span className={styles.icon}>
+            <FiSun />
+          </span>
+          {!collapsed && <span className={styles.label}>Modo claro</span>}
+        </button>
 
-          <button type="button" className={styles.bottomBtn} onClick={handleLogout}>
-            <span className={styles.icon}>
-              <FiLogOut />
-            </span>
-            {!collapsed && <span className={styles.label}>Cerrar Sesión</span>}
-          </button>
-        </div>
+        <button
+          type="button"
+          className={styles.bottomBtn}
+          onClick={handleLogout}
+        >
+          <span className={styles.icon}>
+            <FiLogOut />
+          </span>
+          {!collapsed && <span className={styles.label}>Cerrar Sesión</span>}
+        </button>
       </div>
     </aside>
   );

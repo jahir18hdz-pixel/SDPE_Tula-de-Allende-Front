@@ -2,8 +2,10 @@
   width: 100vw;
   height: 100vh;
   height: 100dvh;
+
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
+
   background: #f5f7fb;
   overflow: hidden;
 }
@@ -22,17 +24,47 @@
   flex-direction: column;
 }
 
+/* ✅ TopBar global (desktop y móvil) */
+.topbarRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  /* se comporta como tu topbar anterior */
+  padding: 18px 18px 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+
+  min-width: 0;
+}
+
+.topbarGrow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ✅ Botón menú (solo móvil) */
+.menuBtn {
+  display: none;
+  border: none;
+  background: #4b0016;
+  color: white;
+  width: 42px;
+  height: 38px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Main */
 .main {
   flex: 1;
   min-height: 0;
   min-width: 0; /* ✅ para que tablas no rompan layout */
   overflow: auto;
   padding: 18px;
-}
-
-/* Topbar: solo móvil */
-.topbar {
-  display: none;
 }
 
 /* Mobile drawer */
@@ -53,34 +85,15 @@
     display: none;
   }
 
-  .topbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 56px;
-    padding: 0 14px;
-    background: white;
-    border-bottom: 1px solid #e5e7eb;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+  /* ✅ En móvil, el topbarRow se ve como tu topbar de antes */
+  .topbarRow {
+    padding: 14px 14px 0;
   }
 
   .menuBtn {
-    border: none;
-    background: #4b0016;
-    color: white;
-    width: 42px;
-    height: 38px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 20px;
-    line-height: 1;
-  }
-
-  .topbarTitle {
-    font-weight: 800;
-    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .main {
@@ -118,5 +131,13 @@
 
   .sidebarMobileOpen {
     transform: translateX(0);
+  }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .sidebarMobile {
+    transition: none !important;
   }
 }

@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import type { CSSProperties } from "react";
-import Sidebar from "../layout/sidebar";
+
+import Sidebar from "../layout/Sidebar"; // ✅ casing correcto (asegúrate que el archivo se llame Sidebar.tsx)
+import TopBar from "../layout/TopBar";   // ✅ topbar global
+
 import styles from "./AppLayout.module.css";
 
 type LayoutVars = CSSProperties & {
@@ -26,45 +29,43 @@ export default function AppLayout() {
       <aside className={styles.sidebarDesktop}>
         <Sidebar
           collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((v) => !v)}
-          onBackgroundToggle={() => setCollapsed((v) => !v)} // ✅ aquí
+          onBackgroundToggle={() => setCollapsed((v) => !v)}
         />
       </aside>
 
-      {/* Sidebar Mobile */}
+      {/* Overlay Mobile */}
       <div
         className={`${styles.overlay} ${mobileOpen ? styles.overlayOpen : ""}`}
         onClick={closeMobile}
         aria-hidden="true"
       />
 
+      {/* Sidebar Mobile */}
       <aside
         className={`${styles.sidebarMobile} ${
           mobileOpen ? styles.sidebarMobileOpen : ""
         }`}
       >
-        <Sidebar
-          collapsed={false}
-          onToggleCollapse={() => {}}
-          onNavigate={closeMobile}
-          showCloseButton
-          onClose={closeMobile}
-          // ✅ NO pasar onBackgroundToggle en móvil
-        />
+        <Sidebar collapsed={false} onNavigate={closeMobile} />
       </aside>
 
       {/* Content */}
       <div className={styles.content}>
-        <header className={styles.topbar}>
+        {/* ✅ TopBar global con botón menú */}
+        <div className={styles.topbarRow}>
           <button
+            type="button"
             className={styles.menuBtn}
             onClick={() => setMobileOpen(true)}
             aria-label="Abrir menú"
           >
             ☰
           </button>
-          <div className={styles.topbarTitle}>Sistema</div>
-        </header>
+
+          <div className={styles.topbarGrow}>
+            <TopBar />
+          </div>
+        </div>
 
         <main className={styles.main}>
           <Outlet />

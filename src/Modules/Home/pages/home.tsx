@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅
-import { FiSearch, FiFilter, FiClock, FiCalendar } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiSearch, FiFilter } from "react-icons/fi";
 import styles from "../styles/home.module.css";
 
 type Estado = "Completo" | "Incompleto";
@@ -10,32 +10,13 @@ type Row = {
   poliza: string;
   adquisicion: string;
   area: string;
-  fecha: string; // dd/mm/yyyy
+  fecha: string;
   estado: Estado;
 };
 
 export default function Home() {
   const [query, setQuery] = useState("");
-  const navigate = useNavigate(); // ✅
-
-  const now = useMemo(() => new Date(), []);
-  const timeStr = useMemo(
-    () =>
-      now.toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    [now]
-  );
-  const dateStr = useMemo(
-    () =>
-      now.toLocaleDateString("es-MX", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
-    [now]
-  );
+  const navigate = useNavigate();
 
   const data: Row[] = [
     { folio: "808595", poliza: "458769", adquisicion: "Camioneta", area: "Planeación", fecha: "12/01/2025", estado: "Completo" },
@@ -50,21 +31,6 @@ export default function Home() {
 
   return (
     <div className={styles.page}>
-      {/* Header Gradiente */}
-      <div className={styles.topBar}>
-        <div className={styles.topTitle}>Adquisiciones</div>
-
-        <div className={styles.datetimeCard}>
-          <div className={styles.dtRow}>
-            <FiClock />
-            <span>{timeStr}</span>
-          </div>
-          <div className={styles.dtRow}>
-            <FiCalendar />
-            <span>{dateStr}</span>
-          </div>
-        </div>
-      </div>
 
       {/* Acciones + KPI */}
       <div className={styles.actionsRow}>
@@ -77,18 +43,16 @@ export default function Home() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar adquisicion por folio"
-            aria-label="Buscar adquisición por folio"
+            placeholder="Buscar adquisición por folio"
           />
-          <button type="button" className={styles.iconBtn} aria-label="Buscar">
+          <button type="button" className={styles.iconBtn}>
             <FiSearch />
           </button>
-          <button type="button" className={styles.iconBtn} aria-label="Filtrar">
+          <button type="button" className={styles.iconBtn}>
             <FiFilter />
           </button>
         </div>
 
-        {/* ✅ aquí “usas” la navegación */}
         <button
           type="button"
           className={styles.primaryBtn}
@@ -110,7 +74,7 @@ export default function Home() {
             <thead>
               <tr>
                 <th>Folio</th>
-                <th>Poliza</th>
+                <th>Póliza</th>
                 <th>Adquisición</th>
                 <th>Área</th>
                 <th>Fecha</th>
@@ -139,14 +103,6 @@ export default function Home() {
                   </td>
                 </tr>
               ))}
-
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className={styles.empty}>
-                    Sin resultados
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>

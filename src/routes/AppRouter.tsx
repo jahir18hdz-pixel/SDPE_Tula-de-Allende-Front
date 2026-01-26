@@ -1,7 +1,10 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Splash from "../Modules/Auth/pages/Splash";
 import Login from "../Modules/Auth/pages/Login";
 import Home from "../Modules/Home/pages/home";
+import UserCreate from "../Modules/Users/pages/userCreate"; 
+
 import AppLayout from "../Components/layout/AppLayout";
 
 export default function AppRouter() {
@@ -15,6 +18,7 @@ export default function AppRouter() {
         {/* con sidebar global */}
         <Route element={<AppLayout />}>
           <Route path="/home" element={<Home />} />
+          <Route path="/usuarios/nuevo" element={<UserCreate />} /> 
         </Route>
       </Routes>
     </BrowserRouter>
