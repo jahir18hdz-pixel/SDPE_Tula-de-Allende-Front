@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from '../styles/Login.module.css';
 import LogoPresi from '../../../assets/images/logoRGB.png';
-import Icono from '../../../assets/images/quetzalcoatl.png';
+import Icono from '../../../assets/images/iconoatlantevino.png';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const Login: React.FC = () => {

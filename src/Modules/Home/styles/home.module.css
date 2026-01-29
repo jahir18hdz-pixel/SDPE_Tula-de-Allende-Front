@@ -2,20 +2,18 @@
   width: 100%;
   min-width: 0;
 
-  /* ✅ NO fuerces height:100% aquí */
   display: flex;
   flex-direction: column;
   gap: 18px;
 
-  /* opcional: que respire y no choque con el sidebar */
   padding: 0;
 }
 .actionsRow {
-  min-width: 0; /* ✅ evita que el searchbar rompa el layout */
+  min-width: 0;
 }
 
 .tableCard {
-  min-width: 0; /* ✅ evita que la tabla empuje el contenedor */
+  min-width: 0;
 }
 
 
@@ -180,7 +178,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 820px; /* para mantener el estilo, en móvil scrollea */
+  min-width: 820px; 
 }
 
 .table th,
@@ -189,6 +187,7 @@
   border: 1px solid rgba(91, 11, 36, 0.5);
   text-align: left;
   white-space: nowrap;
+  color: rgb(0, 0, 0)
 }
 
 .table th {

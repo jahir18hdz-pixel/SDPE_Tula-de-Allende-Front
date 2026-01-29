@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import type { CSSProperties } from "react";
 
-import Sidebar from "../layout/Sidebar"; // ✅ casing correcto (asegúrate que el archivo se llame Sidebar.tsx)
-import TopBar from "../layout/TopBar";   // ✅ topbar global
+import Sidebar from "../layout/Sidebar"; 
+import TopBar from "../layout/TopBar";  
 
 import styles from "./AppLayout.module.css";
 
@@ -51,7 +51,7 @@ export default function AppLayout() {
 
       {/* Content */}
       <div className={styles.content}>
-        {/* ✅ TopBar global con botón menú */}
+        {/* TopBar global con botón menú */}
         <div className={styles.topbarRow}>
           <button
             type="button"

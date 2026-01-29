@@ -46,7 +46,7 @@ export default function Sidebar({
   onBackgroundToggle,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { name } = getUser(); // role ya no se usa para mostrar el botón
+  const { name } = getUser(); 
   const [catalogsOpen, setCatalogsOpen] = useState(false);
 
   const menu: MenuItem[] = useMemo(() => {
@@ -66,9 +66,9 @@ export default function Sidebar({
         to: "/adquisiciones/registrar",
         icon: <FiFileText />,
       },
-      // ✅ Visible para TODOS
+      // Visible para TODOS
       {
-        label: "Agregar usuario",
+        label: "Usuarios",
         to: "/usuarios/nuevo",
         icon: <FiUserPlus />,
       },

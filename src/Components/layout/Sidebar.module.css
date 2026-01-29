@@ -1,13 +1,13 @@
 .sidebar {
   width: 100%;
-  height: 100dvh; /* ✅ mejor que 100vh en mobile */
+  height: 100dvh;
   min-height: 0;
   background: #4b0016;
   color: #fff;
   display: flex;
   flex-direction: column;
   padding: 14px 14px 12px;
-  overflow: hidden; /* ✅ el sidebar no scrollea completo */
+  overflow: hidden; 
 }
 
 /* TOP */
@@ -78,7 +78,7 @@
 /* SCROLL SOLO MENÚ */
 .scrollArea {
   flex: 1 1 auto;
-  min-height: 0; /* ✅ CRÍTICO */
+  min-height: 0; 
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 10px;
@@ -91,16 +91,24 @@
   min-width: 0;
 }
 
-/* Items unificados (links + buttons) */
+.sidebar {
+  --item-gap: 12px;
+  --item-radius: 12px;
+  --item-pad: 10px;
+  --icon-size: 26px;
+  --icon-font: 18px;
+}
+
+/* (2) Links y botones base */
 .item,
 .itemBtn,
 .bottomBtn {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 12px;
+  gap: var(--item-gap); 
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
   color: #fff;
   text-decoration: none;
   background: transparent;
@@ -109,6 +117,7 @@
   font-size: 16px;
   min-width: 0;
   justify-content: flex-start;
+  text-align: left;
 }
 
 .item:hover,
@@ -122,36 +131,41 @@
   outline: 1px solid rgba(182, 138, 42, 0.45);
 }
 
-/* Icono consistente */
+/* (3) Icono consistente */
 .icon {
-  width: 26px;
-  height: 26px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 26px;
-  font-size: 18px;
+  flex: 0 0 var(--icon-size);
+  font-size: var(--icon-font);
   text-align: center;
 }
 
+/* (4) Texto consistente */
 .label {
   flex: 1;
   min-width: 0;
+  margin: 0; /* ✅ evita offsets raros */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.group {
+  display: grid;
+  gap: 8px;
+}
 
-/* ---- Catálogos (estructura button + left + chev) ---- */
 .left {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--item-gap); /* ✅ igual que .item */
   flex: 1;
   min-width: 0;
 }
 
-/* (Si usas chevron en tu componente) */
+/* Chevron */
 .chev {
   display: inline-flex;
   align-items: center;
@@ -235,7 +249,7 @@
   padding-top: 8px;
 }
 
-/* ✅ Todos los botones/links igual que "Agregar usuario" */
+/*Botones/links centrados en colapsado */
 .collapsed .item,
 .collapsed .itemBtn,
 .collapsed .bottomBtn {
@@ -246,17 +260,17 @@
   border-radius: 14px;
 }
 
-/* ✅ Iconos centrados y consistentes */
+/* Iconos centrados y consistentes */
 .collapsed .icon {
-  width: 26px;
-  height: 26px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   margin: 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-/* ✅ Usuario centrado */
+/* Usuario centrado */
 .collapsed .userRow {
   justify-content: center;
   padding: 10px 0;
@@ -264,16 +278,16 @@
 }
 
 .collapsed .userIcon {
-  width: 26px;
-  height: 26px;
-  font-size: 18px;
-  flex: 0 0 26px;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: var(--icon-font);
+  flex: 0 0 var(--icon-size);
   margin: 0 auto;
 }
 
-/* ✅ FIX: Catálogos (left) no debe ocupar todo en colapsado */
+/*FIX: Catálogos (left) no debe ocupar todo en colapsado */
 .collapsed .left {
-  flex: 0; 
+  flex: 0;
   justify-content: center;
   gap: 0;
 }

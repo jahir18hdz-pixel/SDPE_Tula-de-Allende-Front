@@ -6,7 +6,7 @@ import styles from "./TopBar.module.css";
 
 function titleFromPath(pathname: string) {
   if (pathname === "/home") return "Inicio";
-  if (pathname === "/usuarios/nuevo") return "Agregar usuario";
+  if (pathname === "/usuarios/nuevo") return "Usuarios";
   if (pathname.startsWith("/adquisiciones/registrar")) return "Registrar adquisición";
   if (pathname.startsWith("/catalogos/proveedores")) return "Catálogo: Proveedores";
   if (pathname.startsWith("/catalogos/partidas")) return "Catálogo: Partidas";
@@ -51,7 +51,6 @@ export default function TopBar() {
     <header className={styles.topBar}>
       <div className={styles.left}>
         <div className={styles.topTitle}>{title}</div>
-        {/* ruta/breadcrumb removido */}
       </div>
 
       <div className={styles.datetimeCard}>
