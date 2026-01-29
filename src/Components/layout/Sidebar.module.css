@@ -1,0 +1,298 @@
+.sidebar {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  background: #4b0016;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 12px;
+  overflow: hidden; 
+}
+
+/* TOP */
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  text-align: center;
+  font-size: 22px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.logoWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.logo {
+  width: 160px;
+  height: auto;
+  object-fit: contain;
+  opacity: 0.95;
+}
+
+.goldLine {
+  height: 2px;
+  width: 100%;
+  background: #b68a2a;
+  opacity: 0.9;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  min-width: 0;
+}
+
+.userIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex: 0 0 26px;
+  opacity: 0.95;
+}
+
+.userName {
+  font-weight: 600;
+  opacity: 0.95;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* SCROLL SOLO MENÚ */
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0; 
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 10px;
+}
+
+/* NAV */
+.nav {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sidebar {
+  --item-gap: 12px;
+  --item-radius: 12px;
+  --item-pad: 10px;
+  --icon-size: 26px;
+  --icon-font: 18px;
+}
+
+/* (2) Links y botones base */
+.item,
+.itemBtn,
+.bottomBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--item-gap); 
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
+  color: #fff;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.item:hover,
+.itemBtn:hover,
+.bottomBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.active {
+  background: rgba(182, 138, 42, 0.14);
+  outline: 1px solid rgba(182, 138, 42, 0.45);
+}
+
+/* (3) Icono consistente */
+.icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--icon-size);
+  font-size: var(--icon-font);
+  text-align: center;
+}
+
+/* (4) Texto consistente */
+.label {
+  flex: 1;
+  min-width: 0;
+  margin: 0; /* ✅ evita offsets raros */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group {
+  display: grid;
+  gap: 8px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--item-gap); /* ✅ igual que .item */
+  flex: 1;
+  min-width: 0;
+}
+
+/* Chevron */
+.chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms ease;
+  opacity: 0.9;
+}
+
+.chevOpen {
+  transform: rotate(180deg);
+}
+
+/* SUBMENÚ */
+.submenu {
+  display: none;
+  padding-left: 36px;
+  gap: 8px;
+}
+
+.submenuOpen {
+  display: grid;
+}
+
+.subItem {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.subItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* BOTTOM FIJO */
+.bottom {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 14px;
+  display: grid;
+  gap: 10px;
+  background: #4b0016;
+}
+
+/* =========================
+   COLAPSADO: solo íconos, ordenado
+   ========================= */
+.collapsed {
+  padding: 12px;
+}
+
+/* TOP más compacto y centrado */
+.collapsed .top {
+  gap: 10px;
+  align-items: center;
+}
+
+/* Logo centrado */
+.collapsed .logoWrap {
+  padding: 0;
+  justify-content: center;
+}
+
+.collapsed .logo {
+  width: 54px;
+}
+
+/* Ocultar texto y separadores */
+.collapsed .label,
+.collapsed .userName,
+.collapsed .title,
+.collapsed .submenu,
+.collapsed .goldLine,
+.collapsed .chev {
+  display: none;
+}
+
+/* Ajuste del scroll en colapsado */
+.collapsed .scrollArea {
+  padding-top: 8px;
+}
+
+/*Botones/links centrados en colapsado */
+.collapsed .item,
+.collapsed .itemBtn,
+.collapsed .bottomBtn {
+  width: 100%;
+  justify-content: center;
+  gap: 0;
+  padding: 12px 0;
+  border-radius: 14px;
+}
+
+/* Iconos centrados y consistentes */
+.collapsed .icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Usuario centrado */
+.collapsed .userRow {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+
+.collapsed .userIcon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: var(--icon-font);
+  flex: 0 0 var(--icon-size);
+  margin: 0 auto;
+}
+
+/*FIX: Catálogos (left) no debe ocupar todo en colapsado */
+.collapsed .left {
+  flex: 0;
+  justify-content: center;
+  gap: 0;
+}
+
+/* Bottom un poco más compacto en colapsado */
+.collapsed .bottom {
+  padding-top: 10px;
+}
