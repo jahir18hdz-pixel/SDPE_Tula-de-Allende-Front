@@ -1,0 +1,354 @@
+/* src/Modules/AdministrativeUnit/styles/administrativeUnits.module.css */
+:root {
+  --bg: #f6f6f7;
+  --card: #ffffff;
+
+  --border: #e6e6ea;
+  --border2: #d7d7dd;
+
+  --guinda: #4b0016;
+  --guinda2: #65001f;
+  --gold: #b68a2a;
+
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
+}
+
+.page {
+  color: #000;
+  min-height: calc(100vh - 20px);
+  padding: 24px;
+  background: radial-gradient(
+      1100px 520px at 25% -10%,
+      rgba(182, 138, 42, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 520px at 95% 0%,
+      rgba(75, 0, 22, 0.1),
+      transparent 60%
+    ),
+    var(--bg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 14px;
+}
+
+.h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  color: #000;
+}
+
+.sub {
+  margin: 6px 0 0;
+  color: #000;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: linear-gradient(180deg, #ffffff, #fbfbfd);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadowSoft);
+  overflow: hidden;
+}
+
+.cardHeader {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    90deg,
+    rgba(75, 0, 22, 0.085),
+    rgba(182, 138, 42, 0.09)
+  );
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.25px;
+  text-transform: uppercase;
+  color: #000;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(182, 138, 42, 0.035), transparent 40%);
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+.table thead th {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(17, 24, 39, 0.04);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.row,
+.table tbody tr {
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(230, 230, 234, 0.8);
+  vertical-align: middle;
+}
+
+.table tbody tr:nth-child(odd) {
+  background: rgba(75, 0, 22, 0.02);
+}
+
+.table tbody tr:nth-child(even) {
+  background: rgba(182, 138, 42, 0.02);
+}
+
+.table tbody tr:hover {
+  background: rgba(182, 138, 42, 0.09);
+}
+
+.rowSelected {
+  background: rgba(75, 0, 22, 0.1) !important;
+  box-shadow: inset 4px 0 0 rgba(75, 0, 22, 0.75);
+}
+
+.empty {
+  padding: 18px 14px;
+  color: #000;
+  opacity: 0.7;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+/* Panel */
+.panelBody {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.helper {
+  padding: 12px;
+  border: 1px dashed var(--border2);
+  border-radius: 14px;
+  background: #fff;
+  opacity: 0.85;
+}
+
+.detailBox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.detailLabel {
+  font-weight: 900;
+  font-size: 12px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.detailValue {
+  max-width: 62%;
+  text-align: right;
+  opacity: 0.9;
+}
+
+/* Form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.labelRow {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.label {
+  font-weight: 800;
+  font-size: 13px;
+  color: #000;
+}
+
+.required {
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.input {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  padding: 0 12px;
+  outline: none;
+  font-size: 14px;
+  background: #fff;
+  color: #000;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.input:hover {
+  border-color: #c9c9d0;
+}
+
+.input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(182, 138, 42, 0.18);
+}
+
+.input:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+
+/* Buttons */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.btnGhost,
+.btnDanger,
+.btnEdit {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 900;
+  letter-spacing: 0.15px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease,
+    background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+/* Primary: crear/guardar */
+.btnPrimary {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(180deg, var(--guinda2), var(--guinda));
+  box-shadow: var(--shadowSoft);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* Cancelar: gris opaco + contorno gris fuerte */
+.btnGhost {
+  border: 1px solid rgba(107, 114, 128, 0.65);
+  background: rgba(107, 114, 128, 0.12);
+  color: #111827;
+}
+
+.btnGhost:hover {
+  border-color: rgba(107, 114, 128, 0.9);
+  background: rgba(107, 114, 128, 0.22);
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+/* Editar: dorado opaco + contorno dorado */
+.btnEdit {
+  border: 1px solid rgba(182, 138, 42, 0.9);
+  background: rgba(182, 138, 42, 0.16);
+  color: #111827;
+}
+
+.btnEdit:hover {
+  background: rgba(182, 138, 42, 0.95);
+  border-color: rgba(182, 138, 42, 1);
+  color: #111827;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* Eliminar: rojo opaco + contorno rojo fuerte, hover rojo sólido */
+.btnDanger {
+  border: 1px solid rgba(220, 38, 38, 0.95);
+  background: rgba(220, 38, 38, 0.14);
+  color: #111827;
+}
+
+.btnDanger:hover {
+  background: rgba(220, 38, 38, 0.95);
+  border-color: rgba(220, 38, 38, 1);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.btnPrimary:disabled,
+.btnGhost:disabled,
+.btnDanger:disabled,
+.btnEdit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

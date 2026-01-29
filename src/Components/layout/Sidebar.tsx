@@ -46,11 +46,11 @@ export default function Sidebar({
   onBackgroundToggle,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { name } = getUser(); 
+  const { name } = getUser();
   const [catalogsOpen, setCatalogsOpen] = useState(false);
 
   const menu: MenuItem[] = useMemo(() => {
-    const base: MenuItem[] = [
+    return [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
       {
         label: "Catálogos",
@@ -59,6 +59,12 @@ export default function Sidebar({
           { label: "Proveedores", to: "/catalogos/proveedores" },
           { label: "Partidas", to: "/catalogos/partidas" },
           { label: "Áreas", to: "/catalogos/areas" },
+
+          // ✅ Unidades Administrativas
+          {
+            label: "Unidades Administrativas",
+            to: "/catalogos/unidades-administrativas",
+          },
         ],
       },
       {
@@ -66,15 +72,12 @@ export default function Sidebar({
         to: "/adquisiciones/registrar",
         icon: <FiFileText />,
       },
-      // Visible para TODOS
       {
         label: "Usuarios",
         to: "/usuarios/nuevo",
         icon: <FiUserPlus />,
       },
     ];
-
-    return base;
   }, []);
 
   const handleLogout = () => {
@@ -129,63 +132,59 @@ export default function Sidebar({
         <div className={styles.goldLine} />
       </div>
 
-      {/* SCROLL SOLO MENÚ */}
+      {/* MENÚ */}
       <div className={styles.scrollArea}>
         <nav className={styles.nav}>
-          {menu.map((item) => {
-            if (item.children) {
-              return (
-                <div key={item.label} className={styles.group}>
-                  <button
-                    type="button"
-                    className={styles.itemBtn}
-                    onClick={handleCatalogClick}
-                  >
-                    <span className={styles.left}>
-                      <span className={styles.icon}>{item.icon}</span>
-                      {!collapsed && (
-                        <span className={styles.label}>{item.label}</span>
-                      )}
-                    </span>
-
+          {menu.map((item) =>
+            item.children ? (
+              <div key={item.label} className={styles.group}>
+                <button
+                  type="button"
+                  className={styles.itemBtn}
+                  onClick={handleCatalogClick}
+                >
+                  <span className={styles.left}>
+                    <span className={styles.icon}>{item.icon}</span>
                     {!collapsed && (
-                      <span
-                        className={`${styles.chev} ${
-                          catalogsOpen ? styles.chevOpen : ""
-                        }`}
-                      >
-                        <FiChevronDown />
-                      </span>
+                      <span className={styles.label}>{item.label}</span>
                     )}
-                  </button>
+                  </span>
 
                   {!collapsed && (
-                    <div
-                      className={`${styles.submenu} ${
-                        catalogsOpen ? styles.submenuOpen : ""
+                    <span
+                      className={`${styles.chev} ${
+                        catalogsOpen ? styles.chevOpen : ""
                       }`}
                     >
-                      {item.children.map((c) => (
-                        <NavLink
-                          key={c.to}
-                          to={c.to}
-                          onClick={() => onNavigate?.()}
-                          className={({ isActive }) =>
-                            isActive
-                              ? `${styles.subItem} ${styles.active}`
-                              : styles.subItem
-                          }
-                        >
-                          {c.label}
-                        </NavLink>
-                      ))}
-                    </div>
+                      <FiChevronDown />
+                    </span>
                   )}
-                </div>
-              );
-            }
+                </button>
 
-            return (
+                {!collapsed && (
+                  <div
+                    className={`${styles.submenu} ${
+                      catalogsOpen ? styles.submenuOpen : ""
+                    }`}
+                  >
+                    {item.children.map((c) => (
+                      <NavLink
+                        key={c.to}
+                        to={c.to}
+                        onClick={() => onNavigate?.()}
+                        className={({ isActive }) =>
+                          isActive
+                            ? `${styles.subItem} ${styles.active}`
+                            : styles.subItem
+                        }
+                      >
+                        {c.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
               <NavLink
                 key={item.to}
                 to={item.to!}
@@ -195,14 +194,16 @@ export default function Sidebar({
                 }
               >
                 <span className={styles.icon}>{item.icon}</span>
-                {!collapsed && <span className={styles.label}>{item.label}</span>}
+                {!collapsed && (
+                  <span className={styles.label}>{item.label}</span>
+                )}
               </NavLink>
-            );
-          })}
+            )
+          )}
         </nav>
       </div>
 
-      {/* BOTTOM FIJO */}
+      {/* BOTTOM */}
       <div className={styles.bottom}>
         <button
           type="button"

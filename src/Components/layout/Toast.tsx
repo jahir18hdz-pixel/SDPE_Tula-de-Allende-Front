@@ -8,7 +8,7 @@ type ToastProps = {
   type: ToastType;
   message: string;
   title?: string;
-  durationMs?: number; // default 3200
+  durationMs?: number; 
   onClose: () => void;
 };
 

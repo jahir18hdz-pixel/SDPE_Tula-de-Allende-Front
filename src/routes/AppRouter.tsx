@@ -4,6 +4,7 @@ import Splash from "../Modules/Auth/pages/Splash";
 import Login from "../Modules/Auth/pages/Login";
 import Home from "../Modules/Home/pages/home";
 import UserCreate from "../Modules/Users/pages/userCreate";
+import AdministrativeUnits from "../Modules/AdministrativeUnit/pages/AdministrativeUnits"; // ✅
 
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
@@ -21,6 +22,11 @@ export default function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/home" element={<Home />} />
             <Route path="/usuarios/nuevo" element={<UserCreate />} />
+
+            <Route
+              path="/catalogos/unidades-administrativas"
+              element={<AdministrativeUnits />}
+            />
           </Route>
         </Route>
 
