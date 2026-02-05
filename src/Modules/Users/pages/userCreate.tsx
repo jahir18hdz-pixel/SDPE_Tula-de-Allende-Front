@@ -1,243 +1,1007 @@
-import { useMemo, useState } from "react";
-import styles from "../styles/userCreate.module.css";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import styles from "../styles/UserCreate.module.css";
 
-type RoleValue =
-  | "ADMIN"
-  | "TESORERIA"
-  | "ADQUISICIONES"
-  | "PRESIDENCIA"
-  | "CAPTURISTA"
-  | "CONSULTA";
+import Toast from "../../../Components/layout/Toast";
+import type { ToastType } from "../../../Components/layout/Toast";
 
-type AreaValue =
-  | "TESORERIA"
-  | "ADQUISICIONES"
-  | "PRESIDENCIA"
-  | "CONTRALORIA"
-  | "SISTEMAS";
+type UserRow = {
+  idUser?: number;
+  IdUser?: number;
+  id?: number;
+  Id?: number;
 
-type FormState = {
-  nombre: string;
-  apellidoPaterno: string;
-  apellidoMaterno: string;
-  username: string;
+  email?: string;
+  Email?: string;
+
+  role?: string;
+  Role?: string;
+
+  administrativeUnit?: string;
+  AdministrativeUnit?: string;
+
+  asset?: boolean | number | string;
+  Asset?: boolean | number | string;
+
+  [key: string]: unknown;
+};
+
+type PagedLike = {
+  items?: UserRow[];
+  Items?: UserRow[];
+  data?: UserRow[];
+  Data?: UserRow[];
+  users?: UserRow[];
+  Users?: UserRow[];
+  totalCount?: number;
+  TotalCount?: number;
+  total?: number;
+  Total?: number;
+  page?: number;
+  Page?: number;
+  pageSize?: number;
+  PageSize?: number;
+};
+
+type CreateForm = {
   email: string;
-  rol: RoleValue;
-  area: AreaValue;
-  activo: boolean;
   password: string;
   password2: string;
+  idAdministrativeUnit: string;
+  idRole: string;
 };
 
-type ApiError = { message?: string };
+type AuthStored = { token?: string; Token?: string };
+type UnknownRecord = Record<string, unknown>;
+type UnknownObject = Record<string, unknown>;
 
-const initialForm: FormState = {
-  nombre: "",
-  apellidoPaterno: "",
-  apellidoMaterno: "",
-  username: "",
+type RoleOption = { id: number; name: string; active?: boolean };
+type AuOption = { id: number; name: string; active?: boolean };
+
+const BASE_API = "https://localhost:7197";
+const API_BASE = `${BASE_API}/api/users`;
+
+const ROLE_ENDPOINTS = [
+  `${BASE_API}/api/Roles`,
+  `${BASE_API}/api/roles`,
+  `${BASE_API}/api/Role`,
+  `${BASE_API}/api/role`,
+  `${BASE_API}/api/Roles/all`,
+  `${BASE_API}/api/roles/all`,
+  `${BASE_API}/api/Roles/get-all`,
+  `${BASE_API}/api/roles/get-all`,
+];
+
+const AU_ENDPOINTS = [
+  `${BASE_API}/api/AdministrativeUnit`,
+  `${BASE_API}/api/administrativeunit`,
+  `${BASE_API}/api/AdministrativeUnits`,
+  `${BASE_API}/api/administrativeunits`,
+];
+
+const initialCreate: CreateForm = {
   email: "",
-  rol: "CAPTURISTA",
-  area: "TESORERIA",
-  activo: true,
   password: "",
   password2: "",
+  idAdministrativeUnit: "",
+  idRole: "",
 };
 
-export default function UserCreate() {
-  const [form, setForm] = useState<FormState>(initialForm);
+export default function Users() {
+  const [rows, setRows] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [adminUnits, setAdminUnits] = useState<AuOption[]>([]);
+  const [loadingCombos, setLoadingCombos] = useState(false);
+
+  const [selected, setSelected] = useState<UserRow | null>(null);
+  const [mode, setMode] = useState<"view" | "create" | "edit">("view");
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+
+  const [showInactive, setShowInactive] = useState(false);
+
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [ok, setOk] = useState("");
 
-  const roles = useMemo(
-    () => [
-      { value: "ADMIN" as const, label: "Administrador" },
-      { value: "TESORERIA" as const, label: "Tesorería" },
-      { value: "ADQUISICIONES" as const, label: "Adquisiciones" },
-      { value: "PRESIDENCIA" as const, label: "Presidencia" },
-      { value: "CAPTURISTA" as const, label: "Capturista" },
-      { value: "CONSULTA" as const, label: "Consulta" },
-    ],
-    []
-  );
+  const [search, setSearch] = useState("");
 
-  const areas = useMemo(
-    () => [
-      { value: "TESORERIA" as const, label: "Tesorería" },
-      { value: "ADQUISICIONES" as const, label: "Adquisiciones" },
-      { value: "PRESIDENCIA" as const, label: "Presidencia" },
-      { value: "CONTRALORIA" as const, label: "Contraloría" },
-      { value: "SISTEMAS" as const, label: "Sistemas" },
-    ],
-    []
-  );
+  const [create, setCreate] = useState<CreateForm>(initialCreate);
 
-  function onChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
+  const [editStatus, setEditStatus] = useState<boolean>(true);
 
-  function validate(): string {
-    if (!form.nombre.trim()) return "El nombre es obligatorio.";
-    if (!form.username.trim()) return "El usuario es obligatorio.";
-    if (!form.email.trim()) return "El correo es obligatorio.";
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) return "Correo inválido.";
-    if (!form.password) return "La contraseña es obligatoria.";
-    if (form.password.length < 8) return "Mínimo 8 caracteres.";
-    if (form.password !== form.password2) return "Las contraseñas no coinciden.";
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastType, setToastType] = useState<ToastType>("success");
+  const [toastMsg, setToastMsg] = useState("");
+
+  const showToast = useCallback((type: ToastType, msg: string) => {
+    setToastType(type);
+    setToastMsg(msg);
+    setToastOpen(true);
+  }, []);
+
+  const selectedId = useMemo(() => getId(selected), [selected]);
+
+  useEffect(() => {
+    void loadPaged(1, pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (mode === "create") void loadCombos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  function readToken(): string {
+    const rawAuth = localStorage.getItem("auth");
+    if (rawAuth) {
+      try {
+        const parsed = JSON.parse(rawAuth) as AuthStored;
+        const token = (parsed.token ?? parsed.Token ?? "").trim();
+        if (token) return token;
+      } catch {
+        // ignore
+      }
+    }
     return "";
   }
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function authHeaders(): HeadersInit {
+    const token = readToken();
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }
 
-    const msg = validate();
-    if (msg) {
-      setError(msg);
-      return;
+  async function requestJson(
+    url: string,
+    init?: RequestInit
+  ): Promise<
+    | { ok: true; data: unknown; status: number }
+    | { ok: false; error: string; status: number }
+  > {
+    const res = await fetch(url, { ...init, credentials: "omit" });
+
+    if (res.status === 204) return { ok: true, data: [], status: 204 };
+
+    const text = await safeText(res);
+    const parsed = tryParseJson(text);
+
+    if (!res.ok) {
+      const apiMsg =
+        isRecord(parsed) &&
+        typeof (parsed as Record<string, unknown>).message === "string"
+          ? String((parsed as Record<string, unknown>).message)
+          : "";
+      const msg =
+        apiMsg ||
+        (typeof parsed === "string" ? parsed : "") ||
+        text ||
+        `HTTP ${res.status}`;
+      return { ok: false, error: msg, status: res.status };
     }
 
-    setSaving(true);
-    setError("");
-    setOk("");
+    return { ok: true, data: parsed, status: res.status };
+  }
 
-    const payload = {
-      nombre: form.nombre.trim(),
-      apellidoPaterno: form.apellidoPaterno.trim(),
-      apellidoMaterno: form.apellidoMaterno.trim(),
-      username: form.username.trim(),
-      email: form.email.trim().toLowerCase(),
-      rol: form.rol,
-      area: form.area,
-      activo: form.activo,
-      password: form.password,
-    };
+  async function firstWorkingEndpoint(endpoints: string[]) {
+    const headers = authHeaders();
 
+    for (const url of endpoints) {
+      const r = await requestJson(url, { method: "GET", headers });
+      if (r.ok) return { url, data: r.data as unknown };
+    }
+
+    return { url: endpoints[0] ?? "", data: [] as unknown };
+  }
+
+  function normalizePaged(payload: unknown): {
+    items: UserRow[];
+    totalCount: number | null;
+    page: number | null;
+    pageSize: number | null;
+  } {
+    if (Array.isArray(payload)) {
+      return { items: payload as UserRow[], totalCount: null, page: null, pageSize: null };
+    }
+
+    const p = (payload ?? {}) as PagedLike;
+
+    const items =
+      (p.items ?? p.Items ?? p.data ?? p.Data ?? p.users ?? p.Users ?? []) as UserRow[];
+
+    const totalCount =
+      (p.totalCount ?? p.TotalCount ?? p.total ?? p.Total) != null
+        ? Number(p.totalCount ?? p.TotalCount ?? p.total ?? p.Total)
+        : null;
+
+    const page = (p.page ?? p.Page) != null ? Number(p.page ?? p.Page) : null;
+    const pageSize = (p.pageSize ?? p.PageSize) != null ? Number(p.pageSize ?? p.PageSize) : null;
+
+    return { items, totalCount, page, pageSize };
+  }
+
+  async function loadPaged(nextPage: number, nextPageSize: number) {
+    setLoading(true);
     try {
-      const res = await fetch("/api/users", {
+      const token = readToken();
+      if (!token) {
+        showToast("error", "No hay token. Inicia sesión nuevamente.");
+        setRows([]);
+        return;
+      }
+
+      const result = await requestJson(
+        `${API_BASE}/paged?page=${nextPage}&pageSize=${nextPageSize}`,
+        { method: "GET", headers: authHeaders() }
+      );
+
+      if (!result.ok) {
+        showToast("error", result.error);
+        setRows([]);
+        return;
+      }
+
+      const norm = normalizePaged(result.data);
+      setRows(norm.items);
+      setTotalCount(norm.totalCount);
+
+      setPage(norm.page ?? nextPage);
+      setPageSize(norm.pageSize ?? nextPageSize);
+
+      if (selectedId != null) {
+        const found = norm.items.find((u) => getId(u) === selectedId) ?? null;
+        setSelected(found);
+        if (found && mode === "edit") setEditStatus(getAsset(found) ?? true);
+      }
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCombos() {
+    setLoadingCombos(true);
+    try {
+      const token = readToken();
+      if (!token) {
+        showToast("error", "No hay token. Inicia sesión nuevamente.");
+        setRoles([]);
+        setAdminUnits([]);
+        return;
+      }
+
+      const [rolesPick, auPick] = await Promise.all([
+        firstWorkingEndpoint(ROLE_ENDPOINTS),
+        firstWorkingEndpoint(AU_ENDPOINTS),
+      ]);
+
+      const rolesNorm = normalizeRoles(rolesPick.data);
+      const auNorm = normalizeAUs(auPick.data);
+
+      setRoles(rolesNorm);
+      setAdminUnits(auNorm);
+
+      if (rolesNorm.length === 0) {
+        showToast(
+          "error",
+          "No se pudieron cargar Roles. Revisa la ruta del endpoint en ROLE_ENDPOINTS (y CORS/HTTPS)."
+        );
+      }
+      if (auNorm.length === 0) {
+        showToast(
+          "error",
+          "No se pudieron cargar Unidades. Revisa la ruta del endpoint en AU_ENDPOINTS."
+        );
+      }
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+      setRoles([]);
+      setAdminUnits([]);
+    } finally {
+      setLoadingCombos(false);
+    }
+  }
+
+  function normalizeRoles(payload: unknown): RoleOption[] {
+    const arr = pickArray(payload, ["items", "Items", "data", "Data", "roles", "Roles"]);
+
+    return arr
+      .map((row): RoleOption | null => {
+        const obj = asObject(row);
+        if (!obj) return null;
+
+        const id = readNumber(obj, ["idRol", "IdRol", "id", "Id"], 0);
+        if (!Number.isFinite(id) || id <= 0) return null;
+
+        const name = readString(
+          obj,
+          ["rolName", "RolName", "roleName", "RoleName", "name", "Name"],
+          `Rol ${id}`
+        );
+
+        const active = readBool(obj, ["active", "Active", "isActive", "IsActive"]);
+        return { id, name, active };
+      })
+      .filter((x): x is RoleOption => x !== null);
+  }
+
+  function normalizeAUs(payload: unknown): AuOption[] {
+    const arr = pickArray(payload, ["items", "Items", "data", "Data"]);
+
+    return arr
+      .map((row): AuOption | null => {
+        const obj = asObject(row);
+        if (!obj) return null;
+
+        const id = readNumber(
+          obj,
+          [
+            "idAdministrativeUnit",
+            "IdAdministrativeUnit",
+            "administrativeUnitId",
+            "AdministrativeUnitId",
+            "id",
+            "Id",
+            "code",
+            "Code",
+          ],
+          0
+        );
+        if (!Number.isFinite(id) || id <= 0) return null;
+
+        const name = readString(
+          obj,
+          [
+            "description",
+            "Description",
+            "descripcion",
+            "Descripcion",
+            "name",
+            "Name",
+            "administrativeUnit",
+            "AdministrativeUnit",
+          ],
+          `Unidad ${id}`
+        );
+
+        const active = readBool(obj, ["active", "Active", "isActive", "IsActive"]);
+        return { id, name, active };
+      })
+      .filter((x): x is AuOption => x !== null);
+  }
+
+  const displayedRows = useMemo(() => {
+    const only = rows.filter((u) => (getAsset(u) ?? false) === !showInactive);
+
+    const q = search.trim().toLowerCase();
+    if (!q) return only;
+
+    return only.filter((u) => {
+      const email = (getEmail(u) ?? "").toLowerCase();
+      const role = (getRole(u) ?? "").toLowerCase();
+      const au = (getAdministrativeUnit(u) ?? "").toLowerCase();
+      return email.includes(q) || role.includes(q) || au.includes(q);
+    });
+  }, [rows, search, showInactive]);
+
+  function onRowClick(row: UserRow) {
+    setSelected(row);
+    setMode("view");
+  }
+
+  function startCreate() {
+    setMode("create");
+    setSelected(null);
+    setCreate(initialCreate);
+  }
+
+  function clearSelection() {
+    setSelected(null);
+    setMode("view");
+  }
+
+  function startEdit() {
+    if (!selected) return;
+    setEditStatus(getAsset(selected) ?? true);
+    setMode("edit");
+  }
+
+  function toggleViewActiveInactive() {
+    setShowInactive((prev) => !prev);
+    setSelected(null);
+    setMode("view");
+    setSearch("");
+  }
+
+  function validateCreate(): string {
+    const email = create.email.trim().toLowerCase();
+    if (!email) return "El correo es obligatorio.";
+    if (!/^\S+@\S+\.\S+$/.test(email)) return "Correo inválido.";
+    if (!create.password) return "La contraseña es obligatoria.";
+    if (create.password.length < 8) return "Mínimo 8 caracteres.";
+    if (create.password !== create.password2) return "Las contraseñas no coinciden.";
+    if (!create.idAdministrativeUnit.trim()) return "Unidad administrativa es obligatoria.";
+    if (!create.idRole.trim()) return "Rol es obligatorio.";
+
+    const au = Number(create.idAdministrativeUnit);
+    const r = Number(create.idRole);
+    if (!Number.isFinite(au) || au <= 0) return "Unidad administrativa inválida.";
+    if (!Number.isFinite(r) || r <= 0) return "Rol inválido.";
+
+    return "";
+  }
+
+  async function onCreate() {
+    const msg = validateCreate();
+    if (msg) return showToast("error", msg);
+
+    setSaving(true);
+    try {
+      const payload = {
+        Email: create.email.trim().toLowerCase(),
+        Password: create.password,
+        IdAdministrativeUnit: Number(create.idAdministrativeUnit),
+        IdRole: Number(create.idRole),
+
+        email: create.email.trim().toLowerCase(),
+        password: create.password,
+        idAdministrativeUnit: Number(create.idAdministrativeUnit),
+        idRole: Number(create.idRole),
+      };
+
+      const result = await requestJson(`${API_BASE}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const data = (await safeJson<ApiError>(res)) ?? {};
-        throw new Error(data.message || "No se pudo crear el usuario.");
-      }
+      if (!result.ok) return showToast("error", result.error);
 
-      setOk("Usuario creado correctamente.");
-      setForm(initialForm);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error inesperado.");
+      showToast("success", "Usuario creado correctamente");
+      setMode("view");
+      setCreate(initialCreate);
+      await loadPaged(1, pageSize);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
     } finally {
       setSaving(false);
     }
   }
 
-  function onReset() {
-    setError("");
-    setOk("");
-    setForm(initialForm);
+  async function updateStatus(user: UserRow, next: boolean) {
+    const id = getId(user);
+    if (id == null) throw new Error("No pude identificar el usuario.");
+
+    const payload = {
+      idUser: id,
+      asset: next,
+      IdUser: id,
+      Asset: next,
+      active: next,
+      Active: next,
+    };
+
+    const result = await requestJson(`${API_BASE}/change-status`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!result.ok) throw new Error(result.error);
   }
+
+  async function onSaveEdit() {
+    if (!selected) return;
+
+    setSaving(true);
+    try {
+      await updateStatus(selected, editStatus);
+      showToast("success", "Estado actualizado correctamente");
+      setMode("view");
+      setSelected(null);
+      await loadPaged(page, pageSize);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totalPages = useMemo(() => {
+    if (totalCount == null) return null;
+    return Math.max(1, Math.ceil(totalCount / pageSize));
+  }, [totalCount, pageSize]);
+
+  const createDisabled = saving || loading || loadingCombos;
 
   return (
     <div className={styles.page}>
-      <section className={styles.card}>
-        <div className={styles.cardHeader}>
-          <p className={styles.cardTitle}>Datos del usuario</p>
-        </div>
+      <Toast
+        open={toastOpen}
+        type={toastType}
+        message={toastMsg}
+        onClose={() => setToastOpen(false)}
+        durationMs={3200}
+      />
 
-        <form onSubmit={onSubmit} className={styles.form}>
-          <div className={styles.grid}>
-            <Field label="Nombre" required>
-              <input name="nombre" value={form.nombre} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Apellido paterno">
-              <input name="apellidoPaterno" value={form.apellidoPaterno} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Apellido materno">
-              <input name="apellidoMaterno" value={form.apellidoMaterno} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Usuario" required>
-              <input name="username" value={form.username} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Correo" required>
-              <input type="email" name="email" value={form.email} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Rol" required>
-              <select name="rol" value={form.rol} onChange={onChange} className={styles.input} disabled={saving}>
-                {roles.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Área" required>
-              <select name="area" value={form.area} onChange={onChange} className={styles.input} disabled={saving}>
-                {areas.map((a) => (
-                  <option key={a.value} value={a.value}>{a.label}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Activo">
-  <label className={styles.switch}>
-    <input
-      type="checkbox"
-      checked={form.activo}
-      onChange={() => setForm((p) => ({ ...p, activo: !p.activo }))}
-      disabled={saving}
-    />
-    <span className={styles.slider}></span>
-  </label>
-</Field>
-
-
-            <Field label="Contraseña" required>
-              <input type="password" name="password" value={form.password} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
-
-            <Field label="Confirmar contraseña" required>
-              <input type="password" name="password2" value={form.password2} onChange={onChange} className={styles.input} disabled={saving} />
-            </Field>
+      <div className={styles.header}>
+        <div className={styles.headerTop}>
+          <div className={styles.headerText}>
+            <h1 className={styles.h1}>Usuarios</h1>
+            <p className={styles.sub}>
+              {showInactive ? "Viendo usuarios inactivos." : "Viendo usuarios activos."}
+            </p>
           </div>
 
-          {(error || ok) && (
-            <div className={error ? styles.alertError : styles.alertOk}>
-              {error || ok}
+          <div className={styles.searchWrapper}>
+            <div className={styles.searchIcon} aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
             </div>
-          )}
 
-          <div className={styles.actions}>
-            <button type="button" className={styles.btnGhost} onClick={onReset} disabled={saving}>
-              Limpiar
+            <input
+              className={styles.searchInput}
+              placeholder="Buscar por correo, rol o unidad…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              disabled={saving || loading}
+            />
+
+            {search.trim() !== "" && (
+              <button
+                className={styles.clearSearchBtn}
+                onClick={() => setSearch("")}
+                type="button"
+                aria-label="Limpiar búsqueda"
+                disabled={saving || loading}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className={styles.headerActions}>
+            <button
+              className={styles.btnGhost}
+              type="button"
+              onClick={toggleViewActiveInactive}
+              disabled={saving || loading || mode === "create" || mode === "edit"}
+              title="Cambiar vista activos/inactivos"
+            >
+              {showInactive ? "Ver activos" : "Ver inactivos"}
             </button>
 
-            <button type="submit" className={styles.btnPrimary} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar usuario"}
+            <button
+              className={styles.btnPrimary}
+              onClick={startCreate}
+              disabled={saving || mode === "create"}
+              type="button"
+            >
+              {mode === "create" ? "Creando..." : "+ Nuevo"}
             </button>
           </div>
-        </form>
-      </section>
+        </div>
+      </div>
+
+      <div className={styles.layout}>
+        {/* LISTADO */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <p className={styles.cardTitle}>Listado</p>
+
+            <div className={styles.pager}>
+              <select
+                className={styles.pageSize}
+                value={pageSize}
+                disabled={loading || saving}
+                onChange={(e) => {
+                  const ps = Number(e.target.value);
+                  void loadPaged(1, ps);
+                }}
+              >
+                {[5, 10, 20, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / pág
+                  </option>
+                ))}
+              </select>
+
+              <div className={styles.pagerBtns}>
+                <button
+                  className={styles.pagerBtn}
+                  type="button"
+                  disabled={loading || saving || page <= 1}
+                  onClick={() => void loadPaged(Math.max(1, page - 1), pageSize)}
+                >
+                  Anterior
+                </button>
+
+                <span className={styles.pagerInfo}>
+                  {page}
+                  {totalPages ? ` / ${totalPages}` : ""}
+                </span>
+
+                <button
+                  className={styles.pagerBtn}
+                  type="button"
+                  disabled={
+                    loading ||
+                    saving ||
+                    (totalPages != null ? page >= totalPages : rows.length < pageSize)
+                  }
+                  onClick={() => void loadPaged(page + 1, pageSize)}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                  <th>Unidad Adm.</th>
+                  <th style={{ width: 170 }}>Activo</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className={styles.empty}>
+                      Cargando usuarios...
+                    </td>
+                  </tr>
+                ) : displayedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className={styles.empty}>
+                      {search.trim()
+                        ? "No se encontraron usuarios con esos criterios."
+                        : showInactive
+                        ? "No hay usuarios inactivos."
+                        : "No hay usuarios activos."}
+                    </td>
+                  </tr>
+                ) : (
+                  displayedRows.map((u, idx) => {
+                    const id = getId(u);
+                    const key = id != null ? String(id) : `row-${idx}`;
+                    const isSelected = selectedId != null && id != null && id === selectedId;
+                    const asset = getAsset(u) ?? false;
+
+                    return (
+                      <tr
+                        key={key}
+                        className={isSelected ? styles.rowSelected : styles.row}
+                        onClick={() => onRowClick(u)}
+                      >
+                        <td className={styles.mono}>{getEmail(u) ?? "—"}</td>
+                        <td>{getRole(u) ?? "—"}</td>
+                        <td>{getAdministrativeUnit(u) ?? "—"}</td>
+                        <td>
+                          <Switch checked={asset} disabled label={asset ? "Activo" : "Inactivo"} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+
+          </div>
+        </section>
+
+        {/* PANEL */}
+        <aside className={styles.card}>
+          <div className={styles.cardHeader}>
+            <p className={styles.cardTitle}>
+              {mode === "create" ? "Nuevo usuario" : mode === "edit" ? "Editar usuario" : "Detalle"}
+            </p>
+          </div>
+
+          <div className={styles.panelBody}>
+            {mode === "create" ? (
+              <form
+                className={styles.form}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onCreate();
+                }}
+              >
+                <div className={styles.grid}>
+                  <Field label="Correo" required>
+                    <input
+                      className={styles.input}
+                      value={create.email}
+                      onChange={(e) => setCreate((p) => ({ ...p, email: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="correo@dominio.com"
+                    />
+                  </Field>
+
+                  <Field label="Rol" required>
+                    <select
+                      className={styles.select}
+                      value={create.idRole}
+                      onChange={(e) => setCreate((p) => ({ ...p, idRole: e.target.value }))}
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona un rol...</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={String(r.id)}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {loadingCombos ? <div className={styles.hint}>Cargando roles…</div> : null}
+                  </Field>
+
+                  <Field label="Unidad administrativa" required>
+                    <select
+                      className={styles.select}
+                      value={create.idAdministrativeUnit}
+                      onChange={(e) =>
+                        setCreate((p) => ({ ...p, idAdministrativeUnit: e.target.value }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona una unidad...</option>
+                      {adminUnits.map((u) => (
+                        <option key={u.id} value={String(u.id)}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {loadingCombos ? <div className={styles.hint}>Cargando unidades…</div> : null}
+                  </Field>
+
+                  <Field label="Contraseña" required>
+                    <input
+                      type="password"
+                      className={styles.input}
+                      value={create.password}
+                      onChange={(e) => setCreate((p) => ({ ...p, password: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="********"
+                    />
+                  </Field>
+
+                  <Field label="Confirmar contraseña" required>
+                    <input
+                      type="password"
+                      className={styles.input}
+                      value={create.password2}
+                      onChange={(e) => setCreate((p) => ({ ...p, password2: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="********"
+                    />
+                  </Field>
+                </div>
+
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.btnEdit}
+                    onClick={() => void loadCombos()}
+                    disabled={saving || loadingCombos}
+                  >
+                    Recargar listas
+                  </button>
+
+                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                    {saving ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            ) : !selected ? (
+              <div className={styles.helper}>Selecciona un usuario de la tabla para ver detalles.</div>
+            ) : mode === "edit" ? (
+              <form
+                className={styles.form}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onSaveEdit();
+                }}
+              >
+                <div className={styles.detailBox}>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Correo</span>
+                    <span className={styles.detailValue}>{getEmail(selected) ?? "—"}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Rol</span>
+                    <span className={styles.detailValue}>{getRole(selected) ?? "—"}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Unidad Adm.</span>
+                    <span className={styles.detailValue}>
+                      {getAdministrativeUnit(selected) ?? "—"}
+                    </span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={editStatus}
+                      disabled={saving || loading}
+                      label={editStatus ? "Activo" : "Inactivo"}
+                      onChange={(next) => setEditStatus(next)}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button type="submit" className={styles.btnSave} disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Correo</span>
+                  <span className={styles.detailValue}>{getEmail(selected) ?? "—"}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Rol</span>
+                  <span className={styles.detailValue}>{getRole(selected) ?? "—"}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Unidad Adm.</span>
+                  <span className={styles.detailValue}>
+                    {getAdministrativeUnit(selected) ?? "—"}
+                  </span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Activo</span>
+                  <Switch
+                    checked={getAsset(selected) ?? false}
+                    disabled
+                    label={(getAsset(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
+                </div>
+
+                <div className={styles.actions}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={saving}
+                  >
+                    Cerrar
+                  </button>
+
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={saving || loading}
+                  >
+                    Editar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
 
-type FieldProps = {
+/** Switch */
+type SwitchProps = {
+  checked: boolean;
+  onChange?: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+};
+
+function Switch({ checked, onChange, disabled, label }: SwitchProps) {
+  return (
+    <label className={styles.switchWrap} aria-disabled={disabled}>
+      {label && <span className={styles.switchLabel}>{label}</span>}
+      <button
+        type="button"
+        className={`${styles.switch} ${checked ? styles.switchOn : ""}`}
+        onClick={() => !disabled && onChange?.(!checked)}
+        disabled={disabled}
+        aria-pressed={checked}
+        aria-label={label ?? "Estado"}
+      >
+        <span className={styles.switchKnob} />
+      </button>
+    </label>
+  );
+}
+
+/** Helpers */
+function getId(u: UserRow | null): number | null {
+  if (!u) return null;
+  const v = u.idUser ?? u.IdUser ?? u.id ?? u.Id;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getEmail(u: UserRow | null): string | null {
+  if (!u) return null;
+  const s = String(u.email ?? u.Email ?? "").trim();
+  return s ? s : null;
+}
+
+function getRole(u: UserRow | null): string | null {
+  if (!u) return null;
+  const s = String(u.role ?? u.Role ?? "").trim();
+  return s ? s : null;
+}
+
+function getAdministrativeUnit(u: UserRow | null): string | null {
+  if (!u) return null;
+  const s = String(u.administrativeUnit ?? u.AdministrativeUnit ?? "").trim();
+  return s ? s : null;
+}
+
+function getAsset(u: UserRow | null): boolean | null {
+  if (!u) return null;
+  const v = u.asset ?? u.Asset;
+
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
+    if (t === "false" || t === "0" || t === "no") return false;
+  }
+  return null;
+}
+
+function Field({
+  label,
+  required = false,
+  children,
+}: {
   label: string;
   required?: boolean;
   children: React.ReactNode;
-};
-
-function Field({ label, required = false, children }: FieldProps) {
+}) {
   return (
     <div>
       <div className={styles.labelRow}>
@@ -249,10 +1013,88 @@ function Field({ label, required = false, children }: FieldProps) {
   );
 }
 
-async function safeJson<T>(res: Response): Promise<T | null> {
+async function safeText(res: Response): Promise<string> {
   try {
-    return (await res.json()) as T;
+    return await res.text();
   } catch {
-    return null;
+    return "";
+  }
+}
+
+function tryParseJson(text: string): unknown {
+  const t = (text ?? "").trim();
+  if (!t) return null;
+  try {
+    return JSON.parse(t) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+
+function asObject(v: unknown): UnknownObject | null {
+  return isRecord(v) ? (v as UnknownObject) : null;
+}
+
+function pickArray(payload: unknown, keys: string[]): unknown[] {
+  if (Array.isArray(payload)) return payload;
+
+  const obj = asObject(payload);
+  if (!obj) return [];
+
+  for (const k of keys) {
+    const maybe = obj[k];
+    if (Array.isArray(maybe)) return maybe;
+  }
+  return [];
+}
+
+function readNumber(obj: UnknownObject, keys: string[], fallback = 0): number {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string") {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return fallback;
+}
+
+function readString(obj: UnknownObject, keys: string[], fallback = ""): string {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s) return s;
+    }
+  }
+  return fallback;
+}
+
+function readBool(obj: UnknownObject, keys: string[]): boolean | undefined {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v === 1;
+    if (typeof v === "string") {
+      const t = v.trim().toLowerCase();
+      if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
+      if (t === "false" || t === "0" || t === "no") return false;
+    }
+  }
+  return undefined;
+}
+
+function toErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error inesperado.";
   }
 }

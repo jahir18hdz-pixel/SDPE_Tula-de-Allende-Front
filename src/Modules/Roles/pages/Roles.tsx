@@ -1,33 +1,40 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "../styles/administrativeUnits.module.css";
+import styles from "../styles/Roles.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import ConfirmDialog from "../../../Components/layout/ConfirmDialog";
 
-type AdministrativeUnit = {
-  code?: number;
+type Role = {
+  idRol?: number;
+  IdRol?: number;
   id?: number;
-  description?: string;
-
-  Code?: number;
   Id?: number;
+
+  rolName?: string;
+  RolName?: string;
+  roleName?: string;
+  RoleName?: string;
+  name?: string;
+  Name?: string;
+
+  description?: string;
   Description?: string;
-
-  administrativeUnitCode?: number;
-  administrativeUnitId?: number;
-  AdministrativeUnitCode?: number;
-  AdministrativeUnitId?: number;
-
   descripcion?: string;
   Descripcion?: string;
+
+  active?: boolean;
+  Active?: boolean;
+  isActive?: boolean;
+  IsActive?: boolean;
 
   [key: string]: unknown;
 };
 
 type FormDto = {
-  code: string;
+  name: string;
   description: string;
+  active: boolean;
 };
 
 type AuthStored = {
@@ -38,15 +45,19 @@ type AuthStored = {
 type UnknownRecord = Record<string, unknown>;
 
 const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/AdministrativeUnit`;
+const API_BASE = `${BASE_API}/api/Role`;
 
-export default function AdministrativeUnits() {
-  const [rows, setRows] = useState<AdministrativeUnit[]>([]);
+export default function Roles() {
+  const [rows, setRows] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [selected, setSelected] = useState<AdministrativeUnit | null>(null);
+  const [selected, setSelected] = useState<Role | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
-  const [form, setForm] = useState<FormDto>({ code: "", description: "" });
+  const [form, setForm] = useState<FormDto>({
+    name: "",
+    description: "",
+    active: true,
+  });
 
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -55,7 +66,7 @@ export default function AdministrativeUnits() {
   const [search, setSearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  // ✅ paginación (frontend)
+  // ✅ paginación (igual que Users)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -69,14 +80,18 @@ export default function AdministrativeUnits() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
+  const selectedId = useMemo(() => getId(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ filtrar
+  // ✅ al cambiar búsqueda, vuelve a página 1 (como UX típica)
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q || isSearching) return rows;
@@ -85,29 +100,32 @@ export default function AdministrativeUnits() {
     const isNum = Number.isFinite(maybeNum) && q !== "";
 
     if (isNum) {
-      return rows.filter((u) => String(getCode(u) ?? "").includes(q));
+      return rows.filter((r) => String(getId(r) ?? "").includes(q));
     }
 
-    return rows.filter((u) => (getDescription(u) ?? "").toLowerCase().includes(q));
+    return rows.filter((r) => {
+      const name = (getName(r) ?? "").toLowerCase();
+      const desc = (getDescription(r) ?? "").toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
   }, [rows, search, isSearching]);
 
-  // ✅ reset a página 1 cuando cambie filtro/lista
-  useEffect(() => {
-    setPage(1);
-  }, [search, rows]);
-
-  const totalCount = filteredRows.length;
+  // ✅ total/páginas + slice
+  const totalCount = useMemo(() => filteredRows.length, [filteredRows]);
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(totalCount / pageSize));
   }, [totalCount, pageSize]);
 
-  const pagedRows = useMemo(() => {
-    const safePage = Math.min(Math.max(1, page), totalPages);
-    const start = (safePage - 1) * pageSize;
-    const end = start + pageSize;
-    return filteredRows.slice(start, end);
-  }, [filteredRows, page, pageSize, totalPages]);
+  const displayedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
+
+  // ✅ si reduces pageSize o cambian filas y tu page queda fuera, corrige
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function readToken(): string {
     const rawAuth = localStorage.getItem("auth");
@@ -138,7 +156,10 @@ export default function AdministrativeUnits() {
     | { ok: true; data: unknown; status: number }
     | { ok: false; error: string; status: number }
   > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
+    const res = await fetch(url, {
+      ...init,
+      credentials: "omit",
+    });
 
     if (res.status === 204) return { ok: true, data: [], status: 204 };
 
@@ -147,24 +168,26 @@ export default function AdministrativeUnits() {
 
     if (!res.ok) {
       const apiMsg =
-        isRecord(parsed) && typeof (parsed as Record<string, unknown>).message === "string"
-          ? String((parsed as Record<string, unknown>).message)
-          : "";
-      const msg = apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
+        isRecord(parsed) && typeof parsed.message === "string" ? parsed.message : "";
+      const msg =
+        apiMsg ||
+        (typeof parsed === "string" ? parsed : "") ||
+        text ||
+        `HTTP ${res.status}`;
       return { ok: false, error: msg, status: res.status };
     }
 
     return { ok: true, data: parsed, status: res.status };
   }
 
-  function extractList(payload: unknown): AdministrativeUnit[] {
-    if (Array.isArray(payload)) return payload as AdministrativeUnit[];
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord)["$values"])) {
-      return (payload as UnknownRecord)["$values"] as AdministrativeUnit[];
+  function extractList(payload: unknown): Role[] {
+    if (Array.isArray(payload)) return payload as Role[];
+    if (isRecord(payload) && Array.isArray(payload.$values)) {
+      return payload.$values as Role[];
     }
     const arr = findArrayDeep(payload, 0);
-    if (arr) return arr as AdministrativeUnit[];
-    if (isRecord(payload)) return [payload as AdministrativeUnit];
+    if (arr) return arr as Role[];
+    if (isRecord(payload)) return [payload as Role];
     return [];
   }
 
@@ -173,14 +196,12 @@ export default function AdministrativeUnits() {
     if (Array.isArray(payload)) return payload;
     if (!isRecord(payload)) return null;
 
-    const obj = payload as UnknownRecord;
-
-    const values = obj["$values"];
+    const values = payload["$values"];
     if (Array.isArray(values)) return values;
 
-    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
+    const keys = ["data", "result", "items", "value", "values"];
     for (const k of keys) {
-      const v = obj[k];
+      const v = payload[k];
       if (Array.isArray(v)) return v;
       const nested = findArrayDeep(v, depth + 1);
       if (nested) return nested;
@@ -188,8 +209,10 @@ export default function AdministrativeUnits() {
     return null;
   }
 
-  function codeExists(code: number): boolean {
-    return rows.some((u) => getCode(u) === code);
+  function nameExists(name: string): boolean {
+    const n = name.trim().toLowerCase();
+    if (!n) return false;
+    return rows.some((r) => (getName(r) ?? "").trim().toLowerCase() === n);
   }
 
   async function loadAll(keepSelected?: number | null) {
@@ -202,7 +225,10 @@ export default function AdministrativeUnits() {
         return;
       }
 
-      const result = await requestJson(API_BASE, { method: "GET", headers: authHeaders() });
+      const result = await requestJson(API_BASE, {
+        method: "GET",
+        headers: authHeaders(),
+      });
 
       if (!result.ok) {
         showToast("error", result.error);
@@ -213,8 +239,11 @@ export default function AdministrativeUnits() {
       const list = extractList(result.data);
       setRows(list);
 
+      // ✅ al recargar data, vuelve a la página 1 (evita quedarte en página vacía)
+      setPage(1);
+
       if (keepSelected != null) {
-        const found = list.find((u) => getCode(u) === keepSelected) ?? null;
+        const found = list.find((r) => getId(r) === keepSelected) ?? null;
         setSelected(found);
         setMode("view");
       }
@@ -227,18 +256,18 @@ export default function AdministrativeUnits() {
     }
   }
 
-  async function searchByCode(code: number) {
+  async function searchById(id: number) {
     setIsSearching(true);
     setLoading(true);
     try {
-      const result = await requestJson(`${API_BASE}/${code}`, {
+      const result = await requestJson(`${API_BASE}/${id}`, {
         method: "GET",
         headers: authHeaders(),
       });
 
       if (!result.ok) {
         if (result.status === 404) {
-          showToast("error", `No se encontró la unidad con clave ${code}.`);
+          showToast("error", `No se encontró el rol con id ${id}.`);
           setRows([]);
           setSelected(null);
           setMode("view");
@@ -248,10 +277,47 @@ export default function AdministrativeUnits() {
         return;
       }
 
-      const unit = extractList(result.data);
-      setRows(unit);
+      const role = extractList(result.data);
+      setRows(role);
+      setPage(1);
 
-      const found = unit[0] ?? null;
+      const found = role[0] ?? null;
+      setSelected(found);
+      setMode("view");
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setLoading(false);
+      setIsSearching(false);
+    }
+  }
+
+  async function searchByName(name: string) {
+    setIsSearching(true);
+    setLoading(true);
+    try {
+      const result = await requestJson(`${API_BASE}/by-name/${encodeURIComponent(name)}`, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+
+      if (!result.ok) {
+        if (result.status === 404) {
+          showToast("error", `No se encontró el rol "${name}".`);
+          setRows([]);
+          setSelected(null);
+          setMode("view");
+          return;
+        }
+        showToast("error", result.error);
+        return;
+      }
+
+      const role = extractList(result.data);
+      setRows(role);
+      setPage(1);
+
+      const found = role[0] ?? null;
       setSelected(found);
       setMode("view");
     } catch (e: unknown) {
@@ -273,47 +339,54 @@ export default function AdministrativeUnits() {
     const isNum = Number.isFinite(num) && q !== "";
 
     if (isNum) {
-      await searchByCode(num);
+      await searchById(num);
       return;
     }
 
-    setIsSearching(true);
-    await loadAll();
+    await searchByName(q);
   }
 
   function clearSelection() {
     setSelected(null);
     setMode("view");
-    setForm({ code: "", description: "" });
+    setForm({ name: "", description: "", active: true });
   }
 
   function startCreate() {
     setMode("create");
     setSelected(null);
-    setForm({ code: "", description: "" });
+    setForm({ name: "", description: "", active: true });
   }
 
-  function startEdit(row: AdministrativeUnit) {
+  function startEdit(row: Role) {
     setMode("edit");
     setSelected(row);
     setForm({
-      code: String(getCode(row) ?? ""),
+      name: String(getName(row) ?? ""),
       description: String(getDescription(row) ?? ""),
+      active: getActive(row) ?? true,
     });
   }
 
-  function onRowClick(row: AdministrativeUnit) {
+  function onRowClick(row: Role) {
     setSelected(row);
     setMode("view");
   }
 
   function validateForm(): string {
-    const codeNum = Number(form.code);
+    const name = form.name.trim();
+    const desc = form.description.trim();
 
-    if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (mode === "create" && codeExists(codeNum)) return "No se pueden repetir las claves";
-    if (!form.description.trim()) return "La descripción es obligatoria.";
-    if (form.description.trim().length < 3) return "La descripción es muy corta.";
+    if (!name) return "El nombre del rol es obligatorio.";
+    if (name.length < 3) return "El nombre del rol es muy corto.";
+
+    if (mode === "create" && nameExists(name)) {
+      return "No se pueden repetir los nombres de rol.";
+    }
+
+    if (!desc) return "La descripción es obligatoria.";
+    if (desc.length < 3) return "La descripción es muy corta.";
+
     return "";
   }
 
@@ -321,12 +394,17 @@ export default function AdministrativeUnits() {
     const msg = validateForm();
     if (msg) return showToast("error", msg);
 
-    const codeNum = Number(form.code);
-    if (codeExists(codeNum)) return showToast("error", "Clave. No se pueden repetir las claves");
+    if (nameExists(form.name)) {
+      return showToast("error", "Nombre duplicado. No se pueden repetir roles.");
+    }
 
     setSaving(true);
     try {
-      const payload = { Code: codeNum, Description: form.description.trim() };
+      const payload = {
+        RolName: form.name.trim(),
+        Description: form.description.trim(),
+        active: form.active,
+      };
 
       const result = await requestJson(API_BASE, {
         method: "POST",
@@ -336,9 +414,9 @@ export default function AdministrativeUnits() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "Unidad creada correctamente");
+      showToast("success", "Rol creado correctamente");
       setMode("view");
-      await loadAll(codeNum);
+      await loadAll(null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -347,14 +425,23 @@ export default function AdministrativeUnits() {
   }
 
   async function onUpdate() {
-    if (!selected || selectedCode == null) return showToast("error", "Selecciona una unidad para editar.");
-    if (!form.description.trim()) return showToast("error", "La descripción es obligatoria.");
+    if (!selected || selectedId == null) {
+      return showToast("error", "Selecciona un rol para editar.");
+    }
+
+    const msg = validateForm();
+    if (msg) return showToast("error", msg);
 
     setSaving(true);
     try {
-      const payload = { Code: selectedCode, Description: form.description.trim() };
+      const payload: Record<string, unknown> = {
+        IdRol: selectedId,
+        RolName: form.name.trim(),
+        Description: form.description.trim(),
+        active: form.active,
+      };
 
-      const result = await requestJson(`${API_BASE}/${selectedCode}`, {
+      const result = await requestJson(API_BASE, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -362,9 +449,9 @@ export default function AdministrativeUnits() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "Unidad actualizada correctamente");
+      showToast("success", "Rol actualizado correctamente");
       setMode("view");
-      await loadAll(selectedCode);
+      await loadAll(selectedId);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -373,21 +460,21 @@ export default function AdministrativeUnits() {
   }
 
   async function onDeleteConfirmed() {
-    if (!selected || selectedCode == null) {
+    if (!selected || selectedId == null) {
       setConfirmOpen(false);
-      return showToast("error", "Selecciona una unidad para eliminar.");
+      return showToast("error", "Selecciona un rol para eliminar.");
     }
 
     setSaving(true);
     try {
-      const result = await requestJson(`${API_BASE}/${selectedCode}`, {
+      const result = await requestJson(`${API_BASE}/${selectedId}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "Unidad eliminada correctamente");
+      showToast("success", "Rol desactivado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll(null);
@@ -411,11 +498,11 @@ export default function AdministrativeUnits() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Eliminar unidad administrativa"
-        message={`¿Estás seguro de eliminar la unidad "${getDescription(selected) ?? "—"}" (clave ${
-          selectedCode ?? "—"
+        title="Desactivar rol"
+        message={`¿Estás seguro de desactivar el rol "${getName(selected) ?? "—"}" (id ${
+          selectedId ?? "—"
         })? Esta acción no se puede deshacer.`}
-        confirmText="Sí, eliminar"
+        confirmText="Sí, desactivar"
         cancelText="Cancelar"
         loading={saving}
         onCancel={() => setConfirmOpen(false)}
@@ -425,8 +512,8 @@ export default function AdministrativeUnits() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
-            <h1 className={styles.h1}>Unidades Administrativas</h1>
-            <p className={styles.sub}>Consulta, crea, edita o elimina unidades administrativas.</p>
+            <h1 className={styles.h1}>Roles</h1>
+            <p className={styles.sub}>Consulta, crea, edita o desactiva roles.</p>
           </div>
 
           <div className={styles.searchWrapper}>
@@ -439,7 +526,7 @@ export default function AdministrativeUnits() {
 
             <input
               className={styles.searchInput}
-              placeholder="Buscar por clave o descripción…"
+              placeholder="Buscar por id o nombre…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               disabled={saving || loading}
@@ -474,22 +561,17 @@ export default function AdministrativeUnits() {
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
 
-            {/* ✅ paginación igual a Users */}
+            {/* ✅ PAGER igual que Users */}
             <div className={styles.pager}>
               <select
                 className={styles.pageSize}
                 value={pageSize}
                 disabled={loading || saving}
-                onChange={(e) => {
-                  const ps = Number(e.target.value);
-                  setPageSize(ps);
-                  setPage(1);
-                }}
+                onChange={(e) => setPageSize(Number(e.target.value))}
               >
                 {[5, 10, 20, 50].map((n) => (
                   <option key={n} value={n}>
@@ -509,7 +591,7 @@ export default function AdministrativeUnits() {
                 </button>
 
                 <span className={styles.pagerInfo}>
-                  {Math.min(page, totalPages)} / {totalPages}
+                  {page} / {totalPages}
                 </span>
 
                 <button
@@ -528,30 +610,36 @@ export default function AdministrativeUnits() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: 120 }}>Clave</th>
-                  <th>Descripción</th>
+                  <th style={{ width: 110 }}>Id</th>
+                  <th>Nombre</th>
+                  <th style={{ width: 140 }}>Activo</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
-                      Cargando unidades...
+                    <td colSpan={3} className={styles.empty}>
+                      Cargando roles...
                     </td>
                   </tr>
-                ) : pagedRows.length === 0 ? (
+                ) : filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
-                      {search.trim() ? "No se encontraron unidades con esos criterios." : "No hay unidades registradas."}
+                    <td colSpan={3} className={styles.empty}>
+                      {search.trim() ? "No se encontraron roles con esos criterios." : "No hay roles registrados."}
                     </td>
+                  </tr>
+                ) : displayedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className={styles.empty}>No hay registros en esta página.</td>
                   </tr>
                 ) : (
-                  pagedRows.map((r, idx) => {
-                    const code = getCode(r);
-                    const desc = getDescription(r) ?? "—";
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                  displayedRows.map((r, idx) => {
+                    const id = getId(r);
+                    const name = getName(r) ?? "—";
+                    const active = getActive(r);
+                    const key = id != null ? String(id) : `row-${idx}`;
+                    const isSelected = selectedId != null && id != null && id === selectedId;
 
                     return (
                       <tr
@@ -559,8 +647,11 @@ export default function AdministrativeUnits() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(r)}
                       >
-                        <td className={styles.mono}>{code != null ? String(code) : "—"}</td>
-                        <td>{desc}</td>
+                        <td className={styles.mono}>{id != null ? String(id) : "—"}</td>
+                        <td>{name}</td>
+                        <td>
+                          <Switch checked={active ?? false} disabled />
+                        </td>
                       </tr>
                     );
                   })
@@ -570,28 +661,37 @@ export default function AdministrativeUnits() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nueva unidad" : mode === "edit" ? "Editar unidad" : "Detalle"}
+              {mode === "create" ? "Nuevo rol" : mode === "edit" ? "Editar rol" : "Detalle"}
             </p>
           </div>
 
           <div className={styles.panelBody}>
             {mode === "view" ? (
               !selected ? (
-                <div className={styles.helper}>Selecciona una unidad de la tabla para ver detalles o editar.</div>
+                <div className={styles.helper}>Selecciona un rol de la tabla para ver detalles o editar.</div>
               ) : (
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Clave</span>
-                    <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
+                    <span className={styles.detailLabel}>Id</span>
+                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Nombre</span>
+                    <span className={styles.detailValue}>{String(getName(selected) ?? "—")}</span>
                   </div>
 
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Descripción</span>
                     <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch checked={getActive(selected) ?? false} disabled />
                   </div>
 
                   <div className={styles.actions}>
@@ -604,7 +704,7 @@ export default function AdministrativeUnits() {
                     </button>
 
                     <button className={styles.btnDanger} type="button" onClick={() => setConfirmOpen(true)} disabled={saving}>
-                      Eliminar
+                      Desactivar
                     </button>
                   </div>
                 </div>
@@ -619,13 +719,12 @@ export default function AdministrativeUnits() {
                 }}
               >
                 <div className={styles.grid}>
-                  <Field label="Clave" required>
+                  <Field label="Nombre" required>
                     <input
                       className={styles.input}
-                      value={form.code}
-                      onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
-                      disabled={saving || mode === "edit"}
-                      inputMode="numeric"
+                      value={form.name}
+                      onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                      disabled={saving}
                     />
                   </Field>
 
@@ -637,6 +736,17 @@ export default function AdministrativeUnits() {
                       disabled={saving}
                     />
                   </Field>
+
+                  <Field label="Activo">
+                    <div className={styles.switchField}>
+                      <Switch
+                        checked={form.active}
+                        disabled={saving}
+                        onChange={(next) => setForm((p) => ({ ...p, active: next }))}
+                        label={form.active ? "Activo" : "Inactivo"}
+                      />
+                    </div>
+                  </Field>
                 </div>
 
                 <div className={styles.actions}>
@@ -645,7 +755,7 @@ export default function AdministrativeUnits() {
                   </button>
 
                   <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : mode === "create" ? "Crear unidad" : "Guardar cambios"}
+                    {saving ? "Guardando..." : mode === "create" ? "Crear rol" : "Guardar cambios"}
                   </button>
                 </div>
               </form>
@@ -657,28 +767,69 @@ export default function AdministrativeUnits() {
   );
 }
 
-/** Helpers */
-function getCode(u: AdministrativeUnit | null): number | null {
-  if (!u) return null;
-  const v =
-    u.code ??
-    u.id ??
-    u.Code ??
-    u.Id ??
-    u.administrativeUnitCode ??
-    u.administrativeUnitId ??
-    u.AdministrativeUnitCode ??
-    u.AdministrativeUnitId;
+/** Switch */
+type SwitchProps = {
+  checked: boolean;
+  onChange?: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+};
 
+function Switch({ checked, onChange, disabled, label }: SwitchProps) {
+  return (
+    <label className={styles.switchWrap} aria-disabled={disabled}>
+      {label && <span className={styles.switchLabel}>{label}</span>}
+      <button
+        type="button"
+        className={`${styles.switch} ${checked ? styles.switchOn : ""}`}
+        onClick={() => !disabled && onChange?.(!checked)}
+        disabled={disabled}
+        aria-pressed={checked}
+        aria-label={label ?? "Cambiar estado"}
+      >
+        <span className={styles.switchKnob} />
+      </button>
+    </label>
+  );
+}
+
+/** Helpers */
+function getId(r: Role | null): number | null {
+  if (!r) return null;
+  const v = r.idRol ?? r.IdRol ?? r.id ?? r.Id;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getDescription(u: AdministrativeUnit | null): string | null {
-  if (!u) return null;
-  const v = u.description ?? u.Description ?? u.descripcion ?? u.Descripcion;
+function getName(r: Role | null): string | null {
+  if (!r) return null;
+  const v = r.rolName ?? r.RolName ?? r.roleName ?? r.RoleName ?? r.name ?? r.Name;
   const s = String(v ?? "").trim();
   return s ? s : null;
+}
+
+function getDescription(r: Role | null): string | null {
+  if (!r) return null;
+  const v = r.description ?? r.Description ?? r.descripcion ?? r.Descripcion;
+  const s = String(v ?? "").trim();
+  return s ? s : null;
+}
+
+function getActive(r: Role | null): boolean | null {
+  if (!r) return null;
+
+  const v: unknown = r.active ?? r.Active ?? r.isActive ?? r.IsActive;
+
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
+    if (t === "false" || t === "0" || t === "no") return false;
+  }
+
+  return null;
 }
 
 type FieldProps = {

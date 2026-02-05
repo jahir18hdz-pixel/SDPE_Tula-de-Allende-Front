@@ -1,4 +1,3 @@
-/* src/Modules/AdministrativeUnit/styles/administrativeUnits.module.css */
 :root {
   --bg: #f6f6f7;
   --card: #ffffff;
@@ -6,7 +5,7 @@
   --border: #e6e6ea;
   --border2: #d7d7dd;
 
-  --guinda: #4b0016;
+  --guinda: #004b05;
   --guinda2: #65001f;
   --gold: #b68a2a;
 
@@ -14,10 +13,14 @@
   --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
 }
 
+/* =========================
+   PAGE + HEADER
+========================= */
 .page {
   color: #000;
   min-height: calc(100vh - 20px);
   padding: 24px;
+  box-sizing: border-box;
   background: radial-gradient(
       1100px 520px at 25% -10%,
       rgba(182, 138, 42, 0.1),
@@ -32,37 +35,119 @@
 }
 
 .header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 0 0 14px;
+  margin: 0 0 18px;
+}
+
+.headerTop {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 520px) auto;
+  align-items: end;
+  gap: 14px;
+}
+
+.headerText {
+  min-width: 0;
 }
 
 .h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 900;
   letter-spacing: 0.2px;
-  color: #000;
+  color: var(--guinda2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .sub {
   margin: 6px 0 0;
   color: #000;
-  font-size: 13px;
+  font-size: 14px;
   opacity: 0.75;
+  font-weight: 400;
 }
 
-.headerActions {
+/* =========================
+   SEARCH
+========================= */
+.searchWrapper {
+  position: relative;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
 }
 
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  color: rgba(75, 0, 22, 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.searchInput {
+  width: 100%;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  padding: 0 42px 0 42px;
+  outline: none;
+  font-size: 15px;
+  background: #ffffff;
+  color: #000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.searchInput:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+  background: #fffef8;
+  transform: translateY(-1px);
+}
+
+.searchInput:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.clearSearchBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: rgba(75, 0, 22, 0.4);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.clearSearchBtn:hover:not(:disabled) {
+  color: rgba(75, 0, 22, 0.85);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.clearSearchBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =========================
+   LAYOUT
+========================= */
 .layout {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
-  gap: 14px;
+  gap: 24px;
 }
 
 @media (max-width: 980px) {
@@ -71,22 +156,33 @@
   }
 }
 
+/* =========================
+   CARD (igual Users)
+========================= */
 .card {
-  background: linear-gradient(180deg, #ffffff, #fbfbfd);
+  background: linear-gradient(180deg, #edebeb, #fbfbfd);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: var(--shadowSoft);
   overflow: hidden;
+
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
 }
 
 .cardHeader {
-  padding: 16px 18px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(
     90deg,
-    rgba(75, 0, 22, 0.085),
-    rgba(182, 138, 42, 0.09)
+    rgba(75, 0, 22, 0.12),
+    rgba(182, 138, 42, 0.12)
   );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .cardTitle {
@@ -98,9 +194,83 @@
   color: #000;
 }
 
+/* =========================
+   PAGER (igual Users)
+========================= */
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagerBtns {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(215, 215, 221, 0.9);
+  padding: 6px;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.05);
+}
+
+.pagerBtn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(66, 71, 81, 0.35);
+  background: rgba(107, 114, 128, 0.10);
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  font-family: inherit;
+}
+
+.pagerBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.08);
+}
+
+.pagerBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.pagerInfo {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 13px;
+  opacity: 0.8;
+  padding: 0 8px;
+}
+
+.pageSize {
+  height: 35px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  background: #989696; /* ✅ igual que Users */
+  padding: 0 15px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #111827;
+}
+
+/* =========================
+   TABLE + SCROLL (igual Users)
+========================= */
 .tableWrap {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: auto;
   background: linear-gradient(180deg, rgba(182, 138, 42, 0.035), transparent 40%);
+  max-height: min(520px, calc(100vh - 300px));
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid rgba(230, 230, 234, 0.7);
 }
 
 .table {
@@ -108,16 +278,26 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
+  min-width: 520px;
 }
 
 .table thead th {
   text-align: left;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  background: rgba(17, 24, 39, 0.04);
+  background: linear-gradient(
+    180deg,
+    rgba(237, 235, 235, 0.98),
+    rgba(230, 230, 234, 0.98)
+  );
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(6px);
   font-size: 12px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .row,
@@ -127,8 +307,8 @@
 }
 
 .table tbody td {
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(230, 230, 234, 0.8);
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(234, 234, 230, 0.8);
   vertical-align: middle;
 }
 
@@ -150,9 +330,10 @@
 }
 
 .empty {
-  padding: 18px 14px;
+  padding: 24px 16px;
   color: #000;
   opacity: 0.7;
+  text-align: center;
 }
 
 .mono {
@@ -160,20 +341,43 @@
     "Liberation Mono", "Courier New", monospace;
 }
 
-/* Panel */
+/* Scrollbar */
+.tableWrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tableWrap::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
+}
+.tableWrap::-webkit-scrollbar-thumb {
+  background: rgba(75, 0, 22, 0.25);
+  border-radius: 999px;
+}
+.tableWrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 0, 22, 0.45);
+}
+
+/* =========================
+   PANEL (scroll igual Users)
+========================= */
 .panelBody {
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+
+  max-height: min(520px, calc(100vh - 300px));
+  overflow: auto;
 }
 
 .helper {
-  padding: 12px;
+  padding: 20px 14px;
   border: 1px dashed var(--border2);
   border-radius: 14px;
   background: #fff;
   opacity: 0.85;
+  text-align: center;
 }
 
 .detailBox {
@@ -187,30 +391,42 @@
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px 12px;
-  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  align-items: center;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
 }
 
 .detailLabel {
   font-weight: 900;
   font-size: 12px;
-  opacity: 0.8;
   text-transform: uppercase;
   letter-spacing: 0.35px;
+  background: rgba(75, 0, 22, 0.10);
+  border: 1px solid rgba(75, 0, 22, 0.18);
+  padding: 6px 10px;
+  border-radius: 999px;
+  opacity: 0.95;
 }
 
 .detailValue {
   max-width: 62%;
   text-align: right;
   opacity: 0.9;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Form */
+/* =========================
+   FORM
+========================= */
 .form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .grid {
@@ -223,7 +439,7 @@
   display: flex;
   gap: 6px;
   align-items: baseline;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .label {
@@ -239,15 +455,16 @@
 
 .input {
   width: 100%;
-  height: 42px;
+  height: 46px;
   border-radius: 12px;
   border: 1px solid var(--border2);
-  padding: 0 12px;
+  padding: 0 14px;
   outline: none;
-  font-size: 14px;
+  font-size: 15px;
   background: #fff;
   color: #000;
   transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+  box-sizing: border-box;
 }
 
 .input:hover {
@@ -256,7 +473,8 @@
 
 .input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 4px rgba(182, 138, 42, 0.18);
+  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
+  transform: translateY(-1px);
 }
 
 .input:disabled {
@@ -265,62 +483,72 @@
   background: #fafafa;
 }
 
-/* Buttons */
+/* =========================
+   ACTIONS + BUTTONS
+========================= */
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 6px;
+  gap: 12px;
+  padding-top: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
 }
 
 .btnGhost,
 .btnDanger,
-.btnEdit {
-  height: 42px;
-  padding: 0 14px;
+.btnEdit,
+.btnSave,
+.btnPrimary {
+  height: 44px;
+  padding: 0 16px;
   border-radius: 12px;
-  font-weight: 900;
+  font-weight: 800;
+  font-size: 14px;
   letter-spacing: 0.15px;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease,
     background 120ms ease, border-color 120ms ease, color 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  font-family: inherit;
 }
 
-/* Primary: crear/guardar */
 .btnPrimary {
-  border: 0;
-  color: #fff;
-  background: linear-gradient(180deg, var(--guinda2), var(--guinda));
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--guinda2), var(--guinda));
   box-shadow: var(--shadowSoft);
+  padding: 0 18px;
 }
 
-.btnPrimary:hover {
+.btnPrimary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: var(--shadow);
+  background: linear-gradient(135deg, var(--guinda), var(--guinda2));
 }
 
-/* Cancelar: gris opaco + contorno gris fuerte */
 .btnGhost {
-  border: 1px solid rgba(107, 114, 128, 0.65);
+  border: 1px solid rgba(66, 71, 81, 0.65);
   background: rgba(107, 114, 128, 0.12);
   color: #111827;
 }
 
-.btnGhost:hover {
+.btnGhost:hover:not(:disabled) {
   border-color: rgba(107, 114, 128, 0.9);
-  background: rgba(107, 114, 128, 0.22);
+  background: rgba(0, 0, 0, 0.22);
   transform: translateY(-1px);
   box-shadow: var(--shadowSoft);
 }
 
-/* Editar: dorado opaco + contorno dorado */
 .btnEdit {
   border: 1px solid rgba(182, 138, 42, 0.9);
   background: rgba(182, 138, 42, 0.16);
   color: #111827;
 }
 
-.btnEdit:hover {
+.btnEdit:hover:not(:disabled) {
   background: rgba(182, 138, 42, 0.95);
   border-color: rgba(182, 138, 42, 1);
   color: #111827;
@@ -328,16 +556,29 @@
   box-shadow: var(--shadow);
 }
 
-/* Eliminar: rojo opaco + contorno rojo fuerte, hover rojo sólido */
 .btnDanger {
   border: 1px solid rgba(220, 38, 38, 0.95);
   background: rgba(220, 38, 38, 0.14);
   color: #111827;
 }
 
-.btnDanger:hover {
+.btnDanger:hover:not(:disabled) {
   background: rgba(220, 38, 38, 0.95);
   border-color: rgba(220, 38, 38, 1);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.btnSave {
+  border: 1px solid rgba(22, 163, 74, 0.95);
+  background: rgba(22, 163, 74, 0.14);
+  color: #111827;
+}
+
+.btnSave:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.95);
+  border-color: rgba(22, 163, 74, 1);
   color: #ffffff;
   transform: translateY(-1px);
   box-shadow: var(--shadow);
@@ -346,9 +587,69 @@
 .btnPrimary:disabled,
 .btnGhost:disabled,
 .btnDanger:disabled,
-.btnEdit:disabled {
+.btnEdit:disabled,
+.btnSave:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 900px) {
+  .headerTop {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .btnPrimary {
+    width: 100%;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pager {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 14px;
+  }
+
+  .h1 {
+    font-size: 24px;
+  }
+
+  .btnPrimary,
+  .btnSave,
+  .btnGhost,
+  .btnEdit,
+  .btnDanger {
+    width: 100%;
+  }
+
+  .detailRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detailValue {
+    max-width: 100%;
+    text-align: left;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .table {
+    min-width: 520px;
+  }
 }

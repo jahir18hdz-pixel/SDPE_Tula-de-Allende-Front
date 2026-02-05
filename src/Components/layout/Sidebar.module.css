@@ -7,7 +7,14 @@
   display: flex;
   flex-direction: column;
   padding: 14px 14px 12px;
-  overflow: hidden; 
+  overflow: hidden;
+
+  /* Vars */
+  --item-gap: 12px;
+  --item-radius: 12px;
+  --item-pad: 10px;
+  --icon-size: 26px;
+  --icon-font: 18px;
 }
 
 /* TOP */
@@ -78,10 +85,40 @@
 /* SCROLL SOLO MENÚ */
 .scrollArea {
   flex: 1 1 auto;
-  min-height: 0; 
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 10px;
+
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+
+  /* evita “saltos” cuando aparece/desaparece scrollbar */
+  scrollbar-gutter: stable;
+
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(209, 32, 85, 0.45) rgba(0, 0, 0, 0.04);
+}
+
+/* ✅ Scrollbar (WebKit) igual al de tableWrap */
+.scrollArea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+  background: rgba(164, 11, 57, 0.45);
+  border-radius: 999px;
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+  background: rgba(164, 11, 57, 0.45);
+  border-radius: 999px;
+}
+
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: rgba(164, 11, 57, 0.45);
 }
 
 /* NAV */
@@ -91,22 +128,14 @@
   min-width: 0;
 }
 
-.sidebar {
-  --item-gap: 12px;
-  --item-radius: 12px;
-  --item-pad: 10px;
-  --icon-size: 26px;
-  --icon-font: 18px;
-}
-
-/* (2) Links y botones base */
+/* Links y botones base */
 .item,
 .itemBtn,
 .bottomBtn {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: var(--item-gap); 
+  gap: var(--item-gap);
   padding: var(--item-pad);
   border-radius: var(--item-radius);
   color: #fff;
@@ -131,7 +160,7 @@
   outline: 1px solid rgba(182, 138, 42, 0.45);
 }
 
-/* (3) Icono consistente */
+/* Icono consistente */
 .icon {
   width: var(--icon-size);
   height: var(--icon-size);
@@ -143,15 +172,16 @@
   text-align: center;
 }
 
-/* (4) Texto consistente */
+/* Texto consistente */
 .label {
   flex: 1;
   min-width: 0;
-  margin: 0; /* ✅ evita offsets raros */
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .group {
   display: grid;
   gap: 8px;
@@ -160,7 +190,7 @@
 .left {
   display: flex;
   align-items: center;
-  gap: var(--item-gap); /* ✅ igual que .item */
+  gap: var(--item-gap);
   flex: 1;
   min-width: 0;
 }
@@ -212,8 +242,8 @@
 }
 
 /* =========================
-   COLAPSADO: solo íconos, ordenado
-   ========================= */
+   COLAPSADO: solo íconos
+========================= */
 .collapsed {
   padding: 12px;
 }
@@ -249,7 +279,7 @@
   padding-top: 8px;
 }
 
-/*Botones/links centrados en colapsado */
+/* Botones/links centrados en colapsado */
 .collapsed .item,
 .collapsed .itemBtn,
 .collapsed .bottomBtn {
@@ -285,7 +315,7 @@
   margin: 0 auto;
 }
 
-/*FIX: Catálogos (left) no debe ocupar todo en colapsado */
+/* FIX: Catálogos (left) no debe ocupar todo en colapsado */
 .collapsed .left {
   flex: 0;
   justify-content: center;

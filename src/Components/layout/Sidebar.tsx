@@ -4,7 +4,6 @@ import styles from "./Sidebar.module.css";
 import {
   FiHome,
   FiFolder,
-  FiFileText,
   FiChevronDown,
   FiUser,
   FiUserPlus,
@@ -13,6 +12,7 @@ import {
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
+import { useAuth } from "../../context/useAuth"; // ✅ ajusta la ruta si tu carpeta cambia
 
 type Role = "PRESIDENCIA" | "TESORERIA" | "ADQUISICIONES" | "ADMIN";
 
@@ -46,6 +46,8 @@ export default function Sidebar({
   onBackgroundToggle,
 }: SidebarProps) {
   const navigate = useNavigate();
+  const { logout } = useAuth(); // ✅
+
   const { name } = getUser();
   const [catalogsOpen, setCatalogsOpen] = useState(false);
 
@@ -56,21 +58,13 @@ export default function Sidebar({
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
-          { label: "Proveedores", to: "/catalogos/proveedores" },
-          { label: "Partidas", to: "/catalogos/partidas" },
-          { label: "Áreas", to: "/catalogos/areas" },
-
-          // ✅ Unidades Administrativas
           {
             label: "Unidades Administrativas",
             to: "/catalogos/unidades-administrativas",
           },
+          { label: "Roles", to: "/catalogos/roles" },
+          { label: "Permisos", to: "/catalogos/permisos" },
         ],
-      },
-      {
-        label: "Registrar Adquisición",
-        to: "/adquisiciones/registrar",
-        icon: <FiFileText />,
       },
       {
         label: "Usuarios",
@@ -82,8 +76,8 @@ export default function Sidebar({
 
   const handleLogout = () => {
     onNavigate?.();
-    localStorage.clear();
-    navigate("/login", { replace: true });
+    logout(); // ✅ actualiza tokenState al instante
+    navigate("/login", { replace: true }); // ✅ sin pasar por "/"
   };
 
   const toggleTheme = () => {
@@ -99,8 +93,19 @@ export default function Sidebar({
     <aside
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
       onMouseDownCapture={(e) => {
+        // ✅ FIX: no cerrar si la interacción viene del scroll/menú
         if (!onBackgroundToggle) return;
-        if (isInteractiveTarget(e.target)) return;
+
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        // 1) Si el click/drag fue dentro del área scrolleable, NO cerrar
+        if (target.closest(`.${styles.scrollArea}`)) return;
+
+        // 2) Si fue en botón/link, NO cerrar
+        if (isInteractiveTarget(target)) return;
+
+        // 3) Solo en áreas "muertas" del sidebar
         onBackgroundToggle();
       }}
     >
@@ -194,9 +199,7 @@ export default function Sidebar({
                 }
               >
                 <span className={styles.icon}>{item.icon}</span>
-                {!collapsed && (
-                  <span className={styles.label}>{item.label}</span>
-                )}
+                {!collapsed && <span className={styles.label}>{item.label}</span>}
               </NavLink>
             )
           )}
@@ -205,11 +208,7 @@ export default function Sidebar({
 
       {/* BOTTOM */}
       <div className={styles.bottom}>
-        <button
-          type="button"
-          className={styles.bottomBtn}
-          onClick={toggleTheme}
-        >
+        <button type="button" className={styles.bottomBtn} onClick={toggleTheme}>
           <span className={styles.icon}>
             <FiSun />
           </span>
