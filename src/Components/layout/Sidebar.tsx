@@ -64,6 +64,12 @@ export default function Sidebar({
           },
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
+
+          // ✅ COG
+          { label: "COG", to: "/catalogos/cog" },
+
+          // ✅ NUEVO: Fondo de Financiamiento
+          { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
         ],
       },
       {
