@@ -20,7 +20,6 @@
   color: #000;
   min-height: calc(100vh - 20px);
   padding: 24px;
-  box-sizing: border-box;
   background: radial-gradient(
       1100px 520px at 25% -10%,
       rgba(182, 138, 42, 0.1),
@@ -46,7 +45,7 @@
 }
 
 .headerText {
-  min-width: 0;
+  min-width: 220px;
 }
 
 .h1 {
@@ -66,6 +65,13 @@
   font-weight: 400;
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 /* =========================
    SEARCH
 ========================= */
@@ -74,7 +80,6 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-width: 0;
 }
 
 .searchIcon {
@@ -98,8 +103,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
   font-family: inherit;
-  box-sizing: border-box;
-  min-width: 0;
 }
 
 .searchInput:focus {
@@ -157,7 +160,7 @@
 }
 
 /* =========================
-   CARD (igual Users)
+   CARD
 ========================= */
 .card {
   background: linear-gradient(180deg, #edebeb, #fbfbfd);
@@ -165,7 +168,6 @@
   border-radius: 14px;
   box-shadow: var(--shadowSoft);
   overflow: hidden;
-
   max-height: 420px;
   display: flex;
   flex-direction: column;
@@ -195,7 +197,7 @@
 }
 
 /* =========================
-   PAGER (igual Users)
+   PAGER
 ========================= */
 .pager {
   display: inline-flex;
@@ -241,7 +243,7 @@
 }
 
 .pagerInfo {
-  min-width: 64px;
+  min-width: 88px;
   text-align: center;
   font-weight: 900;
   font-size: 13px;
@@ -253,15 +255,25 @@
   height: 35px;
   border-radius: 12px;
   border: 1px solid var(--border2);
-  background: #989696; /* ✅ igual que Users */
+  background: #989696;
   padding: 0 15px;
   font-weight: 500;
   font-family: inherit;
-  color: #111827;
+}
+
+@media (max-width: 620px) {
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pager {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
 }
 
 /* =========================
-   TABLE + SCROLL (igual Users)
+   TABLE (sticky)
 ========================= */
 .tableWrap {
   overflow-y: auto;
@@ -278,7 +290,6 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
-  min-width: 520px;
 }
 
 .table thead th {
@@ -359,14 +370,13 @@
 }
 
 /* =========================
-   PANEL (scroll igual Users)
+   PANEL
 ========================= */
 .panelBody {
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-
   max-height: min(520px, calc(100vh - 300px));
   overflow: auto;
 }
@@ -415,13 +425,10 @@
   text-align: right;
   opacity: 0.9;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* =========================
-   FORM
+   FORM + INPUTS
 ========================= */
 .form {
   display: flex;
@@ -432,7 +439,8 @@
 .grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
 }
 
 .labelRow {
@@ -464,7 +472,7 @@
   background: #fff;
   color: #000;
   transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
-  box-sizing: border-box;
+  font-family: inherit;
 }
 
 .input:hover {
@@ -484,7 +492,7 @@
 }
 
 /* =========================
-   ACTIONS + BUTTONS
+   BUTTONS
 ========================= */
 .actions {
   display: flex;
@@ -496,10 +504,10 @@
 }
 
 .btnGhost,
-.btnDanger,
 .btnEdit,
 .btnSave,
-.btnPrimary {
+.btnPrimary,
+.btnDanger {
   height: 44px;
   padding: 0 16px;
   border-radius: 12px;
@@ -556,20 +564,6 @@
   box-shadow: var(--shadow);
 }
 
-.btnDanger {
-  border: 1px solid rgba(220, 38, 38, 0.95);
-  background: rgba(220, 38, 38, 0.14);
-  color: #111827;
-}
-
-.btnDanger:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.95);
-  border-color: rgba(220, 38, 38, 1);
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
 .btnSave {
   border: 1px solid rgba(22, 163, 74, 0.95);
   background: rgba(22, 163, 74, 0.14);
@@ -584,75 +578,31 @@
   box-shadow: var(--shadow);
 }
 
+.btnDanger {
+  border: 1px solid rgba(220, 38, 38, 0.9);
+  background: rgba(220, 38, 38, 0.12);
+  color: #111827;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.92);
+  border-color: rgba(220, 38, 38, 1);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
 .btnPrimary:disabled,
 .btnGhost:disabled,
-.btnDanger:disabled,
 .btnEdit:disabled,
-.btnSave:disabled {
+.btnSave:disabled,
+.btnDanger:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-/* =========================
-   RESPONSIVE
-========================= */
-@media (max-width: 900px) {
-  .headerTop {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-
-  .btnPrimary {
-    width: 100%;
-  }
-
-  .cardHeader {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .pager {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 520px) {
-  .page {
-    padding: 14px;
-  }
-
-  .h1 {
-    font-size: 24px;
-  }
-
-  .btnPrimary,
-  .btnSave,
-  .btnGhost,
-  .btnEdit,
-  .btnDanger {
-    width: 100%;
-  }
-
-  .detailRow {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .detailValue {
-    max-width: 100%;
-    text-align: left;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-  }
-
-  .table {
-    min-width: 520px;
-  }
-}
 /* =========================
    SWITCH
 ========================= */
@@ -716,8 +666,37 @@
   transform: none;
 }
 
-.switchField {
-  display: flex;
-  align-items: center;
-  height: 46px;
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 900px) {
+  .headerTop {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .headerActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btnPrimary,
+  .btnGhost {
+    width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .headerActions {
+    grid-template-columns: 1fr;
+  }
+
+  .actions > button {
+    width: 100%;
+  }
 }

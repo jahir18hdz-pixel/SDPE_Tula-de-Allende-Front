@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "../styles/Cog.module.css";
+import styles from "../styles/Prog.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
-type CogRow = {
-  idCog?: number;
-  IdCog?: number;
+type ProgRow = {
+  idProg?: number;
+  IdProg?: number;
 
   code?: number;
   Code?: number;
@@ -20,7 +20,7 @@ type CogRow = {
   [key: string]: unknown;
 };
 
-type CreateForm = {
+type Form = {
   code: string;
   description: string;
   active: boolean;
@@ -30,19 +30,19 @@ type AuthStored = { token?: string; Token?: string };
 type UnknownObject = Record<string, unknown>;
 
 const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/Cog`;
+const API_BASE = `${BASE_API}/api/Prog`;
 
-const initialCreate: CreateForm = {
+const initialForm: Form = {
   code: "",
   description: "",
   active: true,
 };
 
-export default function Cog() {
-  const [rows, setRows] = useState<CogRow[]>([]);
+export default function Prog() {
+  const [rows, setRows] = useState<ProgRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [selected, setSelected] = useState<CogRow | null>(null);
+  const [selected, setSelected] = useState<ProgRow | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
 
   const [showInactive, setShowInactive] = useState(false);
@@ -54,8 +54,8 @@ export default function Cog() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [create, setCreate] = useState<CreateForm>(initialCreate);
-  const [edit, setEdit] = useState<CreateForm>(initialCreate);
+  const [create, setCreate] = useState<Form>(initialForm);
+  const [edit, setEdit] = useState<Form>(initialForm);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -68,7 +68,7 @@ export default function Cog() {
   }, []);
 
   const selectedCode = useMemo(() => getCode(selected), [selected]);
-  const selectedId = useMemo(() => getIdCog(selected), [selected]);
+  const selectedId = useMemo(() => getIdProg(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
@@ -147,7 +147,7 @@ export default function Cog() {
         return;
       }
 
-      const normalized = normalizeCogArray(result.data);
+      const normalized = normalizeArray(result.data);
       setRows(normalized);
 
       // mantener selección si existe
@@ -171,16 +171,23 @@ export default function Cog() {
     }
   }
 
-  function normalizeCogArray(payload: unknown): CogRow[] {
-    if (Array.isArray(payload)) return payload as CogRow[];
+  function normalizeArray(payload: unknown): ProgRow[] {
+    if (Array.isArray(payload)) return payload as ProgRow[];
 
     const obj = asObject(payload);
     if (!obj) return [];
 
     const possible =
-      obj.items ?? obj.Items ?? obj.data ?? obj.Data ?? obj.cogs ?? obj.Cogs;
+      obj.items ??
+      obj.Items ??
+      obj.data ??
+      obj.Data ??
+      obj.progs ??
+      obj.Progs ??
+      obj.programas ??
+      obj.Programas;
 
-    if (Array.isArray(possible)) return possible as CogRow[];
+    if (Array.isArray(possible)) return possible as ProgRow[];
 
     return [];
   }
@@ -213,7 +220,7 @@ export default function Cog() {
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, page, pageSize]);
 
-  function onRowClick(row: CogRow) {
+  function onRowClick(row: ProgRow) {
     setSelected(row);
     setMode("view");
   }
@@ -221,7 +228,7 @@ export default function Cog() {
   function startCreate() {
     setMode("create");
     setSelected(null);
-    setCreate(initialCreate);
+    setCreate(initialForm);
   }
 
   function clearSelection() {
@@ -247,7 +254,7 @@ export default function Cog() {
     setPage(1);
   }
 
-  function validateForm(f: CreateForm): string {
+  function validateForm(f: Form): string {
     const code = Number(f.code);
     if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
 
@@ -263,7 +270,6 @@ export default function Cog() {
 
     setSaving(true);
     try {
-      // CreateCogCommand(int Code, string Description, bool Active)
       const payload = {
         code: Number(create.code),
         description: asTrim(create.description),
@@ -278,9 +284,9 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG creado correctamente");
+      showToast("success", "Prog creado correctamente");
       setMode("view");
-      setCreate(initialCreate);
+      setCreate(initialForm);
       await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -293,10 +299,10 @@ export default function Cog() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    // ✅ Controller: PUT /api/Cog/{id:int}
+    // ✅ Controller: PUT /api/Prog/{id:int}
     const id = selectedId;
     if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar el idCog del COG seleccionado.");
+      return showToast("error", "No pude identificar el idProg del prog seleccionado.");
     }
 
     const codeNum = Number(edit.code);
@@ -318,7 +324,7 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG actualizado correctamente");
+      showToast("success", "Prog actualizado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -329,7 +335,7 @@ export default function Cog() {
     }
   }
 
-  // ✅ Controller: PATCH /api/Cog/{code:int}/active  body: boolean
+  // ✅ Controller: PATCH /api/Prog/{code:int}/active   body: boolean
   async function onChangeActive(nextActive: boolean) {
     if (!selected) return;
 
@@ -346,7 +352,7 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", nextActive ? "COG activado correctamente" : "COG desactivado correctamente");
+      showToast("success", nextActive ? "Prog activado correctamente" : "Prog desactivado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -372,9 +378,9 @@ export default function Cog() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
-            <h1 className={styles.h1}>COG</h1>
+            <h1 className={styles.h1}>Prog</h1>
             <p className={styles.sub}>
-              {showInactive ? "Viendo COGs inactivos." : "Viendo COGs activos."}
+              {showInactive ? "Viendo progs inactivos." : "Viendo progs activos."}
             </p>
           </div>
 
@@ -492,17 +498,17 @@ export default function Cog() {
                 {loading ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
-                      Cargando COGs...
+                      Cargando progs...
                     </td>
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron COGs con esos criterios."
+                        ? "No se encontraron progs con esos criterios."
                         : showInactive
-                        ? "No hay COGs inactivos."
-                        : "No hay COGs activos."}
+                        ? "No hay progs inactivos."
+                        : "No hay progs activos."}
                     </td>
                   </tr>
                 ) : (
@@ -536,7 +542,7 @@ export default function Cog() {
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo COG" : mode === "edit" ? "Editar COG" : "Detalle"}
+              {mode === "create" ? "Nuevo Prog" : mode === "edit" ? "Editar Prog" : "Detalle"}
             </p>
           </div>
 
@@ -557,7 +563,7 @@ export default function Cog() {
                       value={create.code}
                       onChange={(e) => setCreate((p) => ({ ...p, code: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Ej: 21101"
+                      placeholder="Ej: 101"
                     />
                   </Field>
 
@@ -567,7 +573,7 @@ export default function Cog() {
                       value={create.description}
                       onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Descripción del COG"
+                      placeholder="Descripción del prog"
                     />
                   </Field>
 
@@ -592,7 +598,7 @@ export default function Cog() {
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un COG de la tabla para ver detalles.</div>
+              <div className={styles.helper}>Selecciona un prog de la tabla para ver detalles.</div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -604,7 +610,7 @@ export default function Cog() {
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                    <span className={styles.detailValue}>{getIdProg(selected) ?? "—"}</span>
                   </div>
 
                   <div className={styles.detailRow}>
@@ -647,7 +653,7 @@ export default function Cog() {
               <div className={styles.detailBox}>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                  <span className={styles.detailValue}>{getIdProg(selected) ?? "—"}</span>
                 </div>
 
                 <div className={styles.detailRow}>
@@ -662,11 +668,7 @@ export default function Cog() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
                 </div>
 
                 <div className={styles.actions}>
@@ -755,27 +757,27 @@ function Field({
 }
 
 /** Helpers */
-function getIdCog(r: CogRow | null): number | null {
+function getIdProg(r: ProgRow | null): number | null {
   if (!r) return null;
-  const v = r.idCog ?? r.IdCog;
+  const v = r.idProg ?? r.IdProg;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getCode(r: CogRow | null): number | null {
+function getCode(r: ProgRow | null): number | null {
   if (!r) return null;
   const v = r.code ?? r.Code;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getDescription(r: CogRow | null): string | null {
+function getDescription(r: ProgRow | null): string | null {
   if (!r) return null;
   const s = asTrim(r.description ?? r.Description ?? "");
   return s ? s : null;
 }
 
-function getActive(r: CogRow | null): boolean | null {
+function getActive(r: ProgRow | null): boolean | null {
   if (!r) return null;
   const v = r.active ?? r.Active;
 

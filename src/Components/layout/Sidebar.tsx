@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import styles from "./Sidebar.module.css";
 import {
   FiHome,
@@ -12,14 +12,11 @@ import {
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
-import { useAuth } from "../../context/useAuth"; // ✅ ajusta la ruta si tu carpeta cambia
-
-type Role = "PRESIDENCIA" | "TESORERIA" | "ADQUISICIONES" | "ADMIN";
+import { useAuth } from "../../context/useAuth";
 
 const getUser = () => {
   const name = localStorage.getItem("user_name") || "Nombre de Usuario";
-  const role = (localStorage.getItem("role") as Role) || "PRESIDENCIA";
-  return { name, role };
+  return { name };
 };
 
 type MenuItem = {
@@ -46,44 +43,45 @@ export default function Sidebar({
   onBackgroundToggle,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { logout } = useAuth(); // ✅
+  const location = useLocation();
+  const { logout } = useAuth();
 
   const { name } = getUser();
-  const [catalogsOpen, setCatalogsOpen] = useState(false);
 
-  const menu: MenuItem[] = useMemo(() => {
-    return [
+  // Estado SOLO para el toggle manual
+  const [catalogsManualOpen, setCatalogsManualOpen] = useState(false);
+
+  // Derivado: si estás en /catalogos/* debe estar abierto sí o sí
+  const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
+  const catalogsOpen = isInCatalogsRoute || catalogsManualOpen;
+
+  const menu: MenuItem[] = useMemo(
+    () => [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
       {
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
-          {
-            label: "Unidades Administrativas",
-            to: "/catalogos/unidades-administrativas",
-          },
+          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
-
-          // ✅ COG
           { label: "COG", to: "/catalogos/cog" },
-
-          // ✅ NUEVO: Fondo de Financiamiento
           { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
+          { label: "PROG", to: "/catalogos/prog" },
+
+          // ✅ NUEVO: PROYECTOS
+          { label: "Proyectos", to: "/catalogos/proyectos" },
         ],
       },
-      {
-        label: "Usuarios",
-        to: "/usuarios/nuevo",
-        icon: <FiUserPlus />,
-      },
-    ];
-  }, []);
+      { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
+    ],
+    []
+  );
 
   const handleLogout = () => {
     onNavigate?.();
-    logout(); // ✅ actualiza tokenState al instante
-    navigate("/login", { replace: true }); // ✅ sin pasar por "/"
+    logout();
+    navigate("/login", { replace: true });
   };
 
   const toggleTheme = () => {
@@ -92,26 +90,25 @@ export default function Sidebar({
 
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
-    setCatalogsOpen((v) => !v);
+    // Si estás en /catalogos/* no permitas “cerrarlo” (opcional pero recomendado)
+    if (isInCatalogsRoute) return;
+    setCatalogsManualOpen((v) => !v);
   };
+
+  const shouldShowSubmenu = catalogsOpen && !collapsed;
 
   return (
     <aside
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
       onMouseDownCapture={(e) => {
-        // ✅ FIX: no cerrar si la interacción viene del scroll/menú
         if (!onBackgroundToggle) return;
 
         const target = e.target as HTMLElement | null;
         if (!target) return;
 
-        // 1) Si el click/drag fue dentro del área scrolleable, NO cerrar
         if (target.closest(`.${styles.scrollArea}`)) return;
-
-        // 2) Si fue en botón/link, NO cerrar
         if (isInteractiveTarget(target)) return;
 
-        // 3) Solo en áreas "muertas" del sidebar
         onBackgroundToggle();
       }}
     >
@@ -156,23 +153,19 @@ export default function Sidebar({
                 >
                   <span className={styles.left}>
                     <span className={styles.icon}>{item.icon}</span>
-                    {!collapsed && (
-                      <span className={styles.label}>{item.label}</span>
-                    )}
+                    {!collapsed && <span className={styles.label}>{item.label}</span>}
                   </span>
 
                   {!collapsed && (
                     <span
-                      className={`${styles.chev} ${
-                        catalogsOpen ? styles.chevOpen : ""
-                      }`}
+                      className={`${styles.chev} ${catalogsOpen ? styles.chevOpen : ""}`}
                     >
                       <FiChevronDown />
                     </span>
                   )}
                 </button>
 
-                {!collapsed && (
+                {shouldShowSubmenu && (
                   <div
                     className={`${styles.submenu} ${
                       catalogsOpen ? styles.submenuOpen : ""
@@ -221,11 +214,7 @@ export default function Sidebar({
           {!collapsed && <span className={styles.label}>Modo claro</span>}
         </button>
 
-        <button
-          type="button"
-          className={styles.bottomBtn}
-          onClick={handleLogout}
-        >
+        <button type="button" className={styles.bottomBtn} onClick={handleLogout}>
           <span className={styles.icon}>
             <FiLogOut />
           </span>

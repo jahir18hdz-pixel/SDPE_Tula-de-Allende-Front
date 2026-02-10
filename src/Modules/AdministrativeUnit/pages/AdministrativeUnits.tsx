@@ -6,18 +6,23 @@ import type { ToastType } from "../../../Components/layout/Toast";
 import ConfirmDialog from "../../../Components/layout/ConfirmDialog";
 
 type AdministrativeUnit = {
-  code?: number;
-  id?: number;
-  description?: string;
-
+  // DTO real
+  IdAdministrativeUnit?: number;
   Code?: number;
-  Id?: number;
   Description?: string;
+  Active?: boolean;
 
-  administrativeUnitCode?: number;
-  administrativeUnitId?: number;
-  AdministrativeUnitCode?: number;
-  AdministrativeUnitId?: number;
+  // variantes por si llega camelCase
+  idAdministrativeUnit?: number;
+  code?: number;
+  description?: string;
+  active?: boolean;
+
+  isActive?: boolean;
+  IsActive?: boolean;
+
+  id?: number;
+  Id?: number;
 
   descripcion?: string;
   Descripcion?: string;
@@ -28,6 +33,7 @@ type AdministrativeUnit = {
 type FormDto = {
   code: string;
   description: string;
+  active: boolean;
 };
 
 type AuthStored = {
@@ -46,16 +52,20 @@ export default function AdministrativeUnits() {
 
   const [selected, setSelected] = useState<AdministrativeUnit | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
-  const [form, setForm] = useState<FormDto>({ code: "", description: "" });
+  const [form, setForm] = useState<FormDto>({
+    code: "",
+    description: "",
+    active: true,
+  });
 
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // ✅ buscador
+  // buscador
   const [search, setSearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  // ✅ paginación (frontend)
+  // paginación
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -70,13 +80,15 @@ export default function AdministrativeUnits() {
   }, []);
 
   const selectedCode = useMemo(() => getCode(selected), [selected]);
+  const selectedId = useMemo(() => getId(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ filtrar
+  useEffect(() => setPage(1), [search]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q || isSearching) return rows;
@@ -84,30 +96,23 @@ export default function AdministrativeUnits() {
     const maybeNum = Number(q);
     const isNum = Number.isFinite(maybeNum) && q !== "";
 
-    if (isNum) {
-      return rows.filter((u) => String(getCode(u) ?? "").includes(q));
-    }
+    if (isNum) return rows.filter((u) => String(getCode(u) ?? "").includes(q));
 
     return rows.filter((u) => (getDescription(u) ?? "").toLowerCase().includes(q));
   }, [rows, search, isSearching]);
 
-  // ✅ reset a página 1 cuando cambie filtro/lista
+  const totalCount = useMemo(() => filteredRows.length, [filteredRows]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / pageSize)), [totalCount, pageSize]);
+
+  const displayedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
+
   useEffect(() => {
-    setPage(1);
-  }, [search, rows]);
-
-  const totalCount = filteredRows.length;
-
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(totalCount / pageSize));
-  }, [totalCount, pageSize]);
-
-  const pagedRows = useMemo(() => {
-    const safePage = Math.min(Math.max(1, page), totalPages);
-    const start = (safePage - 1) * pageSize;
-    const end = start + pageSize;
-    return filteredRows.slice(start, end);
-  }, [filteredRows, page, pageSize, totalPages]);
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function readToken(): string {
     const rawAuth = localStorage.getItem("auth");
@@ -146,10 +151,7 @@ export default function AdministrativeUnits() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) && typeof (parsed as Record<string, unknown>).message === "string"
-          ? String((parsed as Record<string, unknown>).message)
-          : "";
+      const apiMsg = isRecord(parsed) && typeof parsed.message === "string" ? parsed.message : "";
       const msg = apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
       return { ok: false, error: msg, status: res.status };
     }
@@ -159,9 +161,7 @@ export default function AdministrativeUnits() {
 
   function extractList(payload: unknown): AdministrativeUnit[] {
     if (Array.isArray(payload)) return payload as AdministrativeUnit[];
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord)["$values"])) {
-      return (payload as UnknownRecord)["$values"] as AdministrativeUnit[];
-    }
+    if (isRecord(payload) && Array.isArray(payload.$values)) return payload.$values as AdministrativeUnit[];
     const arr = findArrayDeep(payload, 0);
     if (arr) return arr as AdministrativeUnit[];
     if (isRecord(payload)) return [payload as AdministrativeUnit];
@@ -173,14 +173,12 @@ export default function AdministrativeUnits() {
     if (Array.isArray(payload)) return payload;
     if (!isRecord(payload)) return null;
 
-    const obj = payload as UnknownRecord;
-
-    const values = obj["$values"];
+    const values = payload["$values"];
     if (Array.isArray(values)) return values;
 
     const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
     for (const k of keys) {
-      const v = obj[k];
+      const v = payload[k];
       if (Array.isArray(v)) return v;
       const nested = findArrayDeep(v, depth + 1);
       if (nested) return nested;
@@ -212,9 +210,10 @@ export default function AdministrativeUnits() {
 
       const list = extractList(result.data);
       setRows(list);
+      setPage(1);
 
       if (keepSelected != null) {
-        const found = list.find((u) => getCode(u) === keepSelected) ?? null;
+        const found = list.find((r) => getCode(r) === keepSelected) ?? null;
         setSelected(found);
         setMode("view");
       }
@@ -231,10 +230,7 @@ export default function AdministrativeUnits() {
     setIsSearching(true);
     setLoading(true);
     try {
-      const result = await requestJson(`${API_BASE}/${code}`, {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const result = await requestJson(`${API_BASE}/${code}`, { method: "GET", headers: authHeaders() });
 
       if (!result.ok) {
         if (result.status === 404) {
@@ -250,6 +246,7 @@ export default function AdministrativeUnits() {
 
       const unit = extractList(result.data);
       setRows(unit);
+      setPage(1);
 
       const found = unit[0] ?? null;
       setSelected(found);
@@ -264,18 +261,12 @@ export default function AdministrativeUnits() {
 
   async function onSearch() {
     const q = search.trim();
-    if (!q) {
-      await loadAll();
-      return;
-    }
+    if (!q) return loadAll();
 
     const num = Number(q);
     const isNum = Number.isFinite(num) && q !== "";
 
-    if (isNum) {
-      await searchByCode(num);
-      return;
-    }
+    if (isNum) return searchByCode(num);
 
     setIsSearching(true);
     await loadAll();
@@ -284,13 +275,13 @@ export default function AdministrativeUnits() {
   function clearSelection() {
     setSelected(null);
     setMode("view");
-    setForm({ code: "", description: "" });
+    setForm({ code: "", description: "", active: true });
   }
 
   function startCreate() {
     setMode("create");
     setSelected(null);
-    setForm({ code: "", description: "" });
+    setForm({ code: "", description: "", active: true });
   }
 
   function startEdit(row: AdministrativeUnit) {
@@ -299,6 +290,7 @@ export default function AdministrativeUnits() {
     setForm({
       code: String(getCode(row) ?? ""),
       description: String(getDescription(row) ?? ""),
+      active: getActive(row) ?? true,
     });
   }
 
@@ -311,7 +303,7 @@ export default function AdministrativeUnits() {
     const codeNum = Number(form.code);
 
     if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (mode === "create" && codeExists(codeNum)) return "No se pueden repetir las claves";
+    if (mode === "create" && codeExists(codeNum)) return "No se pueden repetir las claves.";
     if (!form.description.trim()) return "La descripción es obligatoria.";
     if (form.description.trim().length < 3) return "La descripción es muy corta.";
     return "";
@@ -322,11 +314,15 @@ export default function AdministrativeUnits() {
     if (msg) return showToast("error", msg);
 
     const codeNum = Number(form.code);
-    if (codeExists(codeNum)) return showToast("error", "Clave. No se pueden repetir las claves");
+    if (codeExists(codeNum)) return showToast("error", "Clave duplicada. No se pueden repetir las claves.");
 
     setSaving(true);
     try {
-      const payload = { Code: codeNum, Description: form.description.trim() };
+      const payload = {
+        Code: codeNum,
+        Description: form.description.trim(),
+        Active: form.active,
+      };
 
       const result = await requestJson(API_BASE, {
         method: "POST",
@@ -347,14 +343,24 @@ export default function AdministrativeUnits() {
   }
 
   async function onUpdate() {
-    if (!selected || selectedCode == null) return showToast("error", "Selecciona una unidad para editar.");
-    if (!form.description.trim()) return showToast("error", "La descripción es obligatoria.");
+    if (!selected) return showToast("error", "Selecciona una unidad para editar.");
+
+    const msg = validateForm();
+    if (msg) return showToast("error", msg);
+
+    // ✅ TU BACK: PUT /{id:int}
+    if (selectedId == null) return showToast("error", "No se pudo resolver el IdAdministrativeUnit.");
 
     setSaving(true);
     try {
-      const payload = { Code: selectedCode, Description: form.description.trim() };
+      const payload = {
+        IdAdministrativeUnit: selectedId,
+        Code: Number(form.code),
+        Description: form.description.trim(),
+        Active: form.active,
+      };
 
-      const result = await requestJson(`${API_BASE}/${selectedCode}`, {
+      const result = await requestJson(`${API_BASE}/${selectedId}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -364,6 +370,56 @@ export default function AdministrativeUnits() {
 
       showToast("success", "Unidad actualizada correctamente");
       setMode("view");
+
+      if (selectedCode != null) await loadAll(selectedCode);
+      else await loadAll(null);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * ✅ FIX: algunos backends con [FromBody] bool no toman bien false/true
+   * dependiendo de configuración, así que hacemos:
+   *  1) PATCH con body: true/false (raw JSON)
+   *  2) si falla (400/415), reintenta con { active: true/false }
+   */
+  async function patchActive(code: number, next: boolean) {
+    // intento 1: bool directo
+    const r1 = await requestJson(`${API_BASE}/${code}/active`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify(next),
+    });
+
+    if (r1.ok) return;
+
+    // intento 2: objeto { active: next }
+    // (por si el backend realmente espera un DTO)
+    const r2 = await requestJson(`${API_BASE}/${code}/active`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ active: next }),
+    });
+
+    if (!r2.ok) throw new Error(r2.error);
+  }
+
+  // activar directo; desactivar con confirm
+  async function onToggleActive(next: boolean) {
+    if (!selected || selectedCode == null) return showToast("error", "Selecciona una unidad.");
+
+    if (next === false) {
+      setConfirmOpen(true);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await patchActive(selectedCode, true);
+      showToast("success", "Unidad activada correctamente");
       await loadAll(selectedCode);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -372,27 +428,21 @@ export default function AdministrativeUnits() {
     }
   }
 
-  async function onDeleteConfirmed() {
+  async function onConfirmDeactivate() {
     if (!selected || selectedCode == null) {
       setConfirmOpen(false);
-      return showToast("error", "Selecciona una unidad para eliminar.");
+      return showToast("error", "Selecciona una unidad.");
     }
 
     setSaving(true);
     try {
-      const result = await requestJson(`${API_BASE}/${selectedCode}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", "Unidad eliminada correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll(null);
+      await patchActive(selectedCode, false);
+      showToast("success", "Unidad desactivada correctamente");
+      await loadAll(selectedCode);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
+      // muy importante: si falló, recarga para que el switch refleje el back real
+      await loadAll(selectedCode);
     } finally {
       setSaving(false);
       setConfirmOpen(false);
@@ -411,22 +461,22 @@ export default function AdministrativeUnits() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Eliminar unidad administrativa"
-        message={`¿Estás seguro de eliminar la unidad "${getDescription(selected) ?? "—"}" (clave ${
+        title="Desactivar unidad"
+        message={`¿Estás seguro de desactivar la unidad "${getDescription(selected) ?? "—"}" (clave ${
           selectedCode ?? "—"
         })? Esta acción no se puede deshacer.`}
-        confirmText="Sí, eliminar"
+        confirmText="Sí, desactivar"
         cancelText="Cancelar"
         loading={saving}
         onCancel={() => setConfirmOpen(false)}
-        onConfirm={onDeleteConfirmed}
+        onConfirm={onConfirmDeactivate}
       />
 
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Unidades Administrativas</h1>
-            <p className={styles.sub}>Consulta, crea, edita o elimina unidades administrativas.</p>
+            <p className={styles.sub}>Consulta, crea, edita o activa/desactiva unidades administrativas.</p>
           </div>
 
           <div className={styles.searchWrapper}>
@@ -474,22 +524,16 @@ export default function AdministrativeUnits() {
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
 
-            {/* ✅ paginación igual a Users */}
             <div className={styles.pager}>
               <select
                 className={styles.pageSize}
                 value={pageSize}
                 disabled={loading || saving}
-                onChange={(e) => {
-                  const ps = Number(e.target.value);
-                  setPageSize(ps);
-                  setPage(1);
-                }}
+                onChange={(e) => setPageSize(Number(e.target.value))}
               >
                 {[5, 10, 20, 50].map((n) => (
                   <option key={n} value={n}>
@@ -509,7 +553,7 @@ export default function AdministrativeUnits() {
                 </button>
 
                 <span className={styles.pagerInfo}>
-                  {Math.min(page, totalPages)} / {totalPages}
+                  {page} / {totalPages}
                 </span>
 
                 <button
@@ -530,26 +574,35 @@ export default function AdministrativeUnits() {
                 <tr>
                   <th style={{ width: 120 }}>Clave</th>
                   <th>Descripción</th>
+                  <th style={{ width: 140 }}>Activo</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
+                    <td colSpan={3} className={styles.empty}>
                       Cargando unidades...
                     </td>
                   </tr>
-                ) : pagedRows.length === 0 ? (
+                ) : filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
+                    <td colSpan={3} className={styles.empty}>
                       {search.trim() ? "No se encontraron unidades con esos criterios." : "No hay unidades registradas."}
                     </td>
                   </tr>
+                ) : displayedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className={styles.empty}>
+                      No hay registros en esta página.
+                    </td>
+                  </tr>
                 ) : (
-                  pagedRows.map((r, idx) => {
+                  displayedRows.map((r, idx) => {
                     const code = getCode(r);
                     const desc = getDescription(r) ?? "—";
+                    const active = getActive(r) ?? false;
+
                     const key = code != null ? String(code) : `row-${idx}`;
                     const isSelected = selectedCode != null && code != null && code === selectedCode;
 
@@ -561,6 +614,9 @@ export default function AdministrativeUnits() {
                       >
                         <td className={styles.mono}>{code != null ? String(code) : "—"}</td>
                         <td>{desc}</td>
+                        <td>
+                          <Switch checked={active} disabled />
+                        </td>
                       </tr>
                     );
                   })
@@ -570,7 +626,6 @@ export default function AdministrativeUnits() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
@@ -590,8 +645,22 @@ export default function AdministrativeUnits() {
                   </div>
 
                   <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Id</span>
+                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Descripción</span>
                     <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={getActive(selected) ?? false}
+                      disabled={saving}
+                      onChange={(next) => void onToggleActive(next)}
+                    />
                   </div>
 
                   <div className={styles.actions}>
@@ -603,8 +672,13 @@ export default function AdministrativeUnits() {
                       Editar
                     </button>
 
-                    <button className={styles.btnDanger} type="button" onClick={() => setConfirmOpen(true)} disabled={saving}>
-                      Eliminar
+                    <button
+                      className={styles.btnDanger}
+                      type="button"
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={saving || (getActive(selected) ?? false) === false}
+                    >
+                      Desactivar
                     </button>
                   </div>
                 </div>
@@ -637,6 +711,17 @@ export default function AdministrativeUnits() {
                       disabled={saving}
                     />
                   </Field>
+
+                  <Field label="Activo">
+                    <div className={styles.switchField}>
+                      <Switch
+                        checked={form.active}
+                        disabled={saving}
+                        onChange={(next) => setForm((p) => ({ ...p, active: next }))}
+                        label={form.active ? "Activo" : "Inactivo"}
+                      />
+                    </div>
+                  </Field>
                 </div>
 
                 <div className={styles.actions}>
@@ -657,28 +742,69 @@ export default function AdministrativeUnits() {
   );
 }
 
+/** Switch */
+type SwitchProps = {
+  checked: boolean;
+  onChange?: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+};
+
+function Switch({ checked, onChange, disabled, label }: SwitchProps) {
+  return (
+    <label className={styles.switchWrap} aria-disabled={disabled}>
+      {label && <span className={styles.switchLabel}>{label}</span>}
+      <button
+        type="button"
+        className={`${styles.switch} ${checked ? styles.switchOn : ""}`}
+        onClick={() => !disabled && onChange?.(!checked)}
+        disabled={disabled}
+        aria-pressed={checked}
+        aria-label={label ?? "Cambiar estado"}
+      >
+        <span className={styles.switchKnob} />
+      </button>
+    </label>
+  );
+}
+
 /** Helpers */
+function getId(u: AdministrativeUnit | null): number | null {
+  if (!u) return null;
+  const v = u.IdAdministrativeUnit ?? u.idAdministrativeUnit ?? u.id ?? u.Id;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function getCode(u: AdministrativeUnit | null): number | null {
   if (!u) return null;
-  const v =
-    u.code ??
-    u.id ??
-    u.Code ??
-    u.Id ??
-    u.administrativeUnitCode ??
-    u.administrativeUnitId ??
-    u.AdministrativeUnitCode ??
-    u.AdministrativeUnitId;
-
+  const v = u.Code ?? u.code;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
 function getDescription(u: AdministrativeUnit | null): string | null {
   if (!u) return null;
-  const v = u.description ?? u.Description ?? u.descripcion ?? u.Descripcion;
+  const v = u.Description ?? u.description ?? u.descripcion ?? u.Descripcion;
   const s = String(v ?? "").trim();
   return s ? s : null;
+}
+
+function getActive(u: AdministrativeUnit | null): boolean | null {
+  if (!u) return null;
+
+  const v: unknown = u.Active ?? u.active ?? u.isActive ?? u.IsActive;
+
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
+    if (t === "false" || t === "0" || t === "no") return false;
+  }
+
+  return null;
 }
 
 type FieldProps = {

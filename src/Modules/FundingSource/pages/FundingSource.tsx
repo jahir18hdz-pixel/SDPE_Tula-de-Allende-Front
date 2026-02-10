@@ -68,6 +68,7 @@ export default function FundingSource() {
   }, []);
 
   const selectedCode = useMemo(() => getCode(selected), [selected]);
+  const selectedId = useMemo(() => getIdFundingSource(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
@@ -111,8 +112,7 @@ export default function FundingSource() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) && typeof parsed.message === "string" ? parsed.message : "";
+      const apiMsg = isRecord(parsed) ? getStringProp(parsed, "message") ?? "" : "";
 
       const msg =
         apiMsg ||
@@ -271,9 +271,9 @@ export default function FundingSource() {
     setSaving(true);
     try {
       const payload = {
-        Code: Number(create.code),
-        Description: asTrim(create.description),
-        Active: Boolean(create.active),
+        code: Number(create.code),
+        description: asTrim(create.description),
+        active: Boolean(create.active),
       };
 
       const result = await requestJson(`${API_BASE}`, {
@@ -299,21 +299,26 @@ export default function FundingSource() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    const codeUrl = Number(edit.code);
-    if (!Number.isFinite(codeUrl) || codeUrl <= 0) return showToast("error", "Código inválido.");
+    // ✅ Controller: PUT /api/FundingSource/{id:int}
+    const id = selectedId;
+    if (id == null || id <= 0) {
+      return showToast("error", "No pude identificar el idFundingSource del fondo seleccionado.");
+    }
+
+    const codeNum = Number(edit.code);
+    if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
 
     setSaving(true);
     try {
-      // Tu controller dice [HttpPut("{code:int}")] pero recibe UpdateStateFundingCommand.
-      // Normalmente lo correcto sería UpdateFundingSourceCommand (Code, Description, Active).
-      // Aun así, enviamos Code/Description/Active como en COG para mantener consistencia.
+      // UpdateFundingSourceCommand(idFundingSource, Code, Description, Active)
+      // El controller fuerza idFundingSource desde la URL, así que no hace falta mandarlo.
       const payload = {
-        Code: codeUrl,
-        Description: asTrim(edit.description),
-        Active: Boolean(edit.active),
+        code: codeNum,
+        description: asTrim(edit.description),
+        active: Boolean(edit.active),
       };
 
-      const result = await requestJson(`${API_BASE}/${codeUrl}`, {
+      const result = await requestJson(`${API_BASE}/${id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -332,7 +337,8 @@ export default function FundingSource() {
     }
   }
 
-  async function onDeactivate() {
+  // ✅ Controller: PATCH /api/FundingSource/{code:int}/active   body: boolean
+  async function onChangeActive(nextActive: boolean) {
     if (!selected) return;
 
     const code = getCode(selected);
@@ -340,14 +346,15 @@ export default function FundingSource() {
 
     setSaving(true);
     try {
-      const result = await requestJson(`${API_BASE}/${code}/desactivar`, {
+      const result = await requestJson(`${API_BASE}/${code}/active`, {
         method: "PATCH",
         headers: authHeaders(),
+        body: JSON.stringify(nextActive),
       });
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "Fondo de financiamiento desactivado correctamente");
+      showToast("success", nextActive ? "Fondo activado correctamente" : "Fondo desactivado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -604,6 +611,11 @@ export default function FundingSource() {
               >
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>ID</span>
+                    <span className={styles.detailValue}>{getIdFundingSource(selected) ?? "—"}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Código</span>
                     <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
                   </div>
@@ -642,6 +654,11 @@ export default function FundingSource() {
             ) : (
               <div className={styles.detailBox}>
                 <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>ID</span>
+                  <span className={styles.detailValue}>{getIdFundingSource(selected) ?? "—"}</span>
+                </div>
+
+                <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
                   <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
                 </div>
@@ -653,7 +670,11 @@ export default function FundingSource() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
                 <div className={styles.actions}>
@@ -668,11 +689,22 @@ export default function FundingSource() {
                   <button
                     className={styles.btnDanger}
                     type="button"
-                    onClick={() => void onDeactivate()}
+                    onClick={() => void onChangeActive(false)}
                     disabled={saving || loading || !(getActive(selected) ?? false)}
                   >
                     Desactivar
                   </button>
+
+                  {showInactive && (
+                    <button
+                      className={styles.btnSave}
+                      type="button"
+                      onClick={() => void onChangeActive(true)}
+                      disabled={saving || loading || (getActive(selected) ?? false)}
+                    >
+                      Activar
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -731,6 +763,13 @@ function Field({
 }
 
 /** Helpers */
+function getIdFundingSource(r: FundingRow | null): number | null {
+  if (!r) return null;
+  const v = r.idFundingSource ?? r.IdFundingSource;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function getCode(r: FundingRow | null): number | null {
   if (!r) return null;
   const v = r.code ?? r.Code;
@@ -756,6 +795,11 @@ function getActive(r: FundingRow | null): boolean | null {
     if (t === "false" || t === "0" || t === "no") return false;
   }
   return null;
+}
+
+function getStringProp(obj: UnknownObject, key: string): string | undefined {
+  const v = obj[key];
+  return typeof v === "string" ? v : undefined;
 }
 
 function asString(v: unknown): string {

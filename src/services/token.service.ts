@@ -10,5 +10,6 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem("userEmail"); 
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("auth");
 }

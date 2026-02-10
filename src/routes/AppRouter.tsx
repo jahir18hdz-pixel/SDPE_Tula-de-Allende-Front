@@ -8,7 +8,9 @@ import AdministrativeUnits from "../Modules/AdministrativeUnit/pages/Administrat
 import Roles from "../Modules/Roles/pages/Roles";
 import PermissionsByRole from "../Modules/Permissions/pages/Permissions";
 import Cog from "../Modules/Cog/pages/Cog";
-import FundingSource from "../Modules/FundingSource/pages/FundingSource"; // ✅ NUEVO
+import FundingSource from "../Modules/FundingSource/pages/FundingSource";
+import Prog from "../Modules/Prog/pages/Prog";
+import Proyect from "../Modules/Proyect/pages/Proyec"; 
 
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
@@ -27,25 +29,34 @@ export default function AppRouter() {
             <Route path="/home" element={<Home />} />
             <Route path="/usuarios/nuevo" element={<UserCreate />} />
 
-            {/*Unidades Administrativas */}
+            {/* Unidades Administrativas */}
             <Route
               path="/catalogos/unidades-administrativas"
               element={<AdministrativeUnits />}
             />
 
-            {/*Roles */}
+            {/* Roles */}
             <Route path="/catalogos/roles" element={<Roles />} />
 
-            {/*Permisos */}
+            {/* Permisos */}
             <Route path="/catalogos/permisos" element={<PermissionsByRole />} />
 
-            {/*COG */}
+            {/* COG */}
             <Route path="/catalogos/cog" element={<Cog />} />
 
-            {/* ✅ Fondo de Financiamiento */}
+            {/* Fondo de Financiamiento */}
             <Route
               path="/catalogos/fondo-financiamiento"
               element={<FundingSource />}
+            />
+
+            {/* PROG */}
+            <Route path="/catalogos/prog" element={<Prog />} />
+
+            {/* PROYECTOS */}
+            <Route
+              path="/catalogos/proyectos"
+              element={<Proyect />}
             />
           </Route>
         </Route>
