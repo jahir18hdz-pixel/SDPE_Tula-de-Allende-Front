@@ -37,6 +37,13 @@
 .header {
   margin: 0 0 18px;
 }
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 
 .headerTop {
   display: grid;
@@ -720,4 +727,54 @@
   display: flex;
   align-items: center;
   height: 46px;
+}
+
+/* =========================
+   SCROLLBAR (card style)
+========================= */
+
+/* WebKit (Chrome, Edge, Safari) */
+.tableWrap::-webkit-scrollbar,
+.panelBody::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tableWrap::-webkit-scrollbar-track,
+.panelBody::-webkit-scrollbar-track {
+  background: linear-gradient(
+    180deg,
+    rgba(75, 0, 22, 0.08),
+    rgba(182, 138, 42, 0.06)
+  );
+  border: 1px solid rgba(230, 230, 234, 0.9);
+  border-radius: 999px;
+}
+
+.tableWrap::-webkit-scrollbar-thumb,
+.panelBody::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(75, 0, 22, 0.35),
+    rgba(182, 138, 42, 0.35)
+  );
+  border: 2px solid rgba(255, 255, 255, 0.7); /* hace “pill” limpio */
+  border-radius: 999px;
+}
+
+.tableWrap::-webkit-scrollbar-thumb:hover,
+.panelBody::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(75, 0, 22, 0.55),
+    rgba(182, 138, 42, 0.55)
+  );
+}
+
+/* Firefox */
+.tableWrap,
+.panelBody {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 0, 22, 0.45)
+    rgba(182, 138, 42, 0.12);
 }

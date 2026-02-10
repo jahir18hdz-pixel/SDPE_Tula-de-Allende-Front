@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "../styles/Cog.module.css";
+import styles from "../styles/Community.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
-type CogRow = {
-  idCog?: number;
-  IdCog?: number;
+type CommunityRow = {
+  idCommunity?: number;
+  IdCommunity?: number;
 
   code?: number;
   Code?: number;
@@ -20,7 +20,7 @@ type CogRow = {
   [key: string]: unknown;
 };
 
-type CreateForm = {
+type Form = {
   code: string;
   description: string;
   active: boolean;
@@ -30,19 +30,19 @@ type AuthStored = { token?: string; Token?: string };
 type UnknownObject = Record<string, unknown>;
 
 const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/Cog`;
+const API_BASE = `${BASE_API}/api/Community`;
 
-const initialCreate: CreateForm = {
+const initialForm: Form = {
   code: "",
   description: "",
   active: true,
 };
 
-export default function Cog() {
-  const [rows, setRows] = useState<CogRow[]>([]);
+export default function Community() {
+  const [rows, setRows] = useState<CommunityRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [selected, setSelected] = useState<CogRow | null>(null);
+  const [selected, setSelected] = useState<CommunityRow | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
 
   const [showInactive, setShowInactive] = useState(false);
@@ -54,8 +54,8 @@ export default function Cog() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [create, setCreate] = useState<CreateForm>(initialCreate);
-  const [edit, setEdit] = useState<CreateForm>(initialCreate);
+  const [create, setCreate] = useState<Form>(initialForm);
+  const [edit, setEdit] = useState<Form>(initialForm);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -68,7 +68,7 @@ export default function Cog() {
   }, []);
 
   const selectedCode = useMemo(() => getCode(selected), [selected]);
-  const selectedId = useMemo(() => getIdCog(selected), [selected]);
+  const selectedId = useMemo(() => getIdCommunity(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
@@ -146,7 +146,7 @@ export default function Cog() {
         return;
       }
 
-      const normalized = normalizeCogArray(result.data);
+      const normalized = normalizeArray(result.data);
       setRows(normalized);
 
       // mantener selección si existe
@@ -170,22 +170,31 @@ export default function Cog() {
     }
   }
 
-  function normalizeCogArray(payload: unknown): CogRow[] {
-    if (Array.isArray(payload)) return payload as CogRow[];
+  function normalizeArray(payload: unknown): CommunityRow[] {
+    if (Array.isArray(payload)) return payload as CommunityRow[];
 
     const obj = asObject(payload);
     if (!obj) return [];
 
-    const possible = obj.items ?? obj.Items ?? obj.data ?? obj.Data ?? obj.cogs ?? obj.Cogs;
-    if (Array.isArray(possible)) return possible as CogRow[];
+    const possible =
+      obj.items ??
+      obj.Items ??
+      obj.data ??
+      obj.Data ??
+      obj.communities ??
+      obj.Communities ??
+      obj.community ??
+      obj.Community;
+
+    if (Array.isArray(possible)) return possible as CommunityRow[];
 
     return [];
   }
 
   /**
    * ✅ FILTRO CORREGIDO:
-   * - Si hay búsqueda: busca en TODOS (activos e inactivos)
-   * - Si NO hay búsqueda: respeta showInactive (vista activos/inactivos)
+   * - Si hay búsqueda: busca en TODAS (activas e inactivas)
+   * - Si NO hay búsqueda: respeta showInactive (vista activas/inactivas)
    */
   const filteredRows = useMemo(() => {
     const q = asTrim(search).toLowerCase();
@@ -218,7 +227,7 @@ export default function Cog() {
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, page, pageSize]);
 
-  function onRowClick(row: CogRow) {
+  function onRowClick(row: CommunityRow) {
     setSelected(row);
     setMode("view");
   }
@@ -226,7 +235,7 @@ export default function Cog() {
   function startCreate() {
     setMode("create");
     setSelected(null);
-    setCreate(initialCreate);
+    setCreate(initialForm);
   }
 
   function clearSelection() {
@@ -252,7 +261,7 @@ export default function Cog() {
     setPage(1);
   }
 
-  function validateForm(f: CreateForm): string {
+  function validateForm(f: Form): string {
     const code = Number(f.code);
     if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
 
@@ -282,9 +291,9 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG creado correctamente");
+      showToast("success", "Comunidad creada correctamente");
       setMode("view");
-      setCreate(initialCreate);
+      setCreate(initialForm);
       await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -299,7 +308,7 @@ export default function Cog() {
 
     const id = selectedId;
     if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar el idCog del COG seleccionado.");
+      return showToast("error", "No pude identificar el idCommunity de la comunidad seleccionada.");
     }
 
     const codeNum = Number(edit.code);
@@ -308,6 +317,7 @@ export default function Cog() {
     setSaving(true);
     try {
       const payload = {
+        idCommunity: id, // opcional
         code: codeNum,
         description: asTrim(edit.description),
         active: Boolean(edit.active),
@@ -321,7 +331,7 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG actualizado correctamente");
+      showToast("success", "Comunidad actualizada correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -347,13 +357,13 @@ export default function Cog() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
-            <h1 className={styles.h1}>COG</h1>
+            <h1 className={styles.h1}>Comunidades</h1>
             <p className={styles.sub}>
               {asTrim(search)
-                ? "Buscando en activos e inactivos."
+                ? "Buscando en activas e inactivas."
                 : showInactive
-                ? "Viendo COGs inactivos."
-                : "Viendo COGs activos."}
+                ? "Viendo comunidades inactivas."
+                : "Viendo comunidades activas."}
             </p>
           </div>
 
@@ -395,9 +405,9 @@ export default function Cog() {
               type="button"
               onClick={toggleViewActiveInactive}
               disabled={saving || loading || mode === "create" || mode === "edit"}
-              title="Cambiar vista activos/inactivos"
+              title="Cambiar vista activas/inactivas"
             >
-              {showInactive ? "Ver activos" : "Ver inactivos"}
+              {showInactive ? "Ver activas" : "Ver inactivas"}
             </button>
 
             <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
@@ -471,17 +481,17 @@ export default function Cog() {
                 {loading ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
-                      Cargando COGs...
+                      Cargando comunidades...
                     </td>
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron COGs (activos o inactivos) con esos criterios."
+                        ? "No se encontraron comunidades (activas o inactivas) con esos criterios."
                         : showInactive
-                        ? "No hay COGs inactivos."
-                        : "No hay COGs activos."}
+                        ? "No hay comunidades inactivas."
+                        : "No hay comunidades activas."}
                     </td>
                   </tr>
                 ) : (
@@ -515,7 +525,7 @@ export default function Cog() {
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo COG" : mode === "edit" ? "Editar COG" : "Detalle"}
+              {mode === "create" ? "Nueva Comunidad" : mode === "edit" ? "Editar Comunidad" : "Detalle"}
             </p>
           </div>
 
@@ -536,7 +546,7 @@ export default function Cog() {
                       value={create.code}
                       onChange={(e) => setCreate((p) => ({ ...p, code: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Ej: 21101"
+                      placeholder="Ej: 501"
                     />
                   </Field>
 
@@ -546,7 +556,7 @@ export default function Cog() {
                       value={create.description}
                       onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Descripción del COG"
+                      placeholder="Descripción de la comunidad"
                     />
                   </Field>
 
@@ -571,7 +581,7 @@ export default function Cog() {
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un COG de la tabla para ver detalles.</div>
+              <div className={styles.helper}>Selecciona una comunidad de la tabla para ver detalles.</div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -583,7 +593,7 @@ export default function Cog() {
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                    <span className={styles.detailValue}>{getIdCommunity(selected) ?? "—"}</span>
                   </div>
 
                   <div className={styles.detailRow}>
@@ -626,7 +636,7 @@ export default function Cog() {
               <div className={styles.detailBox}>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                  <span className={styles.detailValue}>{getIdCommunity(selected) ?? "—"}</span>
                 </div>
 
                 <div className={styles.detailRow}>
@@ -641,10 +651,14 @@ export default function Cog() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
-                {/* ✅ Sin Activar/Desactivar */}
+                {/* ✅ Acciones sin Activar/Desactivar */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar
@@ -711,27 +725,27 @@ function Field({
 }
 
 /** Helpers */
-function getIdCog(r: CogRow | null): number | null {
+function getIdCommunity(r: CommunityRow | null): number | null {
   if (!r) return null;
-  const v = r.idCog ?? r.IdCog;
+  const v = r.idCommunity ?? r.IdCommunity;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getCode(r: CogRow | null): number | null {
+function getCode(r: CommunityRow | null): number | null {
   if (!r) return null;
   const v = r.code ?? r.Code;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getDescription(r: CogRow | null): string | null {
+function getDescription(r: CommunityRow | null): string | null {
   if (!r) return null;
   const s = asTrim(r.description ?? r.Description ?? "");
   return s ? s : null;
 }
 
-function getActive(r: CogRow | null): boolean | null {
+function getActive(r: CommunityRow | null): boolean | null {
   if (!r) return null;
   const v = r.active ?? r.Active;
 

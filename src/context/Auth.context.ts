@@ -2,6 +2,7 @@ import { createContext } from "react";
 
 export type AuthContextType = {
   token: string | null;
+  email: string | null;
   isAuthenticated: boolean;
   loginWithToken: (token: string) => void;
   logout: () => void;

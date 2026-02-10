@@ -192,16 +192,24 @@ export default function Proyect() {
     return [];
   }
 
+  /**
+   * ✅ FILTRO CORREGIDO
+   * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
+   * - Con búsqueda: busca en TODOS (activos + inactivos)
+   */
   const filteredRows = useMemo(() => {
-    const only = rows.filter((r) => {
-      const active = getActive(r) ?? false;
-      return showInactive ? !active : active;
-    });
-
     const q = asTrim(search).toLowerCase();
-    if (!q) return only;
 
-    return only.filter((r) => {
+    const base = q
+      ? rows
+      : rows.filter((r) => {
+          const active = getActive(r) ?? false;
+          return showInactive ? !active : active;
+        });
+
+    if (!q) return base;
+
+    return base.filter((r) => {
       const code = String(getCode(r) ?? "").toLowerCase();
       const desc = asString(getDescription(r) ?? "").toLowerCase();
       return code.includes(q) || desc.includes(q);
@@ -246,11 +254,11 @@ export default function Proyect() {
     setMode("edit");
   }
 
+  // ✅ No borra el search
   function toggleViewActiveInactive() {
     setShowInactive((prev) => !prev);
     setSelected(null);
     setMode("view");
-    setSearch("");
     setPage(1);
   }
 
@@ -270,7 +278,6 @@ export default function Proyect() {
 
     setSaving(true);
     try {
-      // CreatedProyectCommand(Code, Description, Active)
       const payload = {
         code: Number(create.code),
         description: asTrim(create.description),
@@ -300,7 +307,6 @@ export default function Proyect() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    // ✅ Controller: PUT /api/Proyect/{id:int}
     const id = selectedId;
     if (id == null || id <= 0) {
       return showToast("error", "No pude identificar el idProyect del proyecto seleccionado.");
@@ -311,8 +317,6 @@ export default function Proyect() {
 
     setSaving(true);
     try {
-      // El controller fuerza idProyect desde la URL (command with { idProyect = id })
-      // Aquí mandamos solo los campos que tu command reciba (común: Code, Description, Active).
       const payload = {
         code: codeNum,
         description: asTrim(edit.description),
@@ -328,34 +332,6 @@ export default function Proyect() {
       if (!result.ok) return showToast("error", result.error);
 
       showToast("success", "Proyecto actualizado correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll();
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ✅ Controller: PATCH /api/Proyect/{code:int}/active   body: boolean
-  async function onChangeActive(nextActive: boolean) {
-    if (!selected) return;
-
-    const code = getCode(selected);
-    if (code == null) return showToast("error", "No pude identificar el Code.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(nextActive),
-      });
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", nextActive ? "Proyecto activado correctamente" : "Proyecto desactivado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -382,7 +358,13 @@ export default function Proyect() {
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Proyectos</h1>
-            <p className={styles.sub}>{showInactive ? "Viendo proyectos inactivos." : "Viendo proyectos activos."}</p>
+            <p className={styles.sub}>
+              {asTrim(search)
+                ? "Buscando en activos e inactivos."
+                : showInactive
+                ? "Viendo proyectos inactivos."
+                : "Viendo proyectos activos."}
+            </p>
           </div>
 
           <div className={styles.searchWrapper}>
@@ -506,7 +488,7 @@ export default function Proyect() {
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron proyectos con esos criterios."
+                        ? "No se encontraron proyectos (activos o inactivos) con esos criterios."
                         : showInactive
                         ? "No hay proyectos inactivos."
                         : "No hay proyectos activos."}
@@ -542,7 +524,9 @@ export default function Proyect() {
         {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
-            <p className={styles.cardTitle}>{mode === "create" ? "Nuevo Proyecto" : mode === "edit" ? "Editar Proyecto" : "Detalle"}</p>
+            <p className={styles.cardTitle}>
+              {mode === "create" ? "Nuevo Proyecto" : mode === "edit" ? "Editar Proyecto" : "Detalle"}
+            </p>
           </div>
 
           <div className={styles.panelBody}>
@@ -667,7 +651,11 @@ export default function Proyect() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
                 <div className={styles.actions}>
@@ -678,26 +666,6 @@ export default function Proyect() {
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onChangeActive(false)}
-                    disabled={saving || loading || !(getActive(selected) ?? false)}
-                  >
-                    Desactivar
-                  </button>
-
-                  {showInactive && (
-                    <button
-                      className={styles.btnSave}
-                      type="button"
-                      onClick={() => void onChangeActive(true)}
-                      disabled={saving || loading || (getActive(selected) ?? false)}
-                    >
-                      Activar
-                    </button>
-                  )}
                 </div>
               </div>
             )}

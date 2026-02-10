@@ -10,7 +10,12 @@ import PermissionsByRole from "../Modules/Permissions/pages/Permissions";
 import Cog from "../Modules/Cog/pages/Cog";
 import FundingSource from "../Modules/FundingSource/pages/FundingSource";
 import Prog from "../Modules/Prog/pages/Prog";
-import Proyect from "../Modules/Proyect/pages/Proyec"; 
+import Proyect from "../Modules/Proyect/pages/Proyec";
+
+import ActionsPolicy from "../Modules/ActionsPolicy/pages/ActionsPolicy";
+
+// ✅ NUEVO: Comunidades
+import Community from "../Modules/Community/pages/Community";
 
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
@@ -50,14 +55,23 @@ export default function AppRouter() {
               element={<FundingSource />}
             />
 
+            {/* Acciones de Póliza */}
+            <Route
+              path="/catalogos/acciones-poliza"
+              element={<ActionsPolicy />}
+            />
+
+            {/* ✅ Comunidades */}
+            <Route
+              path="/catalogos/comunidades"
+              element={<Community />}
+            />
+
             {/* PROG */}
             <Route path="/catalogos/prog" element={<Prog />} />
 
             {/* PROYECTOS */}
-            <Route
-              path="/catalogos/proyectos"
-              element={<Proyect />}
-            />
+            <Route path="/catalogos/proyectos" element={<Proyect />} />
           </Route>
         </Route>
 

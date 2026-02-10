@@ -9,6 +9,9 @@
   padding: 14px 14px 12px;
   overflow: hidden;
 
+  /* ✅ para poder “mover” el userRow en colapsado sin tocar JSX */
+  position: relative;
+
   /* Vars */
   --item-gap: 12px;
   --item-radius: 12px;
@@ -17,11 +20,13 @@
   --icon-font: 18px;
 }
 
-/* TOP */
+/* =========================
+   TOP (compactado)
+========================= */
 .top {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px; /* ✅ antes 10px (menos aire) */
 }
 
 .title {
@@ -37,7 +42,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 2px 0;
+  padding: 0; /* ✅ antes 2px 0 */
+  margin-top: 6px; /* ✅ antes 10px */
 }
 
 .logo {
@@ -52,24 +58,29 @@
   width: 100%;
   background: #b68a2a;
   opacity: 0.9;
+  margin: 2px 0; /* ✅ compacta separación */
 }
 
+/* ✅ Perfil más arriba y más compacto */
 .userRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 4px;
+  gap: 8px; /* ✅ antes var(--item-gap) */
+  padding: 6px 8px; /* ✅ antes var(--item-pad) */
+  border-radius: var(--item-radius);
   min-width: 0;
+  margin: -4px 0 4px; /* ✅ sube y reduce aire */
 }
 
 .userIcon {
-  width: 26px;
-  height: 26px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  flex: 0 0 26px;
+  flex: 0 0 var(--icon-size);
+  font-size: var(--icon-font);
+  text-align: center;
   opacity: 0.95;
 }
 
@@ -82,18 +93,19 @@
   text-overflow: ellipsis;
 }
 
-/* SCROLL SOLO MENÚ */
+/* =========================
+   SCROLL SOLO MENÚ
+========================= */
 .scrollArea {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-top: 10px;
+  padding-top: 8px; /* ✅ antes 10px */
 
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 
-  /* evita “saltos” cuando aparece/desaparece scrollbar */
   scrollbar-gutter: stable;
 
   /* Firefox */
@@ -101,7 +113,7 @@
   scrollbar-color: rgba(209, 32, 85, 0.45) rgba(0, 0, 0, 0.04);
 }
 
-/* ✅ Scrollbar (WebKit) igual al de tableWrap */
+/* Scrollbar (WebKit) */
 .scrollArea::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -121,7 +133,9 @@
   background: rgba(164, 11, 57, 0.45);
 }
 
-/* NAV */
+/* =========================
+   NAV
+========================= */
 .nav {
   display: grid;
   gap: 10px;
@@ -149,12 +163,7 @@
   text-align: left;
 }
 
-.item:hover,
-.itemBtn:hover,
-.bottomBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
+/* ACTIVE */
 .active {
   background: rgba(182, 138, 42, 0.14);
   outline: 1px solid rgba(182, 138, 42, 0.45);
@@ -227,11 +236,9 @@
   font-size: 14px;
 }
 
-.subItem:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* BOTTOM FIJO */
+/* =========================
+   BOTTOM FIJO
+========================= */
 .bottom {
   flex: 0 0 auto;
   margin-top: auto;
@@ -248,20 +255,25 @@
   padding: 12px;
 }
 
-/* TOP más compacto y centrado */
+/* TOP compacto */
 .collapsed .top {
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
-/* Logo centrado */
+/* ✅ Logo hasta arriba en colapsado */
 .collapsed .logoWrap {
   padding: 0;
   justify-content: center;
+  margin-top: 4px;
 }
 
+/* ✅ Logo más pequeño para verse completo */
 .collapsed .logo {
-  width: 54px;
+  width: 44px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 /* Ocultar texto y separadores */
@@ -274,9 +286,39 @@
   display: none;
 }
 
-/* Ajuste del scroll en colapsado */
+/* ✅ PERFIL “con los otros iconos” en colapsado */
+.collapsed .userRow {
+  position: absolute;
+  left: 2px;
+  right: 10px;
+  top: 200px; /* ✅ un poco más arriba (antes 210px) */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 10px 0; /* ✅ más compacto */
+  border-radius: 20px;
+}
+
+/* ✅ el userIcon como cualquier icono */
+.collapsed .userIcon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: var(--icon-font);
+  flex: 0 0 var(--icon-size);
+  margin: 0 auto;
+}
+
+/* Dejamos espacio en el scroll para que NO se encime con el userRow absoluto */
 .collapsed .scrollArea {
-  padding-top: 8px;
+  padding-top: 58px; /* ✅ antes 64px */
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 6px;
+}
+
+.collapsed .nav {
+  margin: auto 0;
 }
 
 /* Botones/links centrados en colapsado */
@@ -300,21 +342,6 @@
   justify-content: center;
 }
 
-/* Usuario centrado */
-.collapsed .userRow {
-  justify-content: center;
-  padding: 10px 0;
-  gap: 0;
-}
-
-.collapsed .userIcon {
-  width: var(--icon-size);
-  height: var(--icon-size);
-  font-size: var(--icon-font);
-  flex: 0 0 var(--icon-size);
-  margin: 0 auto;
-}
-
 /* FIX: Catálogos (left) no debe ocupar todo en colapsado */
 .collapsed .left {
   flex: 0;
@@ -322,7 +349,33 @@
   gap: 0;
 }
 
-/* Bottom un poco más compacto en colapsado */
+/* Bottom compacto en colapsado */
 .collapsed .bottom {
   padding-top: 10px;
+}
+
+/* =========================
+   HOVER Y FOCUS (sin azul)
+========================= */
+.item:hover,
+.itemBtn:hover,
+.bottomBtn:hover,
+.subItem:hover,
+.collapsed .userRow:hover {
+  background: rgba(182, 138, 42, 0.18);
+  color: #fff;
+  text-decoration: none;
+}
+
+.item:visited,
+.subItem:visited {
+  color: #fff;
+}
+
+.item:focus-visible,
+.itemBtn:focus-visible,
+.bottomBtn:focus-visible,
+.subItem:focus-visible {
+  outline: 2px solid rgba(182, 138, 42, 0.7);
+  outline-offset: 2px;
 }

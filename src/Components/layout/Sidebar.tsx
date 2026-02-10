@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import styles from "./Sidebar.module.css";
 import {
@@ -15,8 +15,9 @@ import LogoPresi from "../../assets/images/logoRGB.png";
 import { useAuth } from "../../context/useAuth";
 
 const getUser = () => {
-  const name = localStorage.getItem("user_name") || "Nombre de Usuario";
-  return { name };
+  // ✅ Mostrar el correo del usuario que inició sesión (guardado en Login.tsx)
+  const email = localStorage.getItem("userEmail") || "correo@ejemplo.com";
+  return { email };
 };
 
 type MenuItem = {
@@ -34,7 +35,7 @@ type SidebarProps = {
 
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
-  return !!target.closest("button, a");
+  return !!target.closest("button, a, input, textarea, select, label");
 }
 
 export default function Sidebar({
@@ -46,14 +47,25 @@ export default function Sidebar({
   const location = useLocation();
   const { logout } = useAuth();
 
-  const { name } = getUser();
+  const { email } = getUser();
 
-  // Estado SOLO para el toggle manual
+  // Estado SOLO para el toggle manual del submenú
   const [catalogsManualOpen, setCatalogsManualOpen] = useState(false);
 
-  // Derivado: si estás en /catalogos/* debe estar abierto sí o sí
   const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
-  const catalogsOpen = isInCatalogsRoute || catalogsManualOpen;
+
+  // ✅ Abre Catálogos automáticamente al entrar a /catalogos/*
+  //    pero permite cerrarlo manualmente después.
+  // ✅ Evita warning ESLint: NO setState sincrónico dentro del effect.
+  useEffect(() => {
+    if (!isInCatalogsRoute) return;
+
+    const id = window.setTimeout(() => {
+      setCatalogsManualOpen(true);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [isInCatalogsRoute]);
 
   const menu: MenuItem[] = useMemo(
     () => [
@@ -62,14 +74,17 @@ export default function Sidebar({
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
-          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
+          {
+            label: "Unidades Administrativas",
+            to: "/catalogos/unidades-administrativas",
+          },
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
           { label: "COG", to: "/catalogos/cog" },
           { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
+          { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
+          { label: "Comunidades", to: "/catalogos/comunidades" },
           { label: "PROG", to: "/catalogos/prog" },
-
-          // ✅ NUEVO: PROYECTOS
           { label: "Proyectos", to: "/catalogos/proyectos" },
         ],
       },
@@ -80,7 +95,7 @@ export default function Sidebar({
 
   const handleLogout = () => {
     onNavigate?.();
-    logout();
+    logout(); // tu clearToken() ya elimina userEmail ✅
     navigate("/login", { replace: true });
   };
 
@@ -90,25 +105,24 @@ export default function Sidebar({
 
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
-    // Si estás en /catalogos/* no permitas “cerrarlo” (opcional pero recomendado)
-    if (isInCatalogsRoute) return;
-    setCatalogsManualOpen((v) => !v);
+    setCatalogsManualOpen((v) => !v); // ✅ ya lo puedes cerrar aunque estés en /catalogos/*
   };
 
-  const shouldShowSubmenu = catalogsOpen && !collapsed;
+  const shouldShowSubmenu = catalogsManualOpen && !collapsed;
 
   return (
     <aside
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
-      onMouseDownCapture={(e) => {
+      onPointerDownCapture={(e) => {
         if (!onBackgroundToggle) return;
 
         const target = e.target as HTMLElement | null;
         if (!target) return;
 
-        if (target.closest(`.${styles.scrollArea}`)) return;
+        // ✅ Si fue botón/link/input/etc, NO togglear
         if (isInteractiveTarget(target)) return;
 
+        // ✅ En cualquier otro caso, togglear
         onBackgroundToggle();
       }}
     >
@@ -130,11 +144,12 @@ export default function Sidebar({
 
         <div className={styles.goldLine} />
 
+        {/* Perfil (en colapsado lo mueves visualmente con CSS) */}
         <div className={styles.userRow}>
           <span className={styles.userIcon}>
             <FiUser />
           </span>
-          {!collapsed && <span className={styles.userName}>{name}</span>}
+          {!collapsed && <span className={styles.userName}>{email}</span>}
         </div>
 
         <div className={styles.goldLine} />
@@ -158,7 +173,9 @@ export default function Sidebar({
 
                   {!collapsed && (
                     <span
-                      className={`${styles.chev} ${catalogsOpen ? styles.chevOpen : ""}`}
+                      className={`${styles.chev} ${
+                        catalogsManualOpen ? styles.chevOpen : ""
+                      }`}
                     >
                       <FiChevronDown />
                     </span>
@@ -168,7 +185,7 @@ export default function Sidebar({
                 {shouldShowSubmenu && (
                   <div
                     className={`${styles.submenu} ${
-                      catalogsOpen ? styles.submenuOpen : ""
+                      catalogsManualOpen ? styles.submenuOpen : ""
                     }`}
                   >
                     {item.children.map((c) => (

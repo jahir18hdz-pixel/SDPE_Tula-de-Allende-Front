@@ -4,15 +4,24 @@ import { clearToken, getToken, setToken } from "../services/token.service";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tokenState, setTokenState] = useState<string | null>(() => getToken());
+  const [emailState, setEmailState] = useState<string | null>(() => localStorage.getItem("userEmail"));
 
-  const loginWithToken = (token: string) => {
+
+  const loginWithToken = (token: string, email?: string) => {
     setToken(token);
     setTokenState(token);
+
+     if (email) {
+    localStorage.setItem("userEmail", email);
+    setEmailState(email);
+    }
   };
 
   const logout = () => {
     clearToken();
     setTokenState(null);
+    setEmailState(null);
+
   };
 
   useEffect(() => {
@@ -22,14 +31,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({
-      token: tokenState,
-      isAuthenticated: !!tokenState,
-      loginWithToken,
-      logout,
-    }),
-    [tokenState]
-  );
+  () => ({
+    token: tokenState,
+    email: emailState,
+    isAuthenticated: !!tokenState,
+    loginWithToken,
+    logout,
+  }),
+  [tokenState, emailState]
+);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

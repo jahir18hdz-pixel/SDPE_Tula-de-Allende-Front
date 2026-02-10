@@ -3,7 +3,6 @@ import styles from "../styles/administrativeUnits.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
-import ConfirmDialog from "../../../Components/layout/ConfirmDialog";
 
 type AdministrativeUnit = {
   // DTO real
@@ -46,28 +45,31 @@ type UnknownRecord = Record<string, unknown>;
 const BASE_API = "https://localhost:7197";
 const API_BASE = `${BASE_API}/api/AdministrativeUnit`;
 
+const initialForm: FormDto = {
+  code: "",
+  description: "",
+  active: true,
+};
+
 export default function AdministrativeUnits() {
   const [rows, setRows] = useState<AdministrativeUnit[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [selected, setSelected] = useState<AdministrativeUnit | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
-  const [form, setForm] = useState<FormDto>({
-    code: "",
-    description: "",
-    active: true,
-  });
 
+  const [showInactive, setShowInactive] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // buscador
   const [search, setSearch] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
 
-  // paginación
+  // paginación FRONT
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const [formCreate, setFormCreate] = useState<FormDto>(initialForm);
+  const [formEdit, setFormEdit] = useState<FormDto>(initialForm);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -83,36 +85,9 @@ export default function AdministrativeUnits() {
   const selectedId = useMemo(() => getId(selected), [selected]);
 
   useEffect(() => {
-    void loadAll();
+    void loadAll(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => setPage(1), [search]);
-
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q || isSearching) return rows;
-
-    const maybeNum = Number(q);
-    const isNum = Number.isFinite(maybeNum) && q !== "";
-
-    if (isNum) return rows.filter((u) => String(getCode(u) ?? "").includes(q));
-
-    return rows.filter((u) => (getDescription(u) ?? "").toLowerCase().includes(q));
-  }, [rows, search, isSearching]);
-
-  const totalCount = useMemo(() => filteredRows.length, [filteredRows]);
-
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / pageSize)), [totalCount, pageSize]);
-
-  const displayedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, page, pageSize]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   function readToken(): string {
     const rawAuth = localStorage.getItem("auth");
@@ -151,7 +126,9 @@ export default function AdministrativeUnits() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg = isRecord(parsed) && typeof parsed.message === "string" ? parsed.message : "";
+      const apiMsg = isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
+        ? String((parsed as UnknownRecord).message)
+        : "";
       const msg = apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
       return { ok: false, error: msg, status: res.status };
     }
@@ -161,9 +138,30 @@ export default function AdministrativeUnits() {
 
   function extractList(payload: unknown): AdministrativeUnit[] {
     if (Array.isArray(payload)) return payload as AdministrativeUnit[];
-    if (isRecord(payload) && Array.isArray(payload.$values)) return payload.$values as AdministrativeUnit[];
+    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
+      return (payload as UnknownRecord).$values as AdministrativeUnit[];
+    }
+
+    const obj = isRecord(payload) ? (payload as UnknownRecord) : null;
+    if (obj) {
+      const possible =
+        obj.items ??
+        obj.Items ??
+        obj.data ??
+        obj.Data ??
+        obj.result ??
+        obj.Result ??
+        obj.value ??
+        obj.Value ??
+        obj.values ??
+        obj.Values;
+
+      if (Array.isArray(possible)) return possible as AdministrativeUnit[];
+    }
+
     const arr = findArrayDeep(payload, 0);
     if (arr) return arr as AdministrativeUnit[];
+
     if (isRecord(payload)) return [payload as AdministrativeUnit];
     return [];
   }
@@ -173,12 +171,14 @@ export default function AdministrativeUnits() {
     if (Array.isArray(payload)) return payload;
     if (!isRecord(payload)) return null;
 
-    const values = payload["$values"];
+    const obj = payload as UnknownRecord;
+
+    const values = obj["$values"];
     if (Array.isArray(values)) return values;
 
     const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
     for (const k of keys) {
-      const v = payload[k];
+      const v = obj[k];
       if (Array.isArray(v)) return v;
       const nested = findArrayDeep(v, depth + 1);
       if (nested) return nested;
@@ -190,7 +190,7 @@ export default function AdministrativeUnits() {
     return rows.some((u) => getCode(u) === code);
   }
 
-  async function loadAll(keepSelected?: number | null) {
+  async function loadAll(keepSelectedCode?: number | null) {
     setLoading(true);
     try {
       const token = readToken();
@@ -210,118 +210,121 @@ export default function AdministrativeUnits() {
 
       const list = extractList(result.data);
       setRows(list);
-      setPage(1);
 
-      if (keepSelected != null) {
-        const found = list.find((r) => getCode(r) === keepSelected) ?? null;
+      // mantener selección si aplica
+      if (keepSelectedCode != null) {
+        const found = list.find((r) => getCode(r) === keepSelectedCode) ?? null;
         setSelected(found);
         setMode("view");
+
+        if (found && mode === "edit") {
+          setFormEdit({
+            code: String(getCode(found) ?? ""),
+            description: String(getDescription(found) ?? ""),
+            active: getActive(found) ?? true,
+          });
+        }
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
       setRows([]);
     } finally {
       setLoading(false);
-      setIsSearching(false);
     }
   }
 
-  async function searchByCode(code: number) {
-    setIsSearching(true);
-    setLoading(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}`, { method: "GET", headers: authHeaders() });
+  /**
+   * ✅ FILTRO CORREGIDO (igual Roles/Proyect)
+   * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
+   * - Con búsqueda: busca en TODOS (activos + inactivos)
+   */
+  const filteredRows = useMemo(() => {
+    const q = asTrim(search).toLowerCase();
 
-      if (!result.ok) {
-        if (result.status === 404) {
-          showToast("error", `No se encontró la unidad con clave ${code}.`);
-          setRows([]);
-          setSelected(null);
-          setMode("view");
-          return;
-        }
-        showToast("error", result.error);
-        return;
-      }
+    const base = q
+      ? rows
+      : rows.filter((r) => {
+          const active = getActive(r) ?? false;
+          return showInactive ? !active : active;
+        });
 
-      const unit = extractList(result.data);
-      setRows(unit);
-      setPage(1);
+    if (!q) return base;
 
-      const found = unit[0] ?? null;
-      setSelected(found);
-      setMode("view");
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setLoading(false);
-      setIsSearching(false);
-    }
-  }
-
-  async function onSearch() {
-    const q = search.trim();
-    if (!q) return loadAll();
-
-    const num = Number(q);
-    const isNum = Number.isFinite(num) && q !== "";
-
-    if (isNum) return searchByCode(num);
-
-    setIsSearching(true);
-    await loadAll();
-  }
-
-  function clearSelection() {
-    setSelected(null);
-    setMode("view");
-    setForm({ code: "", description: "", active: true });
-  }
-
-  function startCreate() {
-    setMode("create");
-    setSelected(null);
-    setForm({ code: "", description: "", active: true });
-  }
-
-  function startEdit(row: AdministrativeUnit) {
-    setMode("edit");
-    setSelected(row);
-    setForm({
-      code: String(getCode(row) ?? ""),
-      description: String(getDescription(row) ?? ""),
-      active: getActive(row) ?? true,
+    return base.filter((u) => {
+      const code = String(getCode(u) ?? "").toLowerCase();
+      const desc = String(getDescription(u) ?? "").toLowerCase();
+      return code.includes(q) || desc.includes(q);
     });
-  }
+  }, [rows, search, showInactive]);
+
+  const totalCount = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const displayedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
 
   function onRowClick(row: AdministrativeUnit) {
     setSelected(row);
     setMode("view");
   }
 
-  function validateForm(): string {
-    const codeNum = Number(form.code);
+  function startCreate() {
+    setMode("create");
+    setSelected(null);
+    setFormCreate(initialForm);
+  }
 
+  function clearSelection() {
+    setSelected(null);
+    setMode("view");
+  }
+
+  function startEdit() {
+    if (!selected) return;
+    setFormEdit({
+      code: String(getCode(selected) ?? ""),
+      description: String(getDescription(selected) ?? ""),
+      active: getActive(selected) ?? true,
+    });
+    setMode("edit");
+  }
+
+  function toggleViewActiveInactive() {
+    setShowInactive((prev) => !prev);
+    setSelected(null);
+    setMode("view");
+    setPage(1);
+  }
+
+  function validateForm(f: FormDto, isCreate: boolean): string {
+    const codeNum = Number(f.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (mode === "create" && codeExists(codeNum)) return "No se pueden repetir las claves.";
-    if (!form.description.trim()) return "La descripción es obligatoria.";
-    if (form.description.trim().length < 3) return "La descripción es muy corta.";
+    if (isCreate && codeExists(codeNum)) return "No se pueden repetir las claves.";
+
+    const desc = asTrim(f.description);
+    if (!desc) return "La descripción es obligatoria.";
+    if (desc.length < 3) return "La descripción es muy corta.";
     return "";
   }
 
   async function onCreate() {
-    const msg = validateForm();
+    const msg = validateForm(formCreate, true);
     if (msg) return showToast("error", msg);
 
-    const codeNum = Number(form.code);
-    if (codeExists(codeNum)) return showToast("error", "Clave duplicada. No se pueden repetir las claves.");
+    const codeNum = Number(formCreate.code);
 
     setSaving(true);
     try {
       const payload = {
         Code: codeNum,
-        Description: form.description.trim(),
-        Active: form.active,
+        Description: asTrim(formCreate.description),
+        Active: Boolean(formCreate.active),
       };
 
       const result = await requestJson(API_BASE, {
@@ -334,6 +337,7 @@ export default function AdministrativeUnits() {
 
       showToast("success", "Unidad creada correctamente");
       setMode("view");
+      setFormCreate(initialForm);
       await loadAll(codeNum);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -345,19 +349,18 @@ export default function AdministrativeUnits() {
   async function onUpdate() {
     if (!selected) return showToast("error", "Selecciona una unidad para editar.");
 
-    const msg = validateForm();
+    const msg = validateForm(formEdit, false);
     if (msg) return showToast("error", msg);
 
-    // ✅ TU BACK: PUT /{id:int}
     if (selectedId == null) return showToast("error", "No se pudo resolver el IdAdministrativeUnit.");
 
     setSaving(true);
     try {
       const payload = {
         IdAdministrativeUnit: selectedId,
-        Code: Number(form.code),
-        Description: form.description.trim(),
-        Active: form.active,
+        Code: Number(formEdit.code),
+        Description: asTrim(formEdit.description),
+        Active: Boolean(formEdit.active),
       };
 
       const result = await requestJson(`${API_BASE}/${selectedId}`, {
@@ -370,9 +373,8 @@ export default function AdministrativeUnits() {
 
       showToast("success", "Unidad actualizada correctamente");
       setMode("view");
-
-      if (selectedCode != null) await loadAll(selectedCode);
-      else await loadAll(null);
+      setSelected(null);
+      await loadAll(null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -380,74 +382,7 @@ export default function AdministrativeUnits() {
     }
   }
 
-  /**
-   * ✅ FIX: algunos backends con [FromBody] bool no toman bien false/true
-   * dependiendo de configuración, así que hacemos:
-   *  1) PATCH con body: true/false (raw JSON)
-   *  2) si falla (400/415), reintenta con { active: true/false }
-   */
-  async function patchActive(code: number, next: boolean) {
-    // intento 1: bool directo
-    const r1 = await requestJson(`${API_BASE}/${code}/active`, {
-      method: "PATCH",
-      headers: authHeaders(),
-      body: JSON.stringify(next),
-    });
-
-    if (r1.ok) return;
-
-    // intento 2: objeto { active: next }
-    // (por si el backend realmente espera un DTO)
-    const r2 = await requestJson(`${API_BASE}/${code}/active`, {
-      method: "PATCH",
-      headers: authHeaders(),
-      body: JSON.stringify({ active: next }),
-    });
-
-    if (!r2.ok) throw new Error(r2.error);
-  }
-
-  // activar directo; desactivar con confirm
-  async function onToggleActive(next: boolean) {
-    if (!selected || selectedCode == null) return showToast("error", "Selecciona una unidad.");
-
-    if (next === false) {
-      setConfirmOpen(true);
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await patchActive(selectedCode, true);
-      showToast("success", "Unidad activada correctamente");
-      await loadAll(selectedCode);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onConfirmDeactivate() {
-    if (!selected || selectedCode == null) {
-      setConfirmOpen(false);
-      return showToast("error", "Selecciona una unidad.");
-    }
-
-    setSaving(true);
-    try {
-      await patchActive(selectedCode, false);
-      showToast("success", "Unidad desactivada correctamente");
-      await loadAll(selectedCode);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-      // muy importante: si falló, recarga para que el switch refleje el back real
-      await loadAll(selectedCode);
-    } finally {
-      setSaving(false);
-      setConfirmOpen(false);
-    }
-  }
+  const createDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -459,24 +394,17 @@ export default function AdministrativeUnits() {
         durationMs={3200}
       />
 
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Desactivar unidad"
-        message={`¿Estás seguro de desactivar la unidad "${getDescription(selected) ?? "—"}" (clave ${
-          selectedCode ?? "—"
-        })? Esta acción no se puede deshacer.`}
-        confirmText="Sí, desactivar"
-        cancelText="Cancelar"
-        loading={saving}
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={onConfirmDeactivate}
-      />
-
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Unidades Administrativas</h1>
-            <p className={styles.sub}>Consulta, crea, edita o activa/desactiva unidades administrativas.</p>
+            <p className={styles.sub}>
+              {asTrim(search)
+                ? "Buscando en activos e inactivos."
+                : showInactive
+                ? "Viendo unidades inactivas."
+                : "Viendo unidades activas."}
+            </p>
           </div>
 
           <div className={styles.searchWrapper}>
@@ -493,15 +421,9 @@ export default function AdministrativeUnits() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               disabled={saving || loading}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void onSearch();
-                }
-              }}
             />
 
-            {search.trim() !== "" && (
+            {asTrim(search) !== "" && (
               <button
                 className={styles.clearSearchBtn}
                 onClick={() => setSearch("")}
@@ -517,13 +439,32 @@ export default function AdministrativeUnits() {
             )}
           </div>
 
-          <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
-            {mode === "create" ? "Creando..." : "+ Nueva"}
-          </button>
+          {/* ✅ Igual que Roles/Proyect */}
+          <div className={styles.headerActions}>
+            <button
+              className={styles.btnGhost}
+              type="button"
+              onClick={toggleViewActiveInactive}
+              disabled={saving || loading || mode === "create" || mode === "edit"}
+              title="Cambiar vista activos/inactivos"
+            >
+              {showInactive ? "Ver activos" : "Ver inactivos"}
+            </button>
+
+            <button
+              className={styles.btnPrimary}
+              onClick={startCreate}
+              disabled={saving || mode === "create"}
+              type="button"
+            >
+              {mode === "create" ? "Creando..." : "+ Nueva"}
+            </button>
+          </div>
         </div>
       </div>
 
       <div className={styles.layout}>
+        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
@@ -533,7 +474,11 @@ export default function AdministrativeUnits() {
                 className={styles.pageSize}
                 value={pageSize}
                 disabled={loading || saving}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                onChange={(e) => {
+                  const ps = Number(e.target.value);
+                  setPageSize(ps);
+                  setPage(1);
+                }}
               >
                 {[5, 10, 20, 50].map((n) => (
                   <option key={n} value={n}>
@@ -574,7 +519,7 @@ export default function AdministrativeUnits() {
                 <tr>
                   <th style={{ width: 120 }}>Clave</th>
                   <th>Descripción</th>
-                  <th style={{ width: 140 }}>Activo</th>
+                  <th style={{ width: 170 }}>Activo</th>
                 </tr>
               </thead>
 
@@ -585,26 +530,23 @@ export default function AdministrativeUnits() {
                       Cargando unidades...
                     </td>
                   </tr>
-                ) : filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className={styles.empty}>
-                      {search.trim() ? "No se encontraron unidades con esos criterios." : "No hay unidades registradas."}
-                    </td>
-                  </tr>
                 ) : displayedRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
-                      No hay registros en esta página.
+                      {asTrim(search)
+                        ? "No se encontraron unidades (activos o inactivos) con esos criterios."
+                        : showInactive
+                        ? "No hay unidades inactivas."
+                        : "No hay unidades activas."}
                     </td>
                   </tr>
                 ) : (
                   displayedRows.map((r, idx) => {
                     const code = getCode(r);
-                    const desc = getDescription(r) ?? "—";
-                    const active = getActive(r) ?? false;
-
                     const key = code != null ? String(code) : `row-${idx}`;
                     const isSelected = selectedCode != null && code != null && code === selectedCode;
+
+                    const active = getActive(r) ?? false;
 
                     return (
                       <tr
@@ -613,9 +555,9 @@ export default function AdministrativeUnits() {
                         onClick={() => onRowClick(r)}
                       >
                         <td className={styles.mono}>{code != null ? String(code) : "—"}</td>
-                        <td>{desc}</td>
+                        <td>{getDescription(r) ?? "—"}</td>
                         <td>
-                          <Switch checked={active} disabled />
+                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
                         </td>
                       </tr>
                     );
@@ -626,6 +568,7 @@ export default function AdministrativeUnits() {
           </div>
         </section>
 
+        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
@@ -634,106 +577,144 @@ export default function AdministrativeUnits() {
           </div>
 
           <div className={styles.panelBody}>
-            {mode === "view" ? (
-              !selected ? (
-                <div className={styles.helper}>Selecciona una unidad de la tabla para ver detalles o editar.</div>
-              ) : (
-                <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Clave</span>
-                    <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Descripción</span>
-                    <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Activo</span>
-                    <Switch
-                      checked={getActive(selected) ?? false}
-                      disabled={saving}
-                      onChange={(next) => void onToggleActive(next)}
-                    />
-                  </div>
-
-                  <div className={styles.actions}>
-                    <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
-                      Cancelar
-                    </button>
-
-                    <button className={styles.btnEdit} type="button" onClick={() => startEdit(selected)} disabled={saving}>
-                      Editar
-                    </button>
-
-                    <button
-                      className={styles.btnDanger}
-                      type="button"
-                      onClick={() => setConfirmOpen(true)}
-                      disabled={saving || (getActive(selected) ?? false) === false}
-                    >
-                      Desactivar
-                    </button>
-                  </div>
-                </div>
-              )
-            ) : (
+            {mode === "create" ? (
               <form
                 className={styles.form}
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (mode === "create") void onCreate();
-                  else void onUpdate();
+                  void onCreate();
                 }}
               >
                 <div className={styles.grid}>
                   <Field label="Clave" required>
                     <input
                       className={styles.input}
-                      value={form.code}
-                      onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
-                      disabled={saving || mode === "edit"}
+                      value={formCreate.code}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, code: e.target.value }))}
+                      disabled={createDisabled}
                       inputMode="numeric"
+                      placeholder="Ej: 101"
                     />
                   </Field>
 
                   <Field label="Descripción" required>
                     <input
                       className={styles.input}
-                      value={form.description}
-                      onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                      disabled={saving}
+                      value={formCreate.description}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, description: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Descripción de la unidad"
                     />
                   </Field>
 
                   <Field label="Activo">
-                    <div className={styles.switchField}>
-                      <Switch
-                        checked={form.active}
-                        disabled={saving}
-                        onChange={(next) => setForm((p) => ({ ...p, active: next }))}
-                        label={form.active ? "Activo" : "Inactivo"}
-                      />
-                    </div>
+                    <Switch
+                      checked={formCreate.active}
+                      disabled={createDisabled}
+                      label={formCreate.active ? "Activo" : "Inactivo"}
+                      onChange={(next) => setFormCreate((p) => ({ ...p, active: next }))}
+                    />
                   </Field>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={clearSelection} disabled={saving}>
+                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
+                    Cancelar
+                  </button>
+
+                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                    {saving ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            ) : !selected ? (
+              <div className={styles.helper}>Selecciona una unidad de la tabla para ver detalles.</div>
+            ) : mode === "edit" ? (
+              <form
+                className={styles.form}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onUpdate();
+                }}
+              >
+                <div className={styles.detailBox}>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Id</span>
+                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
+                  </div>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Clave</span>
+                    <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
+                  </div>
+
+                  <Field label="Descripción" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.description}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, description: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Descripción"
+                    />
+                  </Field>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={formEdit.active}
+                      disabled={saving || loading}
+                      label={formEdit.active ? "Activo" : "Inactivo"}
+                      onChange={(next) => setFormEdit((p) => ({ ...p, active: next }))}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.actions}>
+                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
                     Cancelar
                   </button>
 
                   <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : mode === "create" ? "Crear unidad" : "Guardar cambios"}
+                    {saving ? "Guardando..." : "Guardar cambios"}
                   </button>
                 </div>
               </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Clave</span>
+                  <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Id</span>
+                  <span className={styles.mono}>{String(selectedId ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Descripción</span>
+                  <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Activo</span>
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
+                </div>
+
+                <div className={styles.actions}>
+                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                    Cerrar
+                  </button>
+
+                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                    Editar
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </aside>
@@ -768,6 +749,27 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
   );
 }
 
+/** Field */
+function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className={styles.labelRow}>
+        <label className={styles.label}>{label}</label>
+        {required && <span className={styles.required}>*</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** Helpers */
 function getId(u: AdministrativeUnit | null): number | null {
   if (!u) return null;
@@ -786,7 +788,7 @@ function getCode(u: AdministrativeUnit | null): number | null {
 function getDescription(u: AdministrativeUnit | null): string | null {
   if (!u) return null;
   const v = u.Description ?? u.description ?? u.descripcion ?? u.Descripcion;
-  const s = String(v ?? "").trim();
+  const s = asTrim(v ?? "");
   return s ? s : null;
 }
 
@@ -799,7 +801,7 @@ function getActive(u: AdministrativeUnit | null): boolean | null {
   if (typeof v === "number") return v === 1;
 
   if (typeof v === "string") {
-    const t = v.trim().toLowerCase();
+    const t = asTrim(v).toLowerCase();
     if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
     if (t === "false" || t === "0" || t === "no") return false;
   }
@@ -807,22 +809,13 @@ function getActive(u: AdministrativeUnit | null): boolean | null {
   return null;
 }
 
-type FieldProps = {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-};
+function asString(v: unknown): string {
+  if (v == null) return "";
+  return typeof v === "string" ? v : String(v);
+}
 
-function Field({ label, required = false, children }: FieldProps) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
-  );
+function asTrim(v: unknown): string {
+  return asString(v).trim();
 }
 
 async function safeText(res: Response): Promise<string> {
@@ -834,7 +827,7 @@ async function safeText(res: Response): Promise<string> {
 }
 
 function tryParseJson(text: string): unknown {
-  const t = (text ?? "").trim();
+  const t = asTrim(text);
   if (!t) return null;
   try {
     return JSON.parse(t) as unknown;

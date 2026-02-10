@@ -37,13 +37,6 @@
   margin: 0 0 18px;
 }
 
-.headerActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
 .headerTop {
   display: grid;
   grid-template-columns: 1fr minmax(280px, 520px) auto;
@@ -70,6 +63,13 @@
   font-size: 14px;
   opacity: 0.75;
   font-weight: 400;
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 /* =========================
@@ -160,7 +160,7 @@
 }
 
 /* =========================
-   CARD (✅ compacta + scroll)
+   CARD
 ========================= */
 .card {
   background: linear-gradient(180deg, #edebeb, #fbfbfd);
@@ -168,7 +168,6 @@
   border-radius: 14px;
   box-shadow: var(--shadowSoft);
   overflow: hidden;
-
   max-height: 420px;
   display: flex;
   flex-direction: column;
@@ -244,7 +243,7 @@
 }
 
 .pagerInfo {
-  min-width: 64px;
+  min-width: 88px;
   text-align: center;
   font-weight: 900;
   font-size: 13px;
@@ -274,19 +273,15 @@
 }
 
 /* =========================
-   TABLE (✅ sticky sólido)
+   TABLE (sticky)
 ========================= */
 .tableWrap {
   overflow-y: auto;
   overflow-x: auto;
-
   background: linear-gradient(180deg, rgba(182, 138, 42, 0.035), transparent 40%);
-
   max-height: min(520px, calc(100vh - 300px));
-
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-
   border-top: 1px solid rgba(230, 230, 234, 0.7);
 }
 
@@ -301,20 +296,16 @@
   text-align: left;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-
   background: linear-gradient(
     180deg,
     rgba(237, 235, 235, 0.98),
     rgba(230, 230, 234, 0.98)
   );
-
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(6px);
-
   font-size: 12px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-
   position: sticky;
   top: 0;
   z-index: 20;
@@ -361,7 +352,7 @@
     "Liberation Mono", "Courier New", monospace;
 }
 
-/* ✅ Scrollbar */
+/* Scrollbar */
 .tableWrap::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -379,14 +370,13 @@
 }
 
 /* =========================
-   PANEL (✅ no infinito)
+   PANEL
 ========================= */
 .panelBody {
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-
   max-height: min(520px, calc(100vh - 300px));
   overflow: auto;
 }
@@ -423,12 +413,10 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.35px;
-
   background: rgba(75, 0, 22, 0.10);
   border: 1px solid rgba(75, 0, 22, 0.18);
   padding: 6px 10px;
   border-radius: 999px;
-
   opacity: 0.95;
 }
 
@@ -451,7 +439,7 @@
 .grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: start;
 }
 
@@ -516,10 +504,10 @@
 }
 
 .btnGhost,
-.btnDanger,
 .btnEdit,
 .btnSave,
-.btnPrimary {
+.btnPrimary,
+.btnDanger {
   height: 44px;
   padding: 0 16px;
   border-radius: 12px;
@@ -576,20 +564,6 @@
   box-shadow: var(--shadow);
 }
 
-.btnDanger {
-  border: 1px solid rgba(220, 38, 38, 0.95);
-  background: rgba(220, 38, 38, 0.14);
-  color: #111827;
-}
-
-.btnDanger:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.95);
-  border-color: rgba(220, 38, 38, 1);
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
 .btnSave {
   border: 1px solid rgba(22, 163, 74, 0.95);
   background: rgba(22, 163, 74, 0.14);
@@ -604,11 +578,25 @@
   box-shadow: var(--shadow);
 }
 
+.btnDanger {
+  border: 1px solid rgba(220, 38, 38, 0.9);
+  background: rgba(220, 38, 38, 0.12);
+  color: #111827;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.92);
+  border-color: rgba(220, 38, 38, 1);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
 .btnPrimary:disabled,
 .btnGhost:disabled,
-.btnDanger:disabled,
 .btnEdit:disabled,
-.btnSave:disabled {
+.btnSave:disabled,
+.btnDanger:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
@@ -678,12 +666,6 @@
   transform: none;
 }
 
-.switchField {
-  display: flex;
-  align-items: center;
-  height: 46px;
-}
-
 /* =========================
    RESPONSIVE
 ========================= */
@@ -693,61 +675,28 @@
     align-items: stretch;
   }
 
-  .btnPrimary {
+  .headerActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btnPrimary,
+  .btnGhost {
     width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .headerActions {
+    grid-template-columns: 1fr;
   }
 
   .actions > button {
     width: 100%;
   }
-}
-
-/* =========================
-   SCROLLBAR (card style)
-========================= */
-
-/* WebKit (Chrome, Edge, Safari) */
-.tableWrap::-webkit-scrollbar,
-.panelBody::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.tableWrap::-webkit-scrollbar-track,
-.panelBody::-webkit-scrollbar-track {
-  background: linear-gradient(
-    180deg,
-    rgba(75, 0, 22, 0.08),
-    rgba(182, 138, 42, 0.06)
-  );
-  border: 1px solid rgba(230, 230, 234, 0.9);
-  border-radius: 999px;
-}
-
-.tableWrap::-webkit-scrollbar-thumb,
-.panelBody::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba(75, 0, 22, 0.35),
-    rgba(182, 138, 42, 0.35)
-  );
-  border: 2px solid rgba(255, 255, 255, 0.7); /* hace “pill” limpio */
-  border-radius: 999px;
-}
-
-.tableWrap::-webkit-scrollbar-thumb:hover,
-.panelBody::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(75, 0, 22, 0.55),
-    rgba(182, 138, 42, 0.55)
-  );
-}
-
-/* Firefox */
-.tableWrap,
-.panelBody {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(75, 0, 22, 0.45)
-    rgba(182, 138, 42, 0.12);
 }

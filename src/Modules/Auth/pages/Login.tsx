@@ -84,7 +84,9 @@ const Login: React.FC = () => {
       if (!token) throw new Error("El backend no devolvió un token válido");
 
       localStorage.setItem("auth", JSON.stringify(data));
-      loginWithToken(token);
+      localStorage.setItem("userEmail", email.trim()); 
+      loginWithToken(token);                            
+
 
       showToast("success", "Sesión iniciada correctamente");
 

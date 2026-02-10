@@ -113,7 +113,6 @@ export default function Prog() {
 
     if (!res.ok) {
       const apiMsg = isRecord(parsed) ? getStringProp(parsed, "message") ?? "" : "";
-
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
@@ -192,16 +191,24 @@ export default function Prog() {
     return [];
   }
 
+  /**
+   * ✅ FILTRO CORREGIDO:
+   * - Si hay búsqueda: busca en TODOS (activos e inactivos)
+   * - Si no hay búsqueda: respeta showInactive (vista activos/inactivos)
+   */
   const filteredRows = useMemo(() => {
-    const only = rows.filter((r) => {
-      const active = getActive(r) ?? false;
-      return showInactive ? !active : active;
-    });
-
     const q = asTrim(search).toLowerCase();
-    if (!q) return only;
 
-    return only.filter((r) => {
+    const base = q
+      ? rows
+      : rows.filter((r) => {
+          const active = getActive(r) ?? false;
+          return showInactive ? !active : active;
+        });
+
+    if (!q) return base;
+
+    return base.filter((r) => {
       const code = String(getCode(r) ?? "").toLowerCase();
       const desc = asString(getDescription(r) ?? "").toLowerCase();
       return code.includes(q) || desc.includes(q);
@@ -246,11 +253,11 @@ export default function Prog() {
     setMode("edit");
   }
 
+  // ✅ NO borra el buscador
   function toggleViewActiveInactive() {
     setShowInactive((prev) => !prev);
     setSelected(null);
     setMode("view");
-    setSearch("");
     setPage(1);
   }
 
@@ -299,7 +306,6 @@ export default function Prog() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    // ✅ Controller: PUT /api/Prog/{id:int}
     const id = selectedId;
     if (id == null || id <= 0) {
       return showToast("error", "No pude identificar el idProg del prog seleccionado.");
@@ -335,34 +341,6 @@ export default function Prog() {
     }
   }
 
-  // ✅ Controller: PATCH /api/Prog/{code:int}/active   body: boolean
-  async function onChangeActive(nextActive: boolean) {
-    if (!selected) return;
-
-    const code = getCode(selected);
-    if (code == null) return showToast("error", "No pude identificar el Code.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(nextActive),
-      });
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", nextActive ? "Prog activado correctamente" : "Prog desactivado correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll();
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const createDisabled = saving || loading;
 
   return (
@@ -380,7 +358,11 @@ export default function Prog() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Prog</h1>
             <p className={styles.sub}>
-              {showInactive ? "Viendo progs inactivos." : "Viendo progs activos."}
+              {asTrim(search)
+                ? "Buscando en activos e inactivos."
+                : showInactive
+                ? "Viendo progs inactivos."
+                : "Viendo progs activos."}
             </p>
           </div>
 
@@ -505,7 +487,7 @@ export default function Prog() {
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron progs con esos criterios."
+                        ? "No se encontraron progs (activos o inactivos) con esos criterios."
                         : showInactive
                         ? "No hay progs inactivos."
                         : "No hay progs activos."}
@@ -668,9 +650,14 @@ export default function Prog() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
+                {/* ✅ Acciones sin Activar/Desactivar */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar
@@ -679,26 +666,6 @@ export default function Prog() {
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onChangeActive(false)}
-                    disabled={saving || loading || !(getActive(selected) ?? false)}
-                  >
-                    Desactivar
-                  </button>
-
-                  {showInactive && (
-                    <button
-                      className={styles.btnSave}
-                      type="button"
-                      onClick={() => void onChangeActive(true)}
-                      disabled={saving || loading || (getActive(selected) ?? false)}
-                    >
-                      Activar
-                    </button>
-                  )}
                 </div>
               </div>
             )}

@@ -113,13 +113,11 @@ export default function FundingSource() {
 
     if (!res.ok) {
       const apiMsg = isRecord(parsed) ? getStringProp(parsed, "message") ?? "" : "";
-
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
         text ||
         `HTTP ${res.status}`;
-
       return { ok: false, error: msg, status: res.status };
     }
 
@@ -192,16 +190,24 @@ export default function FundingSource() {
     return [];
   }
 
+  /**
+   * ✅ FILTRO CORREGIDO:
+   * - Si hay búsqueda: busca en TODOS (activos e inactivos)
+   * - Si NO hay búsqueda: respeta showInactive (vista activos/inactivos)
+   */
   const filteredRows = useMemo(() => {
-    const only = rows.filter((r) => {
-      const active = getActive(r) ?? false;
-      return showInactive ? !active : active;
-    });
-
     const q = asTrim(search).toLowerCase();
-    if (!q) return only;
 
-    return only.filter((r) => {
+    const base = q
+      ? rows
+      : rows.filter((r) => {
+          const active = getActive(r) ?? false;
+          return showInactive ? !active : active;
+        });
+
+    if (!q) return base;
+
+    return base.filter((r) => {
       const code = String(getCode(r) ?? "").toLowerCase();
       const desc = asString(getDescription(r) ?? "").toLowerCase();
       return code.includes(q) || desc.includes(q);
@@ -246,11 +252,11 @@ export default function FundingSource() {
     setMode("edit");
   }
 
+  // ✅ NO borra el buscador
   function toggleViewActiveInactive() {
     setShowInactive((prev) => !prev);
     setSelected(null);
     setMode("view");
-    setSearch("");
     setPage(1);
   }
 
@@ -299,7 +305,6 @@ export default function FundingSource() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    // ✅ Controller: PUT /api/FundingSource/{id:int}
     const id = selectedId;
     if (id == null || id <= 0) {
       return showToast("error", "No pude identificar el idFundingSource del fondo seleccionado.");
@@ -310,8 +315,6 @@ export default function FundingSource() {
 
     setSaving(true);
     try {
-      // UpdateFundingSourceCommand(idFundingSource, Code, Description, Active)
-      // El controller fuerza idFundingSource desde la URL, así que no hace falta mandarlo.
       const payload = {
         code: codeNum,
         description: asTrim(edit.description),
@@ -327,34 +330,6 @@ export default function FundingSource() {
       if (!result.ok) return showToast("error", result.error);
 
       showToast("success", "Fondo de financiamiento actualizado correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll();
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ✅ Controller: PATCH /api/FundingSource/{code:int}/active   body: boolean
-  async function onChangeActive(nextActive: boolean) {
-    if (!selected) return;
-
-    const code = getCode(selected);
-    if (code == null) return showToast("error", "No pude identificar el Code.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(nextActive),
-      });
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", nextActive ? "Fondo activado correctamente" : "Fondo desactivado correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -382,7 +357,11 @@ export default function FundingSource() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Fondo de Financiamiento</h1>
             <p className={styles.sub}>
-              {showInactive ? "Viendo fondos inactivos." : "Viendo fondos activos."}
+              {asTrim(search)
+                ? "Buscando en activos e inactivos."
+                : showInactive
+                ? "Viendo fondos inactivos."
+                : "Viendo fondos activos."}
             </p>
           </div>
 
@@ -507,7 +486,7 @@ export default function FundingSource() {
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron fondos con esos criterios."
+                        ? "No se encontraron fondos (activos o inactivos) con esos criterios."
                         : showInactive
                         ? "No hay fondos inactivos."
                         : "No hay fondos activos."}
@@ -670,13 +649,10 @@ export default function FundingSource() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
                 </div>
 
+                {/* ✅ Acciones sin Activar/Desactivar */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar
@@ -685,26 +661,6 @@ export default function FundingSource() {
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onChangeActive(false)}
-                    disabled={saving || loading || !(getActive(selected) ?? false)}
-                  >
-                    Desactivar
-                  </button>
-
-                  {showInactive && (
-                    <button
-                      className={styles.btnSave}
-                      type="button"
-                      onClick={() => void onChangeActive(true)}
-                      disabled={saving || loading || (getActive(selected) ?? false)}
-                    >
-                      Activar
-                    </button>
-                  )}
                 </div>
               </div>
             )}

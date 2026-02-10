@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "../styles/Cog.module.css";
+import styles from "../styles/ActionsPolicy.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
-type CogRow = {
-  idCog?: number;
-  IdCog?: number;
+type ActionPolicyRow = {
+  idActionPolicy?: number;
+  IdActionPolicy?: number;
 
   code?: number;
   Code?: number;
@@ -20,7 +20,7 @@ type CogRow = {
   [key: string]: unknown;
 };
 
-type CreateForm = {
+type Form = {
   code: string;
   description: string;
   active: boolean;
@@ -30,19 +30,19 @@ type AuthStored = { token?: string; Token?: string };
 type UnknownObject = Record<string, unknown>;
 
 const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/Cog`;
+const API_BASE = `${BASE_API}/api/ActionsPolicy`;
 
-const initialCreate: CreateForm = {
+const initialForm: Form = {
   code: "",
   description: "",
   active: true,
 };
 
-export default function Cog() {
-  const [rows, setRows] = useState<CogRow[]>([]);
+export default function ActionsPolicy() {
+  const [rows, setRows] = useState<ActionPolicyRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [selected, setSelected] = useState<CogRow | null>(null);
+  const [selected, setSelected] = useState<ActionPolicyRow | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
 
   const [showInactive, setShowInactive] = useState(false);
@@ -54,8 +54,8 @@ export default function Cog() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [create, setCreate] = useState<CreateForm>(initialCreate);
-  const [edit, setEdit] = useState<CreateForm>(initialCreate);
+  const [create, setCreate] = useState<Form>(initialForm);
+  const [edit, setEdit] = useState<Form>(initialForm);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -68,7 +68,7 @@ export default function Cog() {
   }, []);
 
   const selectedCode = useMemo(() => getCode(selected), [selected]);
-  const selectedId = useMemo(() => getIdCog(selected), [selected]);
+  const selectedId = useMemo(() => getIdActionPolicy(selected), [selected]);
 
   useEffect(() => {
     void loadAll();
@@ -146,7 +146,7 @@ export default function Cog() {
         return;
       }
 
-      const normalized = normalizeCogArray(result.data);
+      const normalized = normalizeArray(result.data);
       setRows(normalized);
 
       // mantener selección si existe
@@ -170,36 +170,37 @@ export default function Cog() {
     }
   }
 
-  function normalizeCogArray(payload: unknown): CogRow[] {
-    if (Array.isArray(payload)) return payload as CogRow[];
+  function normalizeArray(payload: unknown): ActionPolicyRow[] {
+    if (Array.isArray(payload)) return payload as ActionPolicyRow[];
 
     const obj = asObject(payload);
     if (!obj) return [];
 
-    const possible = obj.items ?? obj.Items ?? obj.data ?? obj.Data ?? obj.cogs ?? obj.Cogs;
-    if (Array.isArray(possible)) return possible as CogRow[];
+    const possible =
+      obj.items ??
+      obj.Items ??
+      obj.data ??
+      obj.Data ??
+      obj.actionPolicies ??
+      obj.ActionPolicies ??
+      obj.actionsPolicies ??
+      obj.ActionsPolicies;
+
+    if (Array.isArray(possible)) return possible as ActionPolicyRow[];
 
     return [];
   }
 
-  /**
-   * ✅ FILTRO CORREGIDO:
-   * - Si hay búsqueda: busca en TODOS (activos e inactivos)
-   * - Si NO hay búsqueda: respeta showInactive (vista activos/inactivos)
-   */
   const filteredRows = useMemo(() => {
+    const only = rows.filter((r) => {
+      const active = getActive(r) ?? false;
+      return showInactive ? !active : active;
+    });
+
     const q = asTrim(search).toLowerCase();
+    if (!q) return only;
 
-    const base = q
-      ? rows
-      : rows.filter((r) => {
-          const active = getActive(r) ?? false;
-          return showInactive ? !active : active;
-        });
-
-    if (!q) return base;
-
-    return base.filter((r) => {
+    return only.filter((r) => {
       const code = String(getCode(r) ?? "").toLowerCase();
       const desc = asString(getDescription(r) ?? "").toLowerCase();
       return code.includes(q) || desc.includes(q);
@@ -218,7 +219,7 @@ export default function Cog() {
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, page, pageSize]);
 
-  function onRowClick(row: CogRow) {
+  function onRowClick(row: ActionPolicyRow) {
     setSelected(row);
     setMode("view");
   }
@@ -226,7 +227,7 @@ export default function Cog() {
   function startCreate() {
     setMode("create");
     setSelected(null);
-    setCreate(initialCreate);
+    setCreate(initialForm);
   }
 
   function clearSelection() {
@@ -244,15 +245,15 @@ export default function Cog() {
     setMode("edit");
   }
 
-  // ✅ NO borra el buscador
   function toggleViewActiveInactive() {
     setShowInactive((prev) => !prev);
     setSelected(null);
     setMode("view");
+    setSearch("");
     setPage(1);
   }
 
-  function validateForm(f: CreateForm): string {
+  function validateForm(f: Form): string {
     const code = Number(f.code);
     if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
 
@@ -282,9 +283,9 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG creado correctamente");
+      showToast("success", "Acción creada correctamente");
       setMode("view");
-      setCreate(initialCreate);
+      setCreate(initialForm);
       await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -297,17 +298,20 @@ export default function Cog() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
+    // ✅ Controller: PUT /api/ActionsPolicy/{id:int}
     const id = selectedId;
     if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar el idCog del COG seleccionado.");
+      return showToast("error", "No pude identificar el idActionPolicy de la acción seleccionada.");
     }
 
+    // el controller requiere Code en el body, así que lo mandamos sí o sí
     const codeNum = Number(edit.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
 
     setSaving(true);
     try {
       const payload = {
+        idActionPolicy: id, // opcional (tu controller lo fuerza desde URL, pero no estorba)
         code: codeNum,
         description: asTrim(edit.description),
         active: Boolean(edit.active),
@@ -321,7 +325,35 @@ export default function Cog() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "COG actualizado correctamente");
+      showToast("success", "Acción actualizada correctamente");
+      setMode("view");
+      setSelected(null);
+      await loadAll();
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ✅ Controller: PATCH /api/ActionsPolicy/{code:int}/active   body: boolean
+  async function onChangeActive(nextActive: boolean) {
+    if (!selected) return;
+
+    const code = getCode(selected);
+    if (code == null) return showToast("error", "No pude identificar el Code.");
+
+    setSaving(true);
+    try {
+      const result = await requestJson(`${API_BASE}/${code}/active`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(nextActive),
+      });
+
+      if (!result.ok) return showToast("error", result.error);
+
+      showToast("success", nextActive ? "Acción activada correctamente" : "Acción desactivada correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -347,13 +379,9 @@ export default function Cog() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
-            <h1 className={styles.h1}>COG</h1>
+            <h1 className={styles.h1}>Acciones de Póliza</h1>
             <p className={styles.sub}>
-              {asTrim(search)
-                ? "Buscando en activos e inactivos."
-                : showInactive
-                ? "Viendo COGs inactivos."
-                : "Viendo COGs activos."}
+              {showInactive ? "Viendo acciones inactivas." : "Viendo acciones activas."}
             </p>
           </div>
 
@@ -397,7 +425,7 @@ export default function Cog() {
               disabled={saving || loading || mode === "create" || mode === "edit"}
               title="Cambiar vista activos/inactivos"
             >
-              {showInactive ? "Ver activos" : "Ver inactivos"}
+              {showInactive ? "Ver activas" : "Ver inactivas"}
             </button>
 
             <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
@@ -471,17 +499,17 @@ export default function Cog() {
                 {loading ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
-                      Cargando COGs...
+                      Cargando acciones...
                     </td>
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron COGs (activos o inactivos) con esos criterios."
+                        ? "No se encontraron acciones con esos criterios."
                         : showInactive
-                        ? "No hay COGs inactivos."
-                        : "No hay COGs activos."}
+                        ? "No hay acciones inactivas."
+                        : "No hay acciones activas."}
                     </td>
                   </tr>
                 ) : (
@@ -515,7 +543,7 @@ export default function Cog() {
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo COG" : mode === "edit" ? "Editar COG" : "Detalle"}
+              {mode === "create" ? "Nueva Acción" : mode === "edit" ? "Editar Acción" : "Detalle"}
             </p>
           </div>
 
@@ -536,7 +564,7 @@ export default function Cog() {
                       value={create.code}
                       onChange={(e) => setCreate((p) => ({ ...p, code: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Ej: 21101"
+                      placeholder="Ej: 10"
                     />
                   </Field>
 
@@ -546,7 +574,7 @@ export default function Cog() {
                       value={create.description}
                       onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
                       disabled={createDisabled}
-                      placeholder="Descripción del COG"
+                      placeholder="Descripción de la acción"
                     />
                   </Field>
 
@@ -571,7 +599,7 @@ export default function Cog() {
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un COG de la tabla para ver detalles.</div>
+              <div className={styles.helper}>Selecciona una acción de la tabla para ver detalles.</div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -583,13 +611,16 @@ export default function Cog() {
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                    <span className={styles.detailValue}>{getIdActionPolicy(selected) ?? "—"}</span>
                   </div>
 
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Código</span>
                     <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
                   </div>
+
+                  {/* mantenemos code en estado para el PUT */}
+                  <input type="hidden" value={edit.code} readOnly />
 
                   <Field label="Descripción" required>
                     <input
@@ -626,7 +657,7 @@ export default function Cog() {
               <div className={styles.detailBox}>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
+                  <span className={styles.detailValue}>{getIdActionPolicy(selected) ?? "—"}</span>
                 </div>
 
                 <div className={styles.detailRow}>
@@ -641,10 +672,13 @@ export default function Cog() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
-                {/* ✅ Sin Activar/Desactivar */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar
@@ -653,6 +687,26 @@ export default function Cog() {
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
+
+                  <button
+                    className={styles.btnDanger}
+                    type="button"
+                    onClick={() => void onChangeActive(false)}
+                    disabled={saving || loading || !(getActive(selected) ?? false)}
+                  >
+                    Desactivar
+                  </button>
+
+                  {showInactive && (
+                    <button
+                      className={styles.btnSave}
+                      type="button"
+                      onClick={() => void onChangeActive(true)}
+                      disabled={saving || loading || (getActive(selected) ?? false)}
+                    >
+                      Activar
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -711,27 +765,27 @@ function Field({
 }
 
 /** Helpers */
-function getIdCog(r: CogRow | null): number | null {
+function getIdActionPolicy(r: ActionPolicyRow | null): number | null {
   if (!r) return null;
-  const v = r.idCog ?? r.IdCog;
+  const v = r.idActionPolicy ?? r.IdActionPolicy;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getCode(r: CogRow | null): number | null {
+function getCode(r: ActionPolicyRow | null): number | null {
   if (!r) return null;
   const v = r.code ?? r.Code;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function getDescription(r: CogRow | null): string | null {
+function getDescription(r: ActionPolicyRow | null): string | null {
   if (!r) return null;
   const s = asTrim(r.description ?? r.Description ?? "");
   return s ? s : null;
 }
 
-function getActive(r: CogRow | null): boolean | null {
+function getActive(r: ActionPolicyRow | null): boolean | null {
   if (!r) return null;
   const v = r.active ?? r.Active;
 
