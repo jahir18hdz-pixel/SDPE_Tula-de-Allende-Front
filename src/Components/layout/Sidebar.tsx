@@ -66,8 +66,16 @@ export default function Sidebar({
           { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
           { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
           { label: "Comunidades", to: "/catalogos/comunidades" },
+
+          // ✅ NUEVO: Beneficiarios
+          { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
+
           { label: "PROG", to: "/catalogos/prog" },
           { label: "Proyectos", to: "/catalogos/proyectos" },
+          { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
+
+          // ✅ Tipos de Adquisición
+          { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
         ],
       },
       { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
@@ -79,7 +87,6 @@ export default function Sidebar({
   const filteredMenu: MenuItem[] = useMemo(() => {
     const canSee = (path?: string) => {
       if (!path) return true;
-      // si no hay permisos, por seguridad no mostramos
       return allowedModules?.has(path) ?? false;
     };
 
@@ -97,11 +104,13 @@ export default function Sidebar({
       .filter((x): x is MenuItem => !!x);
   }, [menu, allowedModules]);
 
-  // ✅ Abre/cierra Catálogos al entrar a /catalogos/*, evitando setState sincrónico dentro del effect
+  // ✅ Abre/cierra Catálogos al entrar a /catalogos/*
   useEffect(() => {
     if (!isInCatalogsRoute) return;
 
-    const hasCatalogs = filteredMenu.some((m) => Array.isArray(m.children) && m.children.length > 0);
+    const hasCatalogs = filteredMenu.some(
+      (m) => Array.isArray(m.children) && m.children.length > 0
+    );
 
     const id = window.setTimeout(() => {
       setCatalogsManualOpen(hasCatalogs);
@@ -174,21 +183,33 @@ export default function Sidebar({
           {filteredMenu.map((item) =>
             item.children ? (
               <div key={item.label} className={styles.group}>
-                <button type="button" className={styles.itemBtn} onClick={handleCatalogClick}>
+                <button
+                  type="button"
+                  className={styles.itemBtn}
+                  onClick={handleCatalogClick}
+                >
                   <span className={styles.left}>
                     <span className={styles.icon}>{item.icon}</span>
                     {!collapsed && <span className={styles.label}>{item.label}</span>}
                   </span>
 
                   {!collapsed && (
-                    <span className={`${styles.chev} ${catalogsManualOpen ? styles.chevOpen : ""}`}>
+                    <span
+                      className={`${styles.chev} ${
+                        catalogsManualOpen ? styles.chevOpen : ""
+                      }`}
+                    >
                       <FiChevronDown />
                     </span>
                   )}
                 </button>
 
                 {shouldShowSubmenu && (
-                  <div className={`${styles.submenu} ${catalogsManualOpen ? styles.submenuOpen : ""}`}>
+                  <div
+                    className={`${styles.submenu} ${
+                      catalogsManualOpen ? styles.submenuOpen : ""
+                    }`}
+                  >
                     {item.children.map((c) => (
                       <NavLink
                         key={c.to}
@@ -209,7 +230,9 @@ export default function Sidebar({
                 key={item.to}
                 to={item.to!}
                 onClick={() => onNavigate?.()}
-                className={({ isActive }) => (isActive ? `${styles.item} ${styles.active}` : styles.item)}
+                className={({ isActive }) =>
+                  isActive ? `${styles.item} ${styles.active}` : styles.item
+                }
               >
                 <span className={styles.icon}>{item.icon}</span>
                 {!collapsed && <span className={styles.label}>{item.label}</span>}

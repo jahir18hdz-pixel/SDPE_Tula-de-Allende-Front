@@ -1,18 +1,26 @@
+// src/routes/AppRouter.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Splash from "../Modules/Auth/pages/Splash";
 import Login from "../Modules/Auth/pages/Login";
 import Home from "../Modules/Home/pages/home";
+
 import UserCreate from "../Modules/Users/pages/userCreate";
+
 import AdministrativeUnits from "../Modules/AdministrativeUnit/pages/AdministrativeUnits";
 import Roles from "../Modules/Roles/pages/Roles";
 import PermissionsByRole from "../Modules/Permissions/pages/Permissions";
 import Cog from "../Modules/Cog/pages/Cog";
 import FundingSource from "../Modules/FundingSource/pages/FundingSource";
-import Prog from "../Modules/Prog/pages/Prog";
-import Proyect from "../Modules/Proyect/pages/Proyec";
 import ActionsPolicy from "../Modules/ActionsPolicy/pages/ActionsPolicy";
 import Community from "../Modules/Community/pages/Community";
+import Prog from "../Modules/Prog/pages/Prog";
+import Proyect from "../Modules/Proyect/pages/Proyec";
+import AcquisitionClassifications from "../Modules/AcquisitionClassifications/pages/AcquisitionClassifications";
+import AcquisitionTypePage from "../Modules/AcquisitionType/pages/AcquisitionType";
+
+// ✅ NUEVO: Beneficiarios
+import BeneficiaryPage from "../Modules/Beneficiary/pages/Beneficiary";
 
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
@@ -39,7 +47,11 @@ export default function AppRouter() {
               <Route path="/usuarios/nuevo" element={<UserCreate />} />
             </Route>
 
-            {/* Catálogos */}
+            {/* =========================
+                CATÁLOGOS
+            ========================== */}
+
+            {/* Unidades administrativas */}
             <Route element={<RequireModule modulePath="/catalogos/unidades-administrativas" />}>
               <Route
                 path="/catalogos/unidades-administrativas"
@@ -47,18 +59,22 @@ export default function AppRouter() {
               />
             </Route>
 
+            {/* Roles */}
             <Route element={<RequireModule modulePath="/catalogos/roles" />}>
               <Route path="/catalogos/roles" element={<Roles />} />
             </Route>
 
+            {/* Permisos */}
             <Route element={<RequireModule modulePath="/catalogos/permisos" />}>
               <Route path="/catalogos/permisos" element={<PermissionsByRole />} />
             </Route>
 
+            {/* COG */}
             <Route element={<RequireModule modulePath="/catalogos/cog" />}>
               <Route path="/catalogos/cog" element={<Cog />} />
             </Route>
 
+            {/* Fondo financiamiento */}
             <Route element={<RequireModule modulePath="/catalogos/fondo-financiamiento" />}>
               <Route
                 path="/catalogos/fondo-financiamiento"
@@ -66,23 +82,45 @@ export default function AppRouter() {
               />
             </Route>
 
+            {/* Acciones póliza */}
             <Route element={<RequireModule modulePath="/catalogos/acciones-poliza" />}>
-              <Route
-                path="/catalogos/acciones-poliza"
-                element={<ActionsPolicy />}
-              />
+              <Route path="/catalogos/acciones-poliza" element={<ActionsPolicy />} />
             </Route>
 
+            {/* Comunidades */}
             <Route element={<RequireModule modulePath="/catalogos/comunidades" />}>
               <Route path="/catalogos/comunidades" element={<Community />} />
             </Route>
 
+            {/* ✅ NUEVO: Beneficiarios */}
+            <Route element={<RequireModule modulePath="/catalogos/beneficiarios" />}>
+              <Route path="/catalogos/beneficiarios" element={<BeneficiaryPage />} />
+            </Route>
+
+            {/* Prog */}
             <Route element={<RequireModule modulePath="/catalogos/prog" />}>
               <Route path="/catalogos/prog" element={<Prog />} />
             </Route>
 
+            {/* Proyectos */}
             <Route element={<RequireModule modulePath="/catalogos/proyectos" />}>
               <Route path="/catalogos/proyectos" element={<Proyect />} />
+            </Route>
+
+            {/* Clasificación de adquisiciones */}
+            <Route element={<RequireModule modulePath="/catalogos/clasificacion-adquisiciones" />}>
+              <Route
+                path="/catalogos/clasificacion-adquisiciones"
+                element={<AcquisitionClassifications />}
+              />
+            </Route>
+
+            {/* Tipos de adquisición */}
+            <Route element={<RequireModule modulePath="/catalogos/tipos-adquisicion" />}>
+              <Route
+                path="/catalogos/tipos-adquisicion"
+                element={<AcquisitionTypePage />}
+              />
             </Route>
           </Route>
         </Route>

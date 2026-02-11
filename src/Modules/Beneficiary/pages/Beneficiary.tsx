@@ -1,0 +1,1453 @@
+// src/Modules/Beneficiary/pages/Beneficiary.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import styles from "../styles/Beneficiary.module.css";
+
+import Toast from "../../../Components/layout/Toast";
+import type { ToastType } from "../../../Components/layout/Toast";
+
+type Beneficiary = {
+  // DTO real (PascalCase)
+  IdBeneficiary?: number;
+
+  FirstName?: string;
+  PaternalLastName?: string;
+  MaternalLastName?: string | null;
+
+  Street?: string;
+  ExternalNumber?: string | null;
+  InternalNumber?: string | null;
+  Neighborhood?: string | null;
+  PostalCode?: number;
+
+  City?: string | null;
+  Municipality?: string;
+  State?: string;
+  Country?: string;
+
+  Ine?: string;
+  Curp?: string;
+
+  Phone?: string | null;
+  Email?: string | null;
+
+  Active?: boolean;
+
+  // variantes camelCase por si acaso
+  idBeneficiary?: number;
+
+  firstName?: string;
+  paternalLastName?: string;
+  maternalLastName?: string | null;
+
+  street?: string;
+  externalNumber?: string | null;
+  internalNumber?: string | null;
+  neighborhood?: string | null;
+  postalCode?: number;
+
+  city?: string | null;
+  municipality?: string;
+  state?: string;
+  country?: string;
+
+  ine?: string;
+  curp?: string;
+
+  phone?: string | null;
+  email?: string | null;
+
+  active?: boolean;
+
+  [key: string]: unknown;
+};
+
+type FormDto = {
+  firstName: string;
+  paternalLastName: string;
+  maternalLastName: string;
+
+  street: string;
+  externalNumber: string;
+  internalNumber: string;
+  neighborhood: string;
+  postalCode: string;
+
+  city: string;
+  municipality: string;
+  state: string;
+  country: string;
+
+  ine: string;
+  curp: string;
+
+  phone: string;
+  email: string;
+
+  active: boolean;
+};
+
+type AuthStored = { token?: string; Token?: string };
+type UnknownRecord = Record<string, unknown>;
+
+const BASE_API = "https://localhost:7197";
+const API_BASE = `${BASE_API}/api/Beneficiary`;
+
+const initialForm: FormDto = {
+  firstName: "",
+  paternalLastName: "",
+  maternalLastName: "",
+
+  street: "",
+  externalNumber: "",
+  internalNumber: "",
+  neighborhood: "",
+  postalCode: "",
+
+  city: "",
+  municipality: "",
+  state: "",
+  country: "México",
+
+  ine: "",
+  curp: "",
+
+  phone: "",
+  email: "",
+
+  active: true,
+};
+
+export default function BeneficiaryPage() {
+  const [rows, setRows] = useState<Beneficiary[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [selected, setSelected] = useState<Beneficiary | null>(null);
+  const [mode, setMode] = useState<"view" | "create" | "edit">("view");
+
+  const [showInactive, setShowInactive] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // buscador
+  const [search, setSearch] = useState("");
+
+  // paginación FRONT
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const [formCreate, setFormCreate] = useState<FormDto>(initialForm);
+  const [formEdit, setFormEdit] = useState<FormDto>(initialForm);
+
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastType, setToastType] = useState<ToastType>("success");
+  const [toastMsg, setToastMsg] = useState("");
+
+  const showToast = useCallback((type: ToastType, msg: string) => {
+    setToastType(type);
+    setToastMsg(msg);
+    setToastOpen(true);
+  }, []);
+
+  const selectedId = useMemo(() => getId(selected), [selected]);
+  const selectedCurp = useMemo(() => getCurp(selected), [selected]);
+
+  useEffect(() => {
+    void loadAll(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function readToken(): string {
+    const rawAuth = localStorage.getItem("auth");
+    if (rawAuth) {
+      try {
+        const parsed = JSON.parse(rawAuth) as AuthStored;
+        const token = (parsed.token ?? parsed.Token ?? "").trim();
+        if (token) return token;
+      } catch {
+        // ignore
+      }
+    }
+    return "";
+  }
+
+  function authHeaders(): HeadersInit {
+    const token = readToken();
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }
+
+  async function requestJson(
+    url: string,
+    init?: RequestInit
+  ): Promise<
+    | { ok: true; data: unknown; status: number }
+    | { ok: false; error: string; status: number }
+  > {
+    const res = await fetch(url, { ...init, credentials: "omit" });
+
+    if (res.status === 204) return { ok: true, data: [], status: 204 };
+
+    const text = await safeText(res);
+    const parsed = tryParseJson(text);
+
+    if (!res.ok) {
+      const apiMsg =
+        isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
+          ? String((parsed as UnknownRecord).message)
+          : "";
+      const msg =
+        apiMsg ||
+        (typeof parsed === "string" ? parsed : "") ||
+        text ||
+        `HTTP ${res.status}`;
+      return { ok: false, error: msg, status: res.status };
+    }
+
+    return { ok: true, data: parsed, status: res.status };
+  }
+
+  function extractList(payload: unknown): Beneficiary[] {
+    if (Array.isArray(payload)) return payload as Beneficiary[];
+    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
+      return (payload as UnknownRecord).$values as Beneficiary[];
+    }
+
+    const obj = isRecord(payload) ? (payload as UnknownRecord) : null;
+    if (obj) {
+      const possible =
+        obj.items ??
+        obj.Items ??
+        obj.data ??
+        obj.Data ??
+        obj.result ??
+        obj.Result ??
+        obj.value ??
+        obj.Value ??
+        obj.values ??
+        obj.Values;
+
+      if (Array.isArray(possible)) return possible as Beneficiary[];
+    }
+
+    const arr = findArrayDeep(payload, 0);
+    if (arr) return arr as Beneficiary[];
+
+    if (isRecord(payload)) return [payload as Beneficiary];
+    return [];
+  }
+
+  function findArrayDeep(payload: unknown, depth: number): unknown[] | null {
+    if (depth > 6) return null;
+    if (Array.isArray(payload)) return payload;
+    if (!isRecord(payload)) return null;
+
+    const obj = payload as UnknownRecord;
+
+    const values = obj["$values"];
+    if (Array.isArray(values)) return values;
+
+    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
+    for (const k of keys) {
+      const v = obj[k];
+      if (Array.isArray(v)) return v;
+      const nested = findArrayDeep(v, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  async function loadAll(keepSelectedCurp?: string | null) {
+    setLoading(true);
+    try {
+      const token = readToken();
+      if (!token) {
+        showToast("error", "No hay token. Inicia sesión nuevamente.");
+        setRows([]);
+        return;
+      }
+
+      const result = await requestJson(API_BASE, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+
+      if (!result.ok) {
+        showToast("error", result.error);
+        setRows([]);
+        return;
+      }
+
+      const list = extractList(result.data);
+      setRows(list);
+
+      if (keepSelectedCurp) {
+        const found =
+          list.find((r) => (getCurp(r) ?? "").toUpperCase() === keepSelectedCurp.toUpperCase()) ??
+          null;
+        setSelected(found);
+        setMode("view");
+
+        if (found && mode === "edit") {
+          setFormEdit(toForm(found));
+        }
+      }
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * ✅ FILTRO CORREGIDO (igual AdministrativeUnits)
+   * - Sin búsqueda: respeta showInactive
+   * - Con búsqueda: busca en TODOS
+   */
+  const filteredRows = useMemo(() => {
+    const q = asTrim(search).toLowerCase();
+
+    const base = q
+      ? rows
+      : rows.filter((r) => {
+          const active = getActive(r) ?? false;
+          return showInactive ? !active : active;
+        });
+
+    if (!q) return base;
+
+    return base.filter((b) => {
+      const name = `${getFirstName(b) ?? ""} ${getPaternal(b) ?? ""} ${getMaternal(b) ?? ""}`
+        .trim()
+        .toLowerCase();
+      const curp = String(getCurp(b) ?? "").toLowerCase();
+      const ine = String(getIne(b) ?? "").toLowerCase();
+      const muni = String(getMunicipality(b) ?? "").toLowerCase();
+
+      return (
+        name.includes(q) ||
+        curp.includes(q) ||
+        ine.includes(q) ||
+        muni.includes(q)
+      );
+    });
+  }, [rows, search, showInactive]);
+
+  const totalCount = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const displayedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, page, pageSize]);
+
+  function onRowClick(row: Beneficiary) {
+    setSelected(row);
+    setMode("view");
+  }
+
+  function startCreate() {
+    setMode("create");
+    setSelected(null);
+    setFormCreate(initialForm);
+  }
+
+  function clearSelection() {
+    setSelected(null);
+    setMode("view");
+  }
+
+  function startEdit() {
+    if (!selected) return;
+    setFormEdit(toForm(selected));
+    setMode("edit");
+  }
+
+  function toggleViewActiveInactive() {
+    setShowInactive((prev) => !prev);
+    setSelected(null);
+    setMode("view");
+    setPage(1);
+  }
+
+  function validateCurp(curp: string): boolean {
+    // Validación ligera (no estricta). Ajusta si quieres regex oficial.
+    const t = asTrim(curp).toUpperCase();
+    return t.length >= 10; // mínimo razonable para no dejar vacío
+  }
+
+  function validateForm(f: FormDto): string {
+    if (!asTrim(f.firstName)) return "El nombre es obligatorio.";
+    if (!asTrim(f.paternalLastName)) return "El apellido paterno es obligatorio.";
+
+    if (!asTrim(f.street)) return "La calle es obligatoria.";
+    const pc = Number(f.postalCode);
+    if (!Number.isFinite(pc) || pc <= 0) return "El código postal debe ser un número válido.";
+
+    if (!asTrim(f.municipality)) return "El municipio es obligatorio.";
+    if (!asTrim(f.state)) return "El estado es obligatorio.";
+    if (!asTrim(f.country)) return "El país es obligatorio.";
+
+    if (!asTrim(f.ine)) return "El INE es obligatorio.";
+    if (!validateCurp(f.curp)) return "La CURP es obligatoria (mínimo 10 caracteres).";
+
+    return "";
+  }
+
+  async function onCreate() {
+    const msg = validateForm(formCreate);
+    if (msg) return showToast("error", msg);
+
+    setSaving(true);
+    try {
+      const payload = {
+        Beneficiary: {
+          IdBeneficiary: 0,
+          FirstName: asTrim(formCreate.firstName),
+          PaternalLastName: asTrim(formCreate.paternalLastName),
+          MaternalLastName: asTrim(formCreate.maternalLastName) || null,
+
+          Street: asTrim(formCreate.street),
+          ExternalNumber: asTrim(formCreate.externalNumber) || null,
+          InternalNumber: asTrim(formCreate.internalNumber) || null,
+          Neighborhood: asTrim(formCreate.neighborhood) || null,
+          PostalCode: Number(formCreate.postalCode),
+
+          City: asTrim(formCreate.city) || null,
+          Municipality: asTrim(formCreate.municipality),
+          State: asTrim(formCreate.state),
+          Country: asTrim(formCreate.country),
+
+          Ine: asTrim(formCreate.ine),
+          Curp: asTrim(formCreate.curp).toUpperCase(),
+
+          Phone: asTrim(formCreate.phone) || null,
+          Email: asTrim(formCreate.email) || null,
+
+          Active: Boolean(formCreate.active),
+        },
+      };
+
+      const result = await requestJson(API_BASE, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!result.ok) return showToast("error", result.error);
+
+      showToast("success", "Beneficiario creado correctamente");
+      setMode("view");
+      setFormCreate(initialForm);
+      await loadAll(asTrim(formCreate.curp).toUpperCase());
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onUpdate() {
+    if (!selected) return showToast("error", "Selecciona un beneficiario para editar.");
+    if (selectedId == null) return showToast("error", "No se pudo resolver el IdBeneficiary.");
+
+    const msg = validateForm(formEdit);
+    if (msg) return showToast("error", msg);
+
+    setSaving(true);
+    try {
+      const payload = {
+        IdBeneficiary: selectedId,
+
+        FirstName: asTrim(formEdit.firstName),
+        PaternalLastName: asTrim(formEdit.paternalLastName),
+        MaternalLastName: asTrim(formEdit.maternalLastName) || null,
+
+        Street: asTrim(formEdit.street),
+        ExternalNumber: asTrim(formEdit.externalNumber) || null,
+        InternalNumber: asTrim(formEdit.internalNumber) || null,
+        Neighborhood: asTrim(formEdit.neighborhood) || null,
+        PostalCode: Number(formEdit.postalCode),
+
+        City: asTrim(formEdit.city) || null,
+        Municipality: asTrim(formEdit.municipality),
+        State: asTrim(formEdit.state),
+        Country: asTrim(formEdit.country),
+
+        Ine: asTrim(formEdit.ine),
+        Curp: asTrim(formEdit.curp).toUpperCase(),
+
+        Phone: asTrim(formEdit.phone) || null,
+        Email: asTrim(formEdit.email) || null,
+
+        Active: Boolean(formEdit.active),
+      };
+
+      const result = await requestJson(`${API_BASE}/${selectedId}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!result.ok) return showToast("error", result.error);
+
+      showToast("success", "Beneficiario actualizado correctamente");
+      setMode("view");
+      setSelected(null);
+      await loadAll(null);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onToggleStatusByCurp(nextActive: boolean) {
+    const curp = selectedCurp ? selectedCurp : null;
+    if (!curp) return showToast("error", "No se pudo resolver la CURP del beneficiario.");
+
+    setSaving(true);
+    try {
+      const result = await requestJson(`${API_BASE}/by-curp/${encodeURIComponent(curp)}/status`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(nextActive),
+      });
+
+      if (!result.ok) return showToast("error", result.error);
+
+      showToast("success", `Beneficiario ${nextActive ? "activado" : "desactivado"} correctamente`);
+      setMode("view");
+      setSelected(null);
+      await loadAll(null);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const createDisabled = saving || loading;
+
+  return (
+    <div className={styles.page}>
+      <Toast
+        open={toastOpen}
+        type={toastType}
+        message={toastMsg}
+        onClose={() => setToastOpen(false)}
+        durationMs={3200}
+      />
+
+      <div className={styles.header}>
+        <div className={styles.headerTop}>
+          <div className={styles.headerText}>
+            <h1 className={styles.h1}>Beneficiarios</h1>
+            <p className={styles.sub}>
+              {asTrim(search)
+                ? "Buscando en activos e inactivos."
+                : showInactive
+                ? "Viendo beneficiarios inactivos."
+                : "Viendo beneficiarios activos."}
+            </p>
+          </div>
+
+          <div className={styles.searchWrapper}>
+            <div className={styles.searchIcon} aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            </div>
+
+            <input
+              className={styles.searchInput}
+              placeholder="Buscar por nombre, CURP, INE o municipio…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              disabled={saving || loading}
+            />
+
+            {asTrim(search) !== "" && (
+              <button
+                className={styles.clearSearchBtn}
+                onClick={() => setSearch("")}
+                type="button"
+                aria-label="Limpiar búsqueda"
+                disabled={saving || loading}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className={styles.headerActions}>
+            <button
+              className={styles.btnGhost}
+              type="button"
+              onClick={toggleViewActiveInactive}
+              disabled={saving || loading || mode === "create" || mode === "edit"}
+              title="Cambiar vista activos/inactivos"
+            >
+              {showInactive ? "Ver activos" : "Ver inactivos"}
+            </button>
+
+            <button
+              className={styles.btnPrimary}
+              onClick={startCreate}
+              disabled={saving || mode === "create"}
+              type="button"
+            >
+              {mode === "create" ? "Creando..." : "+ Nuevo"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.layout}>
+        {/* LISTADO */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <p className={styles.cardTitle}>Listado</p>
+
+            <div className={styles.pager}>
+              <select
+                className={styles.pageSize}
+                value={pageSize}
+                disabled={loading || saving}
+                onChange={(e) => {
+                  const ps = Number(e.target.value);
+                  setPageSize(ps);
+                  setPage(1);
+                }}
+              >
+                {[5, 10, 20, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / pág
+                  </option>
+                ))}
+              </select>
+
+              <div className={styles.pagerBtns}>
+                <button
+                  className={styles.pagerBtn}
+                  type="button"
+                  disabled={loading || saving || page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </button>
+
+                <span className={styles.pagerInfo}>
+                  {page} / {totalPages}
+                </span>
+
+                <button
+                  className={styles.pagerBtn}
+                  type="button"
+                  disabled={loading || saving || page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th style={{ width: 190 }}>CURP</th>
+                  <th style={{ width: 170 }}>Activo</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className={styles.empty}>
+                      Cargando beneficiarios...
+                    </td>
+                  </tr>
+                ) : displayedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className={styles.empty}>
+                      {asTrim(search)
+                        ? "No se encontraron beneficiarios (activos o inactivos) con esos criterios."
+                        : showInactive
+                        ? "No hay beneficiarios inactivos."
+                        : "No hay beneficiarios activos."}
+                    </td>
+                  </tr>
+                ) : (
+                  displayedRows.map((r, idx) => {
+                    const curp = getCurp(r);
+                    const key = curp ? String(curp) : `row-${idx}`;
+                    const isSelected =
+                      selectedCurp != null && curp != null && curp.toUpperCase() === selectedCurp.toUpperCase();
+
+                    const active = getActive(r) ?? false;
+                    const fullName = formatFullName(r);
+
+                    return (
+                      <tr
+                        key={key}
+                        className={isSelected ? styles.rowSelected : styles.row}
+                        onClick={() => onRowClick(r)}
+                      >
+                        <td>{fullName || "—"}</td>
+                        <td className={styles.mono}>{curp ?? "—"}</td>
+                        <td>
+                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* PANEL */}
+        <aside className={styles.card}>
+          <div className={styles.cardHeader}>
+            <p className={styles.cardTitle}>
+              {mode === "create" ? "Nuevo beneficiario" : mode === "edit" ? "Editar beneficiario" : "Detalle"}
+            </p>
+          </div>
+
+          <div className={styles.panelBody}>
+            {mode === "create" ? (
+              <form
+                className={styles.form}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onCreate();
+                }}
+              >
+                <div className={styles.grid}>
+                  <SectionTitle>Identidad</SectionTitle>
+
+                  <Field label="Nombre(s)" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.firstName}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, firstName: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Juan"
+                    />
+                  </Field>
+
+                  <Field label="Apellido paterno" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.paternalLastName}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, paternalLastName: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Pérez"
+                    />
+                  </Field>
+
+                  <Field label="Apellido materno">
+                    <input
+                      className={styles.input}
+                      value={formCreate.maternalLastName}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, maternalLastName: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: López"
+                    />
+                  </Field>
+
+                  <Field label="CURP" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.curp}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, curp: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: ABCD001122HDF..."
+                    />
+                  </Field>
+
+                  <Field label="INE" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.ine}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, ine: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Clave de elector / INE"
+                    />
+                  </Field>
+
+                  <SectionTitle>Contacto</SectionTitle>
+
+                  <Field label="Teléfono">
+                    <input
+                      className={styles.input}
+                      value={formCreate.phone}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, phone: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: 773..."
+                    />
+                  </Field>
+
+                  <Field label="Email">
+                    <input
+                      className={styles.input}
+                      value={formCreate.email}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, email: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="correo@ejemplo.com"
+                    />
+                  </Field>
+
+                  <SectionTitle>Domicilio</SectionTitle>
+
+                  <Field label="Calle" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.street}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, street: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Av. Reforma"
+                    />
+                  </Field>
+
+                  <Field label="No. Exterior">
+                    <input
+                      className={styles.input}
+                      value={formCreate.externalNumber}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, externalNumber: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: 123"
+                    />
+                  </Field>
+
+                  <Field label="No. Interior">
+                    <input
+                      className={styles.input}
+                      value={formCreate.internalNumber}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, internalNumber: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: 4B"
+                    />
+                  </Field>
+
+                  <Field label="Colonia">
+                    <input
+                      className={styles.input}
+                      value={formCreate.neighborhood}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, neighborhood: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Centro"
+                    />
+                  </Field>
+
+                  <Field label="Código postal" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.postalCode}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, postalCode: e.target.value }))}
+                      disabled={createDisabled}
+                      inputMode="numeric"
+                      placeholder="Ej: 42800"
+                    />
+                  </Field>
+
+                  <Field label="Ciudad">
+                    <input
+                      className={styles.input}
+                      value={formCreate.city}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, city: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Tula de Allende"
+                    />
+                  </Field>
+
+                  <Field label="Municipio" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.municipality}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, municipality: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Tula de Allende"
+                    />
+                  </Field>
+
+                  <Field label="Estado" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.state}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, state: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: Hidalgo"
+                    />
+                  </Field>
+
+                  <Field label="País" required>
+                    <input
+                      className={styles.input}
+                      value={formCreate.country}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, country: e.target.value }))}
+                      disabled={createDisabled}
+                      placeholder="Ej: México"
+                    />
+                  </Field>
+
+                  <Field label="Activo">
+                    <Switch
+                      checked={formCreate.active}
+                      disabled={createDisabled}
+                      label={formCreate.active ? "Activo" : "Inactivo"}
+                      onChange={(next) => setFormCreate((p) => ({ ...p, active: next }))}
+                    />
+                  </Field>
+                </div>
+
+                <div className={styles.actions}>
+                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
+                    Cancelar
+                  </button>
+
+                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                    {saving ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            ) : !selected ? (
+              <div className={styles.helper}>Selecciona un beneficiario de la tabla para ver detalles.</div>
+            ) : mode === "edit" ? (
+              <form
+                className={styles.form}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void onUpdate();
+                }}
+              >
+                <div className={styles.detailBox}>
+                  <SectionTitle>Identidad</SectionTitle>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Id</span>
+                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
+                  </div>
+
+                  <Field label="Nombre(s)" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.firstName}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, firstName: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Apellido paterno" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.paternalLastName}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, paternalLastName: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Apellido materno">
+                    <input
+                      className={styles.input}
+                      value={formEdit.maternalLastName}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, maternalLastName: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="CURP" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.curp}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, curp: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="INE" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.ine}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, ine: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <SectionTitle>Contacto</SectionTitle>
+
+                  <Field label="Teléfono">
+                    <input
+                      className={styles.input}
+                      value={formEdit.phone}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, phone: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Email">
+                    <input
+                      className={styles.input}
+                      value={formEdit.email}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, email: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <SectionTitle>Domicilio</SectionTitle>
+
+                  <Field label="Calle" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.street}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, street: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="No. Exterior">
+                    <input
+                      className={styles.input}
+                      value={formEdit.externalNumber}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, externalNumber: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="No. Interior">
+                    <input
+                      className={styles.input}
+                      value={formEdit.internalNumber}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, internalNumber: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Colonia">
+                    <input
+                      className={styles.input}
+                      value={formEdit.neighborhood}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, neighborhood: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Código postal" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.postalCode}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, postalCode: e.target.value }))}
+                      disabled={saving || loading}
+                      inputMode="numeric"
+                    />
+                  </Field>
+
+                  <Field label="Ciudad">
+                    <input
+                      className={styles.input}
+                      value={formEdit.city}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, city: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Municipio" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.municipality}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, municipality: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="Estado" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.state}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, state: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <Field label="País" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.country}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, country: e.target.value }))}
+                      disabled={saving || loading}
+                    />
+                  </Field>
+
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={formEdit.active}
+                      disabled={saving || loading}
+                      label={formEdit.active ? "Activo" : "Inactivo"}
+                      onChange={(next) => setFormEdit((p) => ({ ...p, active: next }))}
+                    />
+                  </div>
+
+                  <div className={styles.actions}>
+                    <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
+                      Cancelar
+                    </button>
+
+                    <button type="submit" className={styles.btnSave} disabled={saving}>
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <SectionTitle>Identidad</SectionTitle>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Nombre</span>
+                  <span className={styles.detailValue}>{formatFullName(selected) || "—"}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>CURP</span>
+                  <span className={styles.mono}>{String(getCurp(selected) ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>INE</span>
+                  <span className={styles.detailValue}>{String(getIne(selected) ?? "—")}</span>
+                </div>
+
+                <SectionTitle>Contacto</SectionTitle>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Teléfono</span>
+                  <span className={styles.detailValue}>{String(getPhone(selected) ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Email</span>
+                  <span className={styles.detailValue}>{String(getEmail(selected) ?? "—")}</span>
+                </div>
+
+                <SectionTitle>Domicilio</SectionTitle>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Dirección</span>
+                  <span className={styles.detailValue}>
+                    {formatAddress(selected) || "—"}
+                  </span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Municipio</span>
+                  <span className={styles.detailValue}>{String(getMunicipality(selected) ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Estado</span>
+                  <span className={styles.detailValue}>{String(getState(selected) ?? "—")}</span>
+                </div>
+
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Activo</span>
+                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                </div>
+
+                <div className={styles.actions}>
+                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                    Cerrar
+                  </button>
+
+                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                    Editar
+                  </button>
+
+                  {/* ✅ usa tu PATCH por CURP */}
+                  <button
+                    className={styles.btnDanger}
+                    type="button"
+                    onClick={() => void onToggleStatusByCurp(!(getActive(selected) ?? false))}
+                    disabled={saving || loading}
+                    title="Activa/Desactiva usando PATCH por CURP"
+                  >
+                    {(getActive(selected) ?? false) ? "Desactivar" : "Activar"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/** Switch */
+type SwitchProps = {
+  checked: boolean;
+  onChange?: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+};
+
+function Switch({ checked, onChange, disabled, label }: SwitchProps) {
+  return (
+    <label className={styles.switchWrap} aria-disabled={disabled}>
+      {label && <span className={styles.switchLabel}>{label}</span>}
+      <button
+        type="button"
+        className={`${styles.switch} ${checked ? styles.switchOn : ""}`}
+        onClick={() => !disabled && onChange?.(!checked)}
+        disabled={disabled}
+        aria-pressed={checked}
+        aria-label={label ?? "Cambiar estado"}
+      >
+        <span className={styles.switchKnob} />
+      </button>
+    </label>
+  );
+}
+
+/** Field */
+function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className={styles.labelRow}>
+        <label className={styles.label}>{label}</label>
+        {required && <span className={styles.required}>*</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div className={styles.sectionTitle}>{children}</div>;
+}
+
+/** Mappers */
+function toForm(b: Beneficiary): FormDto {
+  return {
+    firstName: asTrim(getFirstName(b) ?? ""),
+    paternalLastName: asTrim(getPaternal(b) ?? ""),
+    maternalLastName: asTrim(getMaternal(b) ?? ""),
+
+    street: asTrim(getStreet(b) ?? ""),
+    externalNumber: asTrim(getExternalNumber(b) ?? ""),
+    internalNumber: asTrim(getInternalNumber(b) ?? ""),
+    neighborhood: asTrim(getNeighborhood(b) ?? ""),
+    postalCode: String(getPostalCode(b) ?? ""),
+
+    city: asTrim(getCity(b) ?? ""),
+    municipality: asTrim(getMunicipality(b) ?? ""),
+    state: asTrim(getState(b) ?? ""),
+    country: asTrim(getCountry(b) ?? "México"),
+
+    ine: asTrim(getIne(b) ?? ""),
+    curp: asTrim(getCurp(b) ?? ""),
+
+    phone: asTrim(getPhone(b) ?? ""),
+    email: asTrim(getEmail(b) ?? ""),
+
+    active: getActive(b) ?? true,
+  };
+}
+
+/** Helpers getters */
+function getId(b: Beneficiary | null): number | null {
+  if (!b) return null;
+  const v = b.IdBeneficiary ?? b.idBeneficiary;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getFirstName(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.FirstName ?? b.firstName;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getPaternal(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.PaternalLastName ?? b.paternalLastName;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getMaternal(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.MaternalLastName ?? b.maternalLastName;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+
+function getStreet(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Street ?? b.street;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getExternalNumber(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.ExternalNumber ?? b.externalNumber;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getInternalNumber(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.InternalNumber ?? b.internalNumber;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getNeighborhood(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Neighborhood ?? b.neighborhood;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getPostalCode(b: Beneficiary | null): number | null {
+  if (!b) return null;
+  const v = b.PostalCode ?? b.postalCode;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function getCity(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.City ?? b.city;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getMunicipality(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Municipality ?? b.municipality;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getState(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.State ?? b.state;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getCountry(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Country ?? b.country;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+
+function getIne(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Ine ?? b.ine;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getCurp(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Curp ?? b.curp;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getPhone(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Phone ?? b.phone;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getEmail(b: Beneficiary | null): string | null {
+  if (!b) return null;
+  const v = b.Email ?? b.email;
+  const s = asTrim(v ?? "");
+  return s ? s : null;
+}
+function getActive(b: Beneficiary | null): boolean | null {
+  if (!b) return null;
+  const v: unknown = b.Active ?? b.active;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const t = asTrim(v).toLowerCase();
+    if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
+    if (t === "false" || t === "0" || t === "no") return false;
+  }
+  return null;
+}
+
+function formatFullName(b: Beneficiary): string {
+  const n = getFirstName(b) ?? "";
+  const p = getPaternal(b) ?? "";
+  const m = getMaternal(b) ?? "";
+  return `${n} ${p} ${m}`.replace(/\s+/g, " ").trim();
+}
+
+function formatAddress(b: Beneficiary): string {
+  const street = getStreet(b) ?? "";
+  const ext = getExternalNumber(b) ?? "";
+  const intr = getInternalNumber(b) ?? "";
+  const neigh = getNeighborhood(b) ?? "";
+  const pc = getPostalCode(b) ?? "";
+
+  const nums = [ext ? `Ext. ${ext}` : "", intr ? `Int. ${intr}` : ""].filter(Boolean).join(" ");
+  const part1 = [street, nums].filter(Boolean).join(", ");
+  const part2 = [neigh ? `Col. ${neigh}` : "", pc ? `CP ${pc}` : ""].filter(Boolean).join(", ");
+
+  return [part1, part2].filter(Boolean).join(" • ").trim();
+}
+
+/** Utils */
+function asString(v: unknown): string {
+  if (v == null) return "";
+  return typeof v === "string" ? v : String(v);
+}
+function asTrim(v: unknown): string {
+  return asString(v).trim();
+}
+async function safeText(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return "";
+  }
+}
+function tryParseJson(text: string): unknown {
+  const t = asTrim(text);
+  if (!t) return null;
+  try {
+    return JSON.parse(t) as unknown;
+  } catch {
+    return text;
+  }
+}
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+function toErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error inesperado.";
+  }
+}
