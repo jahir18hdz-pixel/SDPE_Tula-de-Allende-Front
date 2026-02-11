@@ -52,36 +52,39 @@ export default function Sidebar({
 
   const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
 
-  const menu: MenuItem[] = useMemo(
-    () => [
-      { label: "Inicio", to: "/home", icon: <FiHome /> },
-      {
-        label: "Catálogos",
-        icon: <FiFolder />,
-        children: [
-          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
-          { label: "Roles", to: "/catalogos/roles" },
-          { label: "Permisos", to: "/catalogos/permisos" },
-          { label: "COG", to: "/catalogos/cog" },
-          { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
-          { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
-          { label: "Comunidades", to: "/catalogos/comunidades" },
+ const menu: MenuItem[] = useMemo(
+  () => [
+    { label: "Inicio", to: "/home", icon: <FiHome /> },
+    {
+      label: "Catálogos",
+      icon: <FiFolder />,
+      children: [
+        { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
+        { label: "Roles", to: "/catalogos/roles" },
+        { label: "Permisos", to: "/catalogos/permisos" },
+        { label: "COG", to: "/catalogos/cog" },
+        { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
+        { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
+        { label: "Comunidades", to: "/catalogos/comunidades" },
 
-          // ✅ NUEVO: Beneficiarios
-          { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
+        // ✅ NUEVO: Beneficiarios
+        { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
 
-          { label: "PROG", to: "/catalogos/prog" },
-          { label: "Proyectos", to: "/catalogos/proyectos" },
-          { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
+        // ✅ NUEVO: Proveedores
+        { label: "Proveedores", to: "/catalogos/proveedores" },
 
-          // ✅ Tipos de Adquisición
-          { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
-        ],
-      },
-      { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
-    ],
-    []
-  );
+        { label: "PROG", to: "/catalogos/prog" },
+        { label: "Proyectos", to: "/catalogos/proyectos" },
+        { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
+
+        { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
+      ],
+    },
+    { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
+  ],
+  []
+);
+
 
   // ✅ Filtrado por permisos (sin dependencias faltantes)
   const filteredMenu: MenuItem[] = useMemo(() => {

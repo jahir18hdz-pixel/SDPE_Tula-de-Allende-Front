@@ -22,6 +22,9 @@ import AcquisitionTypePage from "../Modules/AcquisitionType/pages/AcquisitionTyp
 // ✅ NUEVO: Beneficiarios
 import BeneficiaryPage from "../Modules/Beneficiary/pages/Beneficiary";
 
+// ✅ NUEVO: Proveedores
+import SupplierPage from "../Modules/Supplier/pages/Supplier";
+
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -95,6 +98,11 @@ export default function AppRouter() {
             {/* ✅ NUEVO: Beneficiarios */}
             <Route element={<RequireModule modulePath="/catalogos/beneficiarios" />}>
               <Route path="/catalogos/beneficiarios" element={<BeneficiaryPage />} />
+            </Route>
+
+            {/* ✅ NUEVO: Proveedores */}
+            <Route element={<RequireModule modulePath="/catalogos/proveedores" />}>
+              <Route path="/catalogos/proveedores" element={<SupplierPage />} />
             </Route>
 
             {/* Prog */}
