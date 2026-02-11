@@ -15,7 +15,6 @@ import LogoPresi from "../../assets/images/logoRGB.png";
 import { useAuth } from "../../context/useAuth";
 
 const getUser = () => {
-  // ✅ Mostrar el correo del usuario que inició sesión (guardado en Login.tsx)
   const email = localStorage.getItem("userEmail") || "correo@ejemplo.com";
   return { email };
 };
@@ -45,27 +44,13 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
 
+  const { logout, allowedModules } = useAuth();
   const { email } = getUser();
 
-  // Estado SOLO para el toggle manual del submenú
   const [catalogsManualOpen, setCatalogsManualOpen] = useState(false);
 
   const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
-
-  // ✅ Abre Catálogos automáticamente al entrar a /catalogos/*
-  //    pero permite cerrarlo manualmente después.
-  // ✅ Evita warning ESLint: NO setState sincrónico dentro del effect.
-  useEffect(() => {
-    if (!isInCatalogsRoute) return;
-
-    const id = window.setTimeout(() => {
-      setCatalogsManualOpen(true);
-    }, 0);
-
-    return () => window.clearTimeout(id);
-  }, [isInCatalogsRoute]);
 
   const menu: MenuItem[] = useMemo(
     () => [
@@ -74,10 +59,7 @@ export default function Sidebar({
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
-          {
-            label: "Unidades Administrativas",
-            to: "/catalogos/unidades-administrativas",
-          },
+          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
           { label: "COG", to: "/catalogos/cog" },
@@ -93,9 +75,44 @@ export default function Sidebar({
     []
   );
 
+  // ✅ Filtrado por permisos (sin dependencias faltantes)
+  const filteredMenu: MenuItem[] = useMemo(() => {
+    const canSee = (path?: string) => {
+      if (!path) return true;
+      // si no hay permisos, por seguridad no mostramos
+      return allowedModules?.has(path) ?? false;
+    };
+
+    return menu
+      .map((item) => {
+        if (!item.children) {
+          return canSee(item.to) ? item : null;
+        }
+
+        const kids = item.children.filter((c) => canSee(c.to));
+        if (kids.length === 0) return null;
+
+        return { ...item, children: kids };
+      })
+      .filter((x): x is MenuItem => !!x);
+  }, [menu, allowedModules]);
+
+  // ✅ Abre/cierra Catálogos al entrar a /catalogos/*, evitando setState sincrónico dentro del effect
+  useEffect(() => {
+    if (!isInCatalogsRoute) return;
+
+    const hasCatalogs = filteredMenu.some((m) => Array.isArray(m.children) && m.children.length > 0);
+
+    const id = window.setTimeout(() => {
+      setCatalogsManualOpen(hasCatalogs);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [isInCatalogsRoute, filteredMenu]);
+
   const handleLogout = () => {
     onNavigate?.();
-    logout(); // tu clearToken() ya elimina userEmail ✅
+    logout();
     navigate("/login", { replace: true });
   };
 
@@ -105,7 +122,7 @@ export default function Sidebar({
 
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
-    setCatalogsManualOpen((v) => !v); // ✅ ya lo puedes cerrar aunque estés en /catalogos/*
+    setCatalogsManualOpen((v) => !v);
   };
 
   const shouldShowSubmenu = catalogsManualOpen && !collapsed;
@@ -119,10 +136,7 @@ export default function Sidebar({
         const target = e.target as HTMLElement | null;
         if (!target) return;
 
-        // ✅ Si fue botón/link/input/etc, NO togglear
         if (isInteractiveTarget(target)) return;
-
-        // ✅ En cualquier otro caso, togglear
         onBackgroundToggle();
       }}
     >
@@ -144,7 +158,6 @@ export default function Sidebar({
 
         <div className={styles.goldLine} />
 
-        {/* Perfil (en colapsado lo mueves visualmente con CSS) */}
         <div className={styles.userRow}>
           <span className={styles.userIcon}>
             <FiUser />
@@ -158,45 +171,31 @@ export default function Sidebar({
       {/* MENÚ */}
       <div className={styles.scrollArea}>
         <nav className={styles.nav}>
-          {menu.map((item) =>
+          {filteredMenu.map((item) =>
             item.children ? (
               <div key={item.label} className={styles.group}>
-                <button
-                  type="button"
-                  className={styles.itemBtn}
-                  onClick={handleCatalogClick}
-                >
+                <button type="button" className={styles.itemBtn} onClick={handleCatalogClick}>
                   <span className={styles.left}>
                     <span className={styles.icon}>{item.icon}</span>
                     {!collapsed && <span className={styles.label}>{item.label}</span>}
                   </span>
 
                   {!collapsed && (
-                    <span
-                      className={`${styles.chev} ${
-                        catalogsManualOpen ? styles.chevOpen : ""
-                      }`}
-                    >
+                    <span className={`${styles.chev} ${catalogsManualOpen ? styles.chevOpen : ""}`}>
                       <FiChevronDown />
                     </span>
                   )}
                 </button>
 
                 {shouldShowSubmenu && (
-                  <div
-                    className={`${styles.submenu} ${
-                      catalogsManualOpen ? styles.submenuOpen : ""
-                    }`}
-                  >
+                  <div className={`${styles.submenu} ${catalogsManualOpen ? styles.submenuOpen : ""}`}>
                     {item.children.map((c) => (
                       <NavLink
                         key={c.to}
                         to={c.to}
                         onClick={() => onNavigate?.()}
                         className={({ isActive }) =>
-                          isActive
-                            ? `${styles.subItem} ${styles.active}`
-                            : styles.subItem
+                          isActive ? `${styles.subItem} ${styles.active}` : styles.subItem
                         }
                       >
                         {c.label}
@@ -210,9 +209,7 @@ export default function Sidebar({
                 key={item.to}
                 to={item.to!}
                 onClick={() => onNavigate?.()}
-                className={({ isActive }) =>
-                  isActive ? `${styles.item} ${styles.active}` : styles.item
-                }
+                className={({ isActive }) => (isActive ? `${styles.item} ${styles.active}` : styles.item)}
               >
                 <span className={styles.icon}>{item.icon}</span>
                 {!collapsed && <span className={styles.label}>{item.label}</span>}

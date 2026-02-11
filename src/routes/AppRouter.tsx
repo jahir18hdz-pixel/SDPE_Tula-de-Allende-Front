@@ -11,14 +11,12 @@ import Cog from "../Modules/Cog/pages/Cog";
 import FundingSource from "../Modules/FundingSource/pages/FundingSource";
 import Prog from "../Modules/Prog/pages/Prog";
 import Proyect from "../Modules/Proyect/pages/Proyec";
-
 import ActionsPolicy from "../Modules/ActionsPolicy/pages/ActionsPolicy";
-
-// ✅ NUEVO: Comunidades
 import Community from "../Modules/Community/pages/Community";
 
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
+import RequireModule from "./RequireModule";
 
 export default function AppRouter() {
   return (
@@ -31,47 +29,61 @@ export default function AppRouter() {
         {/* privadas */}
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
-            <Route path="/home" element={<Home />} />
-            <Route path="/usuarios/nuevo" element={<UserCreate />} />
+            {/* Home */}
+            <Route element={<RequireModule modulePath="/home" />}>
+              <Route path="/home" element={<Home />} />
+            </Route>
 
-            {/* Unidades Administrativas */}
-            <Route
-              path="/catalogos/unidades-administrativas"
-              element={<AdministrativeUnits />}
-            />
+            {/* Usuarios */}
+            <Route element={<RequireModule modulePath="/usuarios/nuevo" />}>
+              <Route path="/usuarios/nuevo" element={<UserCreate />} />
+            </Route>
 
-            {/* Roles */}
-            <Route path="/catalogos/roles" element={<Roles />} />
+            {/* Catálogos */}
+            <Route element={<RequireModule modulePath="/catalogos/unidades-administrativas" />}>
+              <Route
+                path="/catalogos/unidades-administrativas"
+                element={<AdministrativeUnits />}
+              />
+            </Route>
 
-            {/* Permisos */}
-            <Route path="/catalogos/permisos" element={<PermissionsByRole />} />
+            <Route element={<RequireModule modulePath="/catalogos/roles" />}>
+              <Route path="/catalogos/roles" element={<Roles />} />
+            </Route>
 
-            {/* COG */}
-            <Route path="/catalogos/cog" element={<Cog />} />
+            <Route element={<RequireModule modulePath="/catalogos/permisos" />}>
+              <Route path="/catalogos/permisos" element={<PermissionsByRole />} />
+            </Route>
 
-            {/* Fondo de Financiamiento */}
-            <Route
-              path="/catalogos/fondo-financiamiento"
-              element={<FundingSource />}
-            />
+            <Route element={<RequireModule modulePath="/catalogos/cog" />}>
+              <Route path="/catalogos/cog" element={<Cog />} />
+            </Route>
 
-            {/* Acciones de Póliza */}
-            <Route
-              path="/catalogos/acciones-poliza"
-              element={<ActionsPolicy />}
-            />
+            <Route element={<RequireModule modulePath="/catalogos/fondo-financiamiento" />}>
+              <Route
+                path="/catalogos/fondo-financiamiento"
+                element={<FundingSource />}
+              />
+            </Route>
 
-            {/* ✅ Comunidades */}
-            <Route
-              path="/catalogos/comunidades"
-              element={<Community />}
-            />
+            <Route element={<RequireModule modulePath="/catalogos/acciones-poliza" />}>
+              <Route
+                path="/catalogos/acciones-poliza"
+                element={<ActionsPolicy />}
+              />
+            </Route>
 
-            {/* PROG */}
-            <Route path="/catalogos/prog" element={<Prog />} />
+            <Route element={<RequireModule modulePath="/catalogos/comunidades" />}>
+              <Route path="/catalogos/comunidades" element={<Community />} />
+            </Route>
 
-            {/* PROYECTOS */}
-            <Route path="/catalogos/proyectos" element={<Proyect />} />
+            <Route element={<RequireModule modulePath="/catalogos/prog" />}>
+              <Route path="/catalogos/prog" element={<Prog />} />
+            </Route>
+
+            <Route element={<RequireModule modulePath="/catalogos/proyectos" />}>
+              <Route path="/catalogos/proyectos" element={<Proyect />} />
+            </Route>
           </Route>
         </Route>
 

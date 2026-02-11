@@ -20,6 +20,21 @@ import type { ToastType } from "../../../Components/layout/Toast";
 type Mode = "login" | "forgot";
 type ForgotStep = "request" | "validate" | "change";
 
+type PermissionGroupDto = {
+  Module?: string;
+  Action?: string[] | string;
+
+  module?: string;
+  action?: string[] | string;
+
+  [key: string]: unknown;
+};
+
+type LoginResponseWithPerms = {
+  Permissions?: PermissionGroupDto[];
+  permissions?: PermissionGroupDto[];
+};
+
 function getErrorMessage(err: unknown, fallback = "Ocurrió un error"): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
@@ -30,6 +45,29 @@ function getErrorMessage(err: unknown, fallback = "Ocurrió un error"): string {
   }
 
   return fallback;
+}
+
+function normalizeActions(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x));
+  if (typeof v === "string") return [v];
+  return [];
+}
+
+function getPermissions(data: unknown): PermissionGroupDto[] {
+  const d = data as LoginResponseWithPerms;
+  const perms = d.Permissions ?? d.permissions ?? [];
+  return Array.isArray(perms) ? perms : [];
+}
+
+function buildAllowedModules(perms: PermissionGroupDto[]): string[] {
+  return perms
+    .filter((p) => {
+      const actionsRaw = p.Action ?? p.action;
+      const actions = normalizeActions(actionsRaw).map((a) => a.trim().toUpperCase());
+      return actions.includes("VIEW");
+    })
+    .map((p) => String(p.Module ?? p.module ?? "").trim())
+    .filter(Boolean);
 }
 
 const Login: React.FC = () => {
@@ -79,14 +117,25 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const data = await login({ email, password });
+      const cleanEmail = email.trim();
+
+      const data = await login({ email: cleanEmail, password });
       const token = extractToken(data);
       if (!token) throw new Error("El backend no devolvió un token válido");
 
-      localStorage.setItem("auth", JSON.stringify(data));
-      localStorage.setItem("userEmail", email.trim()); 
-      loginWithToken(token);                            
+      const perms = getPermissions(data);
+      const allowedModules = buildAllowedModules(perms);
 
+      // Debug opcional (puedes quitarlo luego)
+      // console.log("PERMISSIONS:", perms);
+      // console.log("ALLOWED MODULES:", allowedModules);
+
+      localStorage.setItem("auth", JSON.stringify(data));
+      localStorage.setItem("userEmail", cleanEmail);
+      localStorage.setItem("allowedModules", JSON.stringify(allowedModules));
+
+      // ✅ IMPORTANTÍSIMO: pasar allowedModules al provider
+      loginWithToken(token, cleanEmail, allowedModules);
 
       showToast("success", "Sesión iniciada correctamente");
 
@@ -139,10 +188,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
     try {
       const msg = await recoverPassword({ email: cleanEmail });
-      showToast(
-        "success",
-        msg || "Si el correo existe, se enviará un código de recuperación."
-      );
+      showToast("success", msg || "Si el correo existe, se enviará un código de recuperación.");
       setForgotStep("validate");
     } catch (err: unknown) {
       showToast("error", getErrorMessage(err, "No se pudo enviar el código"));
@@ -185,8 +231,7 @@ const Login: React.FC = () => {
     if (!cleanEmail) return showToast("error", "Escribe tu correo");
     if (!cleanCode) return showToast("error", "Falta el código");
     if (!np) return showToast("error", "Escribe la nueva contraseña");
-    if (np.length < 6)
-      return showToast("error", "La contraseña debe tener al menos 6 caracteres");
+    if (np.length < 6) return showToast("error", "La contraseña debe tener al menos 6 caracteres");
     if (np !== cp) return showToast("error", "Las contraseñas no coinciden");
 
     setIsLoading(true);
