@@ -81,11 +81,11 @@ export default function AdministrativeUnits() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
   const selectedId = useMemo(() => getId(selected), [selected]);
+  const selectedCode = useMemo(() => getCode(selected), [selected]);
 
   useEffect(() => {
-    void loadAll(null);
+    void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -126,10 +126,15 @@ export default function AdministrativeUnits() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg = isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
-        ? String((parsed as UnknownRecord).message)
-        : "";
-      const msg = apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
+      const apiMsg =
+        isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
+          ? String((parsed as UnknownRecord).message)
+          : "";
+      const msg =
+        apiMsg ||
+        (typeof parsed === "string" ? parsed : "") ||
+        text ||
+        `HTTP ${res.status}`;
       return { ok: false, error: msg, status: res.status };
     }
 
@@ -190,7 +195,18 @@ export default function AdministrativeUnits() {
     return rows.some((u) => getCode(u) === code);
   }
 
-  async function loadAll(keepSelectedCode?: number | null) {
+  function codeExistsExcept(code: number, excludeId: number | null): boolean {
+    return rows.some((u) => {
+      const c = getCode(u);
+      if (c !== code) return false;
+      const id = getId(u);
+      // si no se puede resolver id, lo consideramos conflicto por seguridad
+      if (excludeId == null || id == null) return true;
+      return id !== excludeId;
+    });
+  }
+
+  async function loadAll() {
     setLoading(true);
     try {
       const token = readToken();
@@ -210,21 +226,6 @@ export default function AdministrativeUnits() {
 
       const list = extractList(result.data);
       setRows(list);
-
-      // mantener selección si aplica
-      if (keepSelectedCode != null) {
-        const found = list.find((r) => getCode(r) === keepSelectedCode) ?? null;
-        setSelected(found);
-        setMode("view");
-
-        if (found && mode === "edit") {
-          setFormEdit({
-            code: String(getCode(found) ?? ""),
-            description: String(getDescription(found) ?? ""),
-            active: getActive(found) ?? true,
-          });
-        }
-      }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
       setRows([]);
@@ -234,7 +235,7 @@ export default function AdministrativeUnits() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO (igual Roles/Proyect)
+   * ✅ FILTRO
    * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
    * - Con búsqueda: busca en TODOS (activos + inactivos)
    */
@@ -305,7 +306,14 @@ export default function AdministrativeUnits() {
   function validateForm(f: FormDto, isCreate: boolean): string {
     const codeNum = Number(f.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (isCreate && codeExists(codeNum)) return "No se pueden repetir las claves.";
+
+    if (isCreate) {
+      if (codeExists(codeNum)) return "Ese código ya existe.";
+    } else {
+      // ✅ en editar: si el usuario cambia la clave, validar duplicados (excluyendo el mismo id)
+      const currentId = selectedId;
+      if (codeExistsExcept(codeNum, currentId)) return "Ese código ya existe.";
+    }
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
@@ -338,7 +346,7 @@ export default function AdministrativeUnits() {
       showToast("success", "Unidad creada correctamente");
       setMode("view");
       setFormCreate(initialForm);
-      await loadAll(codeNum);
+      await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -357,8 +365,8 @@ export default function AdministrativeUnits() {
     setSaving(true);
     try {
       const payload = {
-        IdAdministrativeUnit: selectedId,
-        Code: Number(formEdit.code),
+        IdAdministrativeUnit: selectedId, // requerido por tu DTO
+        Code: Number(formEdit.code),      // ✅ ahora editable
         Description: asTrim(formEdit.description),
         Active: Boolean(formEdit.active),
       };
@@ -374,7 +382,7 @@ export default function AdministrativeUnits() {
       showToast("success", "Unidad actualizada correctamente");
       setMode("view");
       setSelected(null);
-      await loadAll(null);
+      await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -439,7 +447,6 @@ export default function AdministrativeUnits() {
             )}
           </div>
 
-          {/* ✅ Igual que Roles/Proyect */}
           <div className={styles.headerActions}>
             <button
               className={styles.btnGhost}
@@ -544,7 +551,9 @@ export default function AdministrativeUnits() {
                   displayedRows.map((r, idx) => {
                     const code = getCode(r);
                     const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+
+                    const isSelected =
+                      selectedId != null && getId(r) != null && getId(r) === selectedId;
 
                     const active = getActive(r) ?? false;
 
@@ -638,15 +647,18 @@ export default function AdministrativeUnits() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
+                  {/* ✅ NO SE MUESTRA ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Clave</span>
-                    <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
-                  </div>
+                  <Field label="Clave" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.code}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      inputMode="numeric"
+                      placeholder="Ej: 101"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -686,10 +698,7 @@ export default function AdministrativeUnits() {
                   <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
                 </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Id</span>
-                  <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                </div>
+                {/* ✅ NO SE MUESTRA ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Descripción</span>

@@ -191,6 +191,17 @@ export default function AcquisitionClassifications() {
     return rows.some((u) => getCode(u) === code);
   }
 
+  // ✅ nuevo: para validar duplicados en edición (excepto el registro actual)
+  function codeExistsExcept(code: number, exceptId: number | null): boolean {
+    return rows.some((r) => {
+      const rCode = getCode(r);
+      const rId = getId(r);
+      if (rCode !== code) return false;
+      if (exceptId == null) return true;
+      return rId !== exceptId;
+    });
+  }
+
   async function loadAll(keepSelectedCode?: number | null) {
     setLoading(true);
     try {
@@ -308,7 +319,13 @@ export default function AcquisitionClassifications() {
   function validateForm(f: FormDto, isCreate: boolean): string {
     const codeNum = Number(f.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (isCreate && codeExists(codeNum)) return "No se pueden repetir las claves.";
+
+    if (isCreate) {
+      if (codeExists(codeNum)) return "No se pueden repetir las claves.";
+    } else {
+      const sid = getId(selected);
+      if (codeExistsExcept(codeNum, sid)) return "No se pueden repetir las claves.";
+    }
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
@@ -324,7 +341,6 @@ export default function AcquisitionClassifications() {
 
     setSaving(true);
     try {
-      // AddAcquisitionClassificationCmd (Code, Description, Active)
       const payload = {
         Code: codeNum,
         Description: asTrim(formCreate.description),
@@ -360,11 +376,8 @@ export default function AcquisitionClassifications() {
 
     setSaving(true);
     try {
-      // UpdateAcqClassificationCmd: el controller fuerza el id desde la URL
       const payload = {
-        // si tu record usa otro nombre, no pasa nada si el back ignora; el id lo toma de la URL
-        idUpdateAcquisitionClassification: selectedId,
-        Code: Number(formEdit.code),
+        Code: Number(formEdit.code), // ✅ ahora sí editable
         Description: asTrim(formEdit.description),
         Active: Boolean(formEdit.active),
       };
@@ -377,10 +390,12 @@ export default function AcquisitionClassifications() {
 
       if (!result.ok) return showToast("error", result.error);
 
+      const newCode = Number(formEdit.code);
+
       showToast("success", "Clasificación actualizada correctamente");
       setMode("view");
       setSelected(null);
-      await loadAll(null);
+      await loadAll(Number.isFinite(newCode) ? newCode : null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -398,7 +413,6 @@ export default function AcquisitionClassifications() {
 
     setSaving(true);
     try {
-      // PATCH /{code}/active  body: bool
       const result = await requestJson(`${API_BASE}/${code}/active`, {
         method: "PATCH",
         headers: authHeaders(),
@@ -408,9 +422,8 @@ export default function AcquisitionClassifications() {
       if (!result.ok) return showToast("error", result.error);
 
       showToast("success", next ? "Se activó correctamente" : "Se desactivó correctamente");
-      setSelected(null);
+      await loadAll(code); // ✅ mantiene selección por code
       setMode("view");
-      await loadAll(null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -667,15 +680,19 @@ export default function AcquisitionClassifications() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
+                  {/* ✅ Ya NO mostramos ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Clave</span>
-                    <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
-                  </div>
+                  {/* ✅ Clave editable */}
+                  <Field label="Clave" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.code}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      inputMode="numeric"
+                      placeholder="Ej: 10"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -715,10 +732,7 @@ export default function AcquisitionClassifications() {
                   <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
                 </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Id</span>
-                  <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                </div>
+                {/* ✅ Ya NO mostramos ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Descripción</span>
@@ -808,11 +822,7 @@ function Field({
 /** Helpers */
 function getId(u: AcquisitionClassification | null): number | null {
   if (!u) return null;
-  const v =
-    u.idAcquisitionClassification ??
-    u.IdAcquisitionClassification ??
-    u.id ??
-    u.Id;
+  const v = u.idAcquisitionClassification ?? u.IdAcquisitionClassification ?? u.id ?? u.Id;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }

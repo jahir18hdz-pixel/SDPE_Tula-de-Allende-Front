@@ -1,3 +1,4 @@
+// src/Modules/Community/pages/Community.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/Community.module.css";
 
@@ -67,7 +68,7 @@ export default function Community() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
+  // ✅ Selección estable por ID (aunque el código cambie)
   const selectedId = useMemo(() => getIdCommunity(selected), [selected]);
 
   useEffect(() => {
@@ -149,9 +150,9 @@ export default function Community() {
       const normalized = normalizeArray(result.data);
       setRows(normalized);
 
-      // mantener selección si existe
-      if (selectedCode != null) {
-        const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
+      // ✅ Mantener selección por ID
+      if (selectedId != null) {
+        const found = normalized.find((r) => getIdCommunity(r) === selectedId) ?? null;
         setSelected(found);
 
         if (found && mode === "edit") {
@@ -192,7 +193,7 @@ export default function Community() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO:
+   * ✅ FILTRO:
    * - Si hay búsqueda: busca en TODAS (activas e inactivas)
    * - Si NO hay búsqueda: respeta showInactive (vista activas/inactivas)
    */
@@ -261,9 +262,20 @@ export default function Community() {
     setPage(1);
   }
 
-  function validateForm(f: Form): string {
-    const code = Number(f.code);
-    if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
+  function validateForm(f: Form, opts?: { excludeId?: number | null }): string {
+    const codeNum = Number(f.code);
+    if (!Number.isFinite(codeNum) || codeNum <= 0) return "El código debe ser un número mayor a 0.";
+
+    // ✅ no duplicados (excluye el actual si estás editando)
+    const excludeId = opts?.excludeId ?? null;
+    const dup = rows.some((r) => {
+      const id = getIdCommunity(r);
+      const code = getCode(r);
+      if (code == null) return false;
+      if (excludeId != null && id === excludeId) return false;
+      return code === codeNum;
+    });
+    if (dup) return "Ese código ya existe. Ingresa uno diferente.";
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
@@ -303,13 +315,13 @@ export default function Community() {
   }
 
   async function onSaveEdit() {
-    const msg = validateForm(edit);
-    if (msg) return showToast("error", msg);
-
     const id = selectedId;
     if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar el idCommunity de la comunidad seleccionada.");
+      return showToast("error", "No pude identificar la comunidad seleccionada.");
     }
+
+    const msg = validateForm(edit, { excludeId: id });
+    if (msg) return showToast("error", msg);
 
     const codeNum = Number(edit.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
@@ -496,9 +508,11 @@ export default function Community() {
                   </tr>
                 ) : (
                   pagedRows.map((c, idx) => {
-                    const code = getCode(c);
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                    const id = getIdCommunity(c);
+                    const key = id != null ? String(id) : `row-${idx}`;
+
+                    const isSelected = selectedId != null && id != null && id === selectedId;
+
                     const active = getActive(c) ?? false;
 
                     return (
@@ -507,7 +521,7 @@ export default function Community() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(c)}
                       >
-                        <td className={styles.mono}>{code ?? "—"}</td>
+                        <td className={styles.mono}>{getCode(c) ?? "—"}</td>
                         <td>{getDescription(c) ?? "—"}</td>
                         <td>
                           <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
@@ -591,15 +605,18 @@ export default function Community() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdCommunity(selected) ?? "—"}</span>
-                  </div>
+                  {/* ✅ NO MOSTRAR ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Ej: 501"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -634,10 +651,7 @@ export default function Community() {
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdCommunity(selected) ?? "—"}</span>
-                </div>
+                {/* ✅ NO MOSTRAR ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
@@ -658,7 +672,6 @@ export default function Community() {
                   />
                 </div>
 
-                {/* ✅ Acciones sin Activar/Desactivar */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar

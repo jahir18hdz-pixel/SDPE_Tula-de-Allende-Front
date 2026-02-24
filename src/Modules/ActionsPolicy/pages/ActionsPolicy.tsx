@@ -1,3 +1,4 @@
+// src/Modules/ActionsPolicy/pages/ActionsPolicy.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/ActionsPolicy.module.css";
 
@@ -7,6 +8,9 @@ import type { ToastType } from "../../../Components/layout/Toast";
 type ActionPolicyRow = {
   idActionPolicy?: number;
   IdActionPolicy?: number;
+
+  idAction?: number;
+  IdAction?: number;
 
   code?: number;
   Code?: number;
@@ -67,7 +71,6 @@ export default function ActionsPolicy() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
   const selectedId = useMemo(() => getIdActionPolicy(selected), [selected]);
 
   useEffect(() => {
@@ -150,8 +153,8 @@ export default function ActionsPolicy() {
       setRows(normalized);
 
       // mantener selección si existe
-      if (selectedCode != null) {
-        const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
+      if (selectedId != null) {
+        const found = normalized.find((r) => getIdActionPolicy(r) === selectedId) ?? null;
         setSelected(found);
 
         if (found && mode === "edit") {
@@ -237,11 +240,13 @@ export default function ActionsPolicy() {
 
   function startEdit() {
     if (!selected) return;
+
     setEdit({
       code: String(getCode(selected) ?? ""),
       description: getDescription(selected) ?? "",
       active: getActive(selected) ?? true,
     });
+
     setMode("edit");
   }
 
@@ -294,24 +299,47 @@ export default function ActionsPolicy() {
     }
   }
 
+  async function resolveIdForUpdate(): Promise<number | null> {
+    // 1) intentar por selectedId (si el listado trae ID)
+    if (selectedId != null && selectedId > 0) return selectedId;
+
+    // 2) fallback por code: GET /api/ActionsPolicy/{code}
+    const code = selected ? getCode(selected) : Number(edit.code);
+    if (code == null || !Number.isFinite(code) || code <= 0) return null;
+
+    const result = await requestJson(`${API_BASE}/${code}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    if (!result.ok) {
+      showToast("error", result.error);
+      return null;
+    }
+
+    const obj = asObject(result.data) as ActionPolicyRow | null;
+    const foundId = getIdActionPolicy(obj);
+    return foundId != null && foundId > 0 ? foundId : null;
+  }
+
   async function onSaveEdit() {
     const msg = validateForm(edit);
     if (msg) return showToast("error", msg);
 
-    // ✅ Controller: PUT /api/ActionsPolicy/{id:int}
-    const id = selectedId;
-    if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar el idActionPolicy de la acción seleccionada.");
+    const id = await resolveIdForUpdate();
+    if (id == null) {
+      return showToast(
+        "error",
+        "No pude identificar el ID (IdAction) de la acción seleccionada. Verifica que el GET lo esté enviando."
+      );
     }
 
-    // el controller requiere Code en el body, así que lo mandamos sí o sí
     const codeNum = Number(edit.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
 
     setSaving(true);
     try {
       const payload = {
-        idActionPolicy: id, // opcional (tu controller lo fuerza desde URL, pero no estorba)
         code: codeNum,
         description: asTrim(edit.description),
         active: Boolean(edit.active),
@@ -326,34 +354,6 @@ export default function ActionsPolicy() {
       if (!result.ok) return showToast("error", result.error);
 
       showToast("success", "Acción actualizada correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll();
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ✅ Controller: PATCH /api/ActionsPolicy/{code:int}/active   body: boolean
-  async function onChangeActive(nextActive: boolean) {
-    if (!selected) return;
-
-    const code = getCode(selected);
-    if (code == null) return showToast("error", "No pude identificar el Code.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(nextActive),
-      });
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", nextActive ? "Acción activada correctamente" : "Acción desactivada correctamente");
       setMode("view");
       setSelected(null);
       await loadAll();
@@ -380,9 +380,7 @@ export default function ActionsPolicy() {
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Acciones de Póliza</h1>
-            <p className={styles.sub}>
-              {showInactive ? "Viendo acciones inactivas." : "Viendo acciones activas."}
-            </p>
+            <p className={styles.sub}>{showInactive ? "Viendo acciones inactivas." : "Viendo acciones activas."}</p>
           </div>
 
           <div className={styles.searchWrapper}>
@@ -515,8 +513,14 @@ export default function ActionsPolicy() {
                 ) : (
                   pagedRows.map((c, idx) => {
                     const code = getCode(c);
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                    const id = getIdActionPolicy(c);
+                    const key = id != null ? `id-${id}` : code != null ? `code-${code}` : `row-${idx}`;
+
+                    const isSelected =
+                      selectedId != null && id != null
+                        ? id === selectedId
+                        : selected && code != null && code === getCode(selected);
+
                     const active = getActive(c) ?? false;
 
                     return (
@@ -609,18 +613,16 @@ export default function ActionsPolicy() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdActionPolicy(selected) ?? "—"}</span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
-
-                  {/* mantenemos code en estado para el PUT */}
-                  <input type="hidden" value={edit.code} readOnly />
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Código"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -656,11 +658,6 @@ export default function ActionsPolicy() {
             ) : (
               <div className={styles.detailBox}>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdActionPolicy(selected) ?? "—"}</span>
-                </div>
-
-                <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
                   <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
                 </div>
@@ -687,26 +684,6 @@ export default function ActionsPolicy() {
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onChangeActive(false)}
-                    disabled={saving || loading || !(getActive(selected) ?? false)}
-                  >
-                    Desactivar
-                  </button>
-
-                  {showInactive && (
-                    <button
-                      className={styles.btnSave}
-                      type="button"
-                      onClick={() => void onChangeActive(true)}
-                      disabled={saving || loading || (getActive(selected) ?? false)}
-                    >
-                      Activar
-                    </button>
-                  )}
                 </div>
               </div>
             )}
@@ -767,7 +744,15 @@ function Field({
 /** Helpers */
 function getIdActionPolicy(r: ActionPolicyRow | null): number | null {
   if (!r) return null;
-  const v = r.idActionPolicy ?? r.IdActionPolicy;
+
+  const v =
+    r.idActionPolicy ??
+    r.IdActionPolicy ??
+    r.idAction ??
+    r.IdAction ??
+    (r as unknown as UnknownObject)?.IdAction ??
+    (r as unknown as UnknownObject)?.idAction;
+
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }

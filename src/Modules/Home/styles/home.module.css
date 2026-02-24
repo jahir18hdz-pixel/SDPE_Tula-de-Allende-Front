@@ -6,8 +6,13 @@
   flex-direction: column;
   gap: 18px;
 
+  /* ✅ NO padding aquí: ya lo pone AppLayout .main */
   padding: 0;
+
+  /* ✅ evita desbordes raros */
+  overflow: hidden;
 }
+
 .actionsRow {
   min-width: 0;
 }
@@ -15,7 +20,6 @@
 .tableCard {
   min-width: 0;
 }
-
 
 /* ===== HEADER GRADIENTE ===== */
 .topBar {
@@ -25,6 +29,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+
   background: linear-gradient(90deg, #c04a72 0%, #f5d6df 70%, #ffffff 100%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
@@ -33,6 +39,7 @@
   font-weight: 800;
   font-size: 18px;
   color: #3b0b1a;
+  min-width: 0;
 }
 
 .datetimeCard {
@@ -43,6 +50,7 @@
   display: grid;
   gap: 6px;
   min-width: 160px;
+  flex: 0 0 auto;
 }
 
 .dtRow {
@@ -57,17 +65,22 @@
 .actionsRow {
   width: 100%;
   display: grid;
-  grid-template-columns: 150px 1fr 220px;
+
+  /* ✅ minmax(0,1fr) evita que el input reviente el grid */
+  grid-template-columns: 150px minmax(0, 1fr) 220px;
+
   gap: 14px;
   align-items: center;
+  min-width: 0;
 }
 
 .kpiCard {
   background: white;
   border-radius: 12px;
   padding: 12px 14px;
-  box-shadow: 0 10px 22px rgba(0,0,0,0.14);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
   width: 100%;
+  min-width: 0;
 }
 
 .kpiLabel {
@@ -93,7 +106,7 @@
   align-items: center;
   padding: 0 8px 0 14px;
   gap: 6px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
   min-width: 0;
 }
 
@@ -113,6 +126,7 @@
   cursor: pointer;
   width: 38px;
   height: 38px;
+  flex: 0 0 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -126,6 +140,7 @@
 
 .primaryBtn {
   height: 46px;
+  width: 100%;
   border-radius: 12px;
   border: none;
   cursor: pointer;
@@ -133,7 +148,9 @@
   font-size: 16px;
   background: #e0a64a;
   color: #2b0b10;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .primaryBtn:hover {
@@ -145,6 +162,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+  min-width: 0;
 }
 
 .sectionTitleRow h2 {
@@ -165,20 +183,23 @@
   width: 100%;
   background: white;
   border-radius: 14px;
-  box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
   overflow: hidden;
+  min-width: 0;
 }
 
 .tableWrap {
   width: 100%;
+  min-width: 0;
   overflow-x: auto;
   border-top: 2px solid rgba(91, 11, 36, 0.35);
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 820px; 
+  min-width: 820px; /* ✅ si no cabe, habrá scroll horizontal */
 }
 
 .table th,
@@ -187,7 +208,7 @@
   border: 1px solid rgba(91, 11, 36, 0.5);
   text-align: left;
   white-space: nowrap;
-  color: rgb(0, 0, 0)
+  color: rgb(0, 0, 0);
 }
 
 .table th {
@@ -226,6 +247,7 @@
   font-weight: 800;
   background: #e0a64a;
   color: #2b0b10;
+  white-space: nowrap;
 }
 
 .secondaryBtn:hover {
@@ -241,7 +263,7 @@
 
 .pagination {
   padding: 12px 16px;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   color: #6b7280;
   font-size: 13px;
 }
@@ -278,5 +300,97 @@
 
   .datetimeCard {
     width: 100%;
+  }
+}
+
+/* =========================
+   PANTALLAS GRANDES (23.8" Full HD+)
+========================= */
+@media (min-width: 1600px), (min-height: 1000px) {
+  .page {
+    gap: 22px;
+  }
+
+  .actionsRow {
+    grid-template-columns: 190px minmax(0, 1fr) 280px;
+    gap: 18px;
+  }
+
+  .kpiCard {
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  .kpiLabel {
+    font-size: 15px;
+  }
+
+  .kpiValue {
+    font-size: 44px;
+  }
+
+  .searchBar {
+    height: 56px;
+    border-radius: 14px;
+    padding: 0 12px 0 18px;
+    gap: 10px;
+  }
+
+  .searchBar input {
+    font-size: 18px;
+  }
+
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+
+  .primaryBtn {
+    height: 56px;
+    border-radius: 14px;
+    font-size: 18px;
+  }
+
+  .sectionTitleRow h2 {
+    font-size: 32px;
+  }
+
+  .sectionNote {
+    font-size: 16px;
+  }
+
+  .tableCard {
+    border-radius: 16px;
+  }
+
+  .table {
+    min-width: 980px;
+  }
+
+  .table th,
+  .table td {
+    padding: 16px 18px;
+    font-size: 16px;
+  }
+
+  .badgeOk,
+  .badgeBad {
+    height: 34px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .secondaryBtn {
+    height: 38px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+
+  .pagination {
+    padding: 14px 18px;
+    font-size: 14px;
   }
 }

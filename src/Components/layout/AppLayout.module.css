@@ -14,6 +14,7 @@
 .sidebarDesktop {
   height: 100%;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* Contenido */
@@ -22,18 +23,18 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+
+  /* ✅ evita que tablas/grids rompan el grid */
+  overflow: hidden;
 }
 
+/* Topbar */
 .topbarRow {
   display: flex;
   align-items: center;
   gap: 12px;
 
   padding: 18px 18px 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-
   min-width: 0;
 }
 
@@ -55,12 +56,14 @@
   line-height: 1;
 }
 
-/* Main */
+/* Main (aquí vive el padding global) */
 .main {
   flex: 1;
   min-height: 0;
-  min-width: 0; 
+  min-width: 0;
   overflow: auto;
+
+  /* ✅ este padding es el único (no lo dupliques en Home) */
   padding: 18px;
 }
 
@@ -68,6 +71,7 @@
 .overlay {
   display: none;
 }
+
 .sidebarMobile {
   display: none;
 }
@@ -119,6 +123,7 @@
     left: 0;
     height: 100vh;
     height: 100dvh;
+
     width: 280px;
     transform: translateX(-105%);
     transition: transform 180ms ease;

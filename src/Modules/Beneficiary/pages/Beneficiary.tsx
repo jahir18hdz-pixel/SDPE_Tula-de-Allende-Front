@@ -76,10 +76,10 @@ type FormDto = {
   state: string;
   country: string;
 
-  ine: string; // ✅ BD: VARCHAR(13) => 13 dígitos
-  curp: string; // ✅ BD: VARCHAR(18)
+  ine: string; // 12 ó 13 números
+  curp: string; // 18 alfanumérico (no repetido)
 
-  phone: string; // ✅ 10 dígitos
+  phone: string; // 10 dígitos
   email: string;
 
   active: boolean;
@@ -91,13 +91,10 @@ type UnknownRecord = Record<string, unknown>;
 const BASE_API = "https://localhost:7197";
 const API_BASE = `${BASE_API}/api/Beneficiary`;
 
-// ✅ CURP oficial (18)
-const CURP_REGEX =
-  /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HM][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z0-9]\d$/;
-
-// ✅ INE según tu BD: VARCHAR(13) => 13 dígitos
-const INE_LEN = 13;
-const INE_REGEX = /^\d{13}$/;
+const CURP_ALNUM_18 = /^[A-Z0-9]{18}$/;
+const INE_MIN = 12;
+const INE_MAX = 13;
+const INE_REGEX = /^\d{12,13}$/;
 
 const PHONE_LEN = 10;
 const CP_LEN = 5;
@@ -157,6 +154,15 @@ export default function BeneficiaryPage() {
 
   const selectedId = useMemo(() => getId(selected), [selected]);
   const selectedCurp = useMemo(() => getCurp(selected), [selected]);
+
+  const existingCurpSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const c = getCurp(r);
+      if (c) set.add(asTrim(c).toUpperCase());
+    }
+    return set;
+  }, [rows]);
 
   useEffect(() => {
     void loadAll(null);
@@ -287,9 +293,7 @@ export default function BeneficiaryPage() {
 
       if (keepSelectedCurp) {
         const found =
-          list.find(
-            (r) => (getCurp(r) ?? "").toUpperCase() === keepSelectedCurp.toUpperCase()
-          ) ?? null;
+          list.find((r) => (getCurp(r) ?? "").toUpperCase() === keepSelectedCurp.toUpperCase()) ?? null;
         setSelected(found);
         setMode("view");
         if (found && mode === "edit") setFormEdit(toForm(found));
@@ -372,14 +376,23 @@ export default function BeneficiaryPage() {
   }
 
   // =========================
-  // ✅ Normalizadores / validaciones (ACORDE A TU BD)
+  // ✅ Normalizadores / validaciones
   // =========================
-  function normalizeTitle(v: string): string {
-    const t = asTrim(v);
-    if (!t) return "";
-    return t
+  function sanitizeLettersSpacesLive(v: string): string {
+    return String(v ?? "").replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, "");
+  }
+
+  function normalizeLettersSpacesTitle(v: string): string {
+    const raw = String(v ?? "")
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!raw) return "";
+
+    return raw
       .toLowerCase()
-      .split(/\s+/g)
+      .split(" ")
       .filter(Boolean)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
@@ -400,15 +413,29 @@ export default function BeneficiaryPage() {
 
   function validateEmail(email: string): boolean {
     const t = asTrim(email);
-    if (!t) return true; // correo opcional
+    if (!t) return true;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
   }
 
-  function validateForm(f: FormDto): string {
-    // nombres / apellidos
-    const name = normalizeTitle(f.firstName);
-    const pat = normalizeTitle(f.paternalLastName);
-    const mat = asTrim(f.maternalLastName) ? normalizeTitle(f.maternalLastName) : "";
+  function isDuplicateCurp(nextCurpUpper: string, currentId: number | null): boolean {
+    for (const r of rows) {
+      const c = (getCurp(r) ?? "").trim().toUpperCase();
+      if (!c) continue;
+      if (c !== nextCurpUpper) continue;
+
+      const rid = getId(r);
+      const sameRecord = currentId != null && rid != null && rid === currentId;
+      if (!sameRecord) return true;
+    }
+    return false;
+  }
+
+  function validateForm(f: FormDto, opts?: { currentId: number | null }): string {
+    const currentId = opts?.currentId ?? null;
+
+    const name = normalizeLettersSpacesTitle(f.firstName);
+    const pat = normalizeLettersSpacesTitle(f.paternalLastName);
+    const mat = asTrim(f.maternalLastName) ? normalizeLettersSpacesTitle(f.maternalLastName) : "";
 
     if (!name) return "El nombre es obligatorio.";
     if (!pat) return "El apellido paterno es obligatorio.";
@@ -416,39 +443,32 @@ export default function BeneficiaryPage() {
     if (pat.length < 2) return "El apellido paterno es muy corto.";
     if (mat && mat.length < 2) return "El apellido materno es muy corto.";
 
-    // calle
     const street = asTrim(f.street);
     if (!street || street.length < 3) return "La calle es obligatoria (mínimo 3 caracteres).";
 
-    // CP (México: 5)
     const cp = onlyDigits(f.postalCode, CP_LEN);
     if (cp.length !== CP_LEN) return "El código postal debe tener exactamente 5 números.";
 
-    // muni/estado/pais
-    const municipality = normalizeTitle(f.municipality);
-    const state = normalizeTitle(f.state);
-    const country = normalizeTitle(f.country);
-
+    const municipality = normalizeLettersSpacesTitle(f.municipality);
+    const state = normalizeLettersSpacesTitle(f.state);
+    const country = normalizeLettersSpacesTitle(f.country);
     if (!municipality) return "El municipio es obligatorio.";
     if (!state) return "El estado es obligatorio.";
     if (!country) return "El país es obligatorio.";
 
-    // INE (BD: VARCHAR(13)) => 13 dígitos
-    const ine = onlyDigits(f.ine, INE_LEN);
-    if (ine.length !== INE_LEN || !INE_REGEX.test(ine)) {
-      return "El INE debe tener exactamente 13 números.";
+    const ine = onlyDigits(f.ine, INE_MAX);
+    if (ine.length < INE_MIN || ine.length > INE_MAX || !INE_REGEX.test(ine)) {
+      return "El INE debe tener 12 ó 13 números (solo dígitos).";
     }
 
-    // CURP (18)
     const curp = normalizeUpperAlnum(f.curp, 18);
     if (curp.length !== 18) return "La CURP debe tener exactamente 18 caracteres.";
-    if (!CURP_REGEX.test(curp)) return "La CURP no cumple el formato oficial.";
+    if (!CURP_ALNUM_18.test(curp)) return "La CURP debe ser alfanumérica (A-Z, 0-9) y sin espacios.";
+    if (existingCurpSet.size > 0 && isDuplicateCurp(curp, currentId)) return "Esa CURP ya existe.";
 
-    // teléfono (10)
     const phone = onlyDigits(f.phone, PHONE_LEN);
     if (phone.length !== PHONE_LEN) return "El teléfono debe tener exactamente 10 números.";
 
-    // email (opcional)
     const email = normalizeEmail(f.email);
     if (email && !validateEmail(email)) return "El correo no tiene un formato válido (ej: usuario@dominio.com).";
 
@@ -459,7 +479,7 @@ export default function BeneficiaryPage() {
   // ✅ CRUD
   // =========================
   async function onCreate() {
-    const msg = validateForm(formCreate);
+    const msg = validateForm(formCreate, { currentId: null });
     if (msg) return showToast("error", msg);
 
     setSaving(true);
@@ -468,10 +488,10 @@ export default function BeneficiaryPage() {
         Beneficiary: {
           IdBeneficiary: 0,
 
-          FirstName: normalizeTitle(formCreate.firstName),
-          PaternalLastName: normalizeTitle(formCreate.paternalLastName),
+          FirstName: normalizeLettersSpacesTitle(formCreate.firstName),
+          PaternalLastName: normalizeLettersSpacesTitle(formCreate.paternalLastName),
           MaternalLastName: asTrim(formCreate.maternalLastName)
-            ? normalizeTitle(formCreate.maternalLastName)
+            ? normalizeLettersSpacesTitle(formCreate.maternalLastName)
             : null,
 
           Street: asTrim(formCreate.street),
@@ -480,12 +500,12 @@ export default function BeneficiaryPage() {
           Neighborhood: asTrim(formCreate.neighborhood) || null,
           PostalCode: Number(onlyDigits(formCreate.postalCode, CP_LEN)),
 
-          City: asTrim(formCreate.city) ? normalizeTitle(formCreate.city) : null,
-          Municipality: normalizeTitle(formCreate.municipality),
-          State: normalizeTitle(formCreate.state),
-          Country: normalizeTitle(formCreate.country),
+          City: asTrim(formCreate.city) ? normalizeLettersSpacesTitle(formCreate.city) : null,
+          Municipality: normalizeLettersSpacesTitle(formCreate.municipality),
+          State: normalizeLettersSpacesTitle(formCreate.state),
+          Country: normalizeLettersSpacesTitle(formCreate.country),
 
-          Ine: onlyDigits(formCreate.ine, INE_LEN),
+          Ine: onlyDigits(formCreate.ine, INE_MAX),
           Curp: normalizeUpperAlnum(formCreate.curp, 18),
 
           Phone: onlyDigits(formCreate.phone, PHONE_LEN) || null,
@@ -514,22 +534,25 @@ export default function BeneficiaryPage() {
     }
   }
 
+  // ✅ IMPORTANTE:
+  // - Aquí NO activas/desactivas hasta que estés en "editar" y presiones "Guardar cambios"
+  // - Se manda el body con { Beneficiary: ... } porque tu backend lo exige.
   async function onUpdate() {
     if (!selected) return showToast("error", "Selecciona un beneficiario para editar.");
     if (selectedId == null) return showToast("error", "No se pudo resolver el IdBeneficiary.");
 
-    const msg = validateForm(formEdit);
+    const msg = validateForm(formEdit, { currentId: selectedId });
     if (msg) return showToast("error", msg);
 
     setSaving(true);
     try {
-      const payload = {
+      const beneficiaryDto = {
         IdBeneficiary: selectedId,
 
-        FirstName: normalizeTitle(formEdit.firstName),
-        PaternalLastName: normalizeTitle(formEdit.paternalLastName),
+        FirstName: normalizeLettersSpacesTitle(formEdit.firstName),
+        PaternalLastName: normalizeLettersSpacesTitle(formEdit.paternalLastName),
         MaternalLastName: asTrim(formEdit.maternalLastName)
-          ? normalizeTitle(formEdit.maternalLastName)
+          ? normalizeLettersSpacesTitle(formEdit.maternalLastName)
           : null,
 
         Street: asTrim(formEdit.street),
@@ -538,18 +561,23 @@ export default function BeneficiaryPage() {
         Neighborhood: asTrim(formEdit.neighborhood) || null,
         PostalCode: Number(onlyDigits(formEdit.postalCode, CP_LEN)),
 
-        City: asTrim(formEdit.city) ? normalizeTitle(formEdit.city) : null,
-        Municipality: normalizeTitle(formEdit.municipality),
-        State: normalizeTitle(formEdit.state),
-        Country: normalizeTitle(formEdit.country),
+        City: asTrim(formEdit.city) ? normalizeLettersSpacesTitle(formEdit.city) : null,
+        Municipality: normalizeLettersSpacesTitle(formEdit.municipality),
+        State: normalizeLettersSpacesTitle(formEdit.state),
+        Country: normalizeLettersSpacesTitle(formEdit.country),
 
-        Ine: onlyDigits(formEdit.ine, INE_LEN),
+        Ine: onlyDigits(formEdit.ine, INE_MAX),
         Curp: normalizeUpperAlnum(formEdit.curp, 18),
 
         Phone: onlyDigits(formEdit.phone, PHONE_LEN) || null,
         Email: normalizeEmail(formEdit.email) || null,
 
-        Active: Boolean(formEdit.active),
+        Active: Boolean(formEdit.active), // ✅ aquí viaja el estatus
+      };
+
+      const payload = {
+        IdBeneficiary: selectedId, // por si tu command lo valida en raíz
+        Beneficiary: beneficiaryDto, // ✅ requerido por el backend
       };
 
       const result = await requestJson(`${API_BASE}/${selectedId}`, {
@@ -561,34 +589,6 @@ export default function BeneficiaryPage() {
       if (!result.ok) return showToast("error", result.error);
 
       showToast("success", "Beneficiario actualizado correctamente");
-      setMode("view");
-      setSelected(null);
-      await loadAll(null);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onToggleStatusByCurp(nextActive: boolean) {
-    const curp = selectedCurp ? normalizeUpperAlnum(selectedCurp, 18) : null;
-    if (!curp) return showToast("error", "No se pudo resolver la CURP del beneficiario.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(
-        `${API_BASE}/by-curp/${encodeURIComponent(curp)}/status`,
-        {
-          method: "PATCH",
-          headers: authHeaders(),
-          body: JSON.stringify(nextActive),
-        }
-      );
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast("success", `Beneficiario ${nextActive ? "activado" : "desactivado"} correctamente`);
       setMode("view");
       setSelected(null);
       await loadAll(null);
@@ -669,12 +669,7 @@ export default function BeneficiaryPage() {
               {showInactive ? "Ver activos" : "Ver inactivos"}
             </button>
 
-            <button
-              className={styles.btnPrimary}
-              onClick={startCreate}
-              disabled={saving || mode === "create"}
-              type="button"
-            >
+            <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
               {mode === "create" ? "Creando..." : "+ Nuevo"}
             </button>
           </div>
@@ -776,6 +771,7 @@ export default function BeneficiaryPage() {
                         <td>{formatFullName(r) || "—"}</td>
                         <td className={styles.mono}>{curp ?? "—"}</td>
                         <td>
+                          {/* ✅ SOLO VISUAL: NO activar/desactivar desde tabla */}
                           <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
                         </td>
                       </tr>
@@ -811,10 +807,10 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.firstName}
-                      onChange={(e) => setCreate({ firstName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ firstName: normalizeTitle(formCreate.firstName) })}
+                      onChange={(e) => setCreate({ firstName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setCreate({ firstName: normalizeLettersSpacesTitle(formCreate.firstName) })}
                       disabled={createDisabled}
-                      placeholder="Ej: Juan"
+                      placeholder="Ej: Juan Carlos"
                     />
                   </Field>
 
@@ -822,8 +818,10 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.paternalLastName}
-                      onChange={(e) => setCreate({ paternalLastName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ paternalLastName: normalizeTitle(formCreate.paternalLastName) })}
+                      onChange={(e) => setCreate({ paternalLastName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() =>
+                        setCreate({ paternalLastName: normalizeLettersSpacesTitle(formCreate.paternalLastName) })
+                      }
                       disabled={createDisabled}
                       placeholder="Ej: Pérez"
                     />
@@ -833,14 +831,16 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.maternalLastName}
-                      onChange={(e) => setCreate({ maternalLastName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ maternalLastName: normalizeTitle(formCreate.maternalLastName) })}
+                      onChange={(e) => setCreate({ maternalLastName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() =>
+                        setCreate({ maternalLastName: normalizeLettersSpacesTitle(formCreate.maternalLastName) })
+                      }
                       disabled={createDisabled}
                       placeholder="Ej: López"
                     />
                   </Field>
 
-                  <Field label="CURP" required>
+                  <Field label="CURP (18 alfanumérico)" required>
                     <input
                       className={styles.input}
                       value={formCreate.curp}
@@ -852,14 +852,14 @@ export default function BeneficiaryPage() {
                     />
                   </Field>
 
-                  <Field label="INE (13 números)" required>
+                  <Field label="INE (12 ó 13 números)" required>
                     <input
                       className={styles.input}
                       value={formCreate.ine}
-                      onChange={(e) => setCreate({ ine: onlyDigits(e.target.value, INE_LEN) })}
+                      onChange={(e) => setCreate({ ine: onlyDigits(e.target.value, INE_MAX) })}
                       disabled={createDisabled}
-                      placeholder="13 dígitos"
-                      maxLength={INE_LEN}
+                      placeholder="12 o 13 dígitos"
+                      maxLength={INE_MAX}
                       inputMode="numeric"
                     />
                   </Field>
@@ -892,43 +892,19 @@ export default function BeneficiaryPage() {
                   <SectionTitle>Domicilio</SectionTitle>
 
                   <Field label="Calle" required>
-                    <input
-                      className={styles.input}
-                      value={formCreate.street}
-                      onChange={(e) => setCreate({ street: e.target.value })}
-                      disabled={createDisabled}
-                      placeholder="Ej: Av. Reforma"
-                    />
+                    <input className={styles.input} value={formCreate.street} onChange={(e) => setCreate({ street: e.target.value })} disabled={createDisabled} />
                   </Field>
 
                   <Field label="No. Exterior">
-                    <input
-                      className={styles.input}
-                      value={formCreate.externalNumber}
-                      onChange={(e) => setCreate({ externalNumber: e.target.value })}
-                      disabled={createDisabled}
-                      placeholder="Ej: 123"
-                    />
+                    <input className={styles.input} value={formCreate.externalNumber} onChange={(e) => setCreate({ externalNumber: e.target.value })} disabled={createDisabled} />
                   </Field>
 
                   <Field label="No. Interior">
-                    <input
-                      className={styles.input}
-                      value={formCreate.internalNumber}
-                      onChange={(e) => setCreate({ internalNumber: e.target.value })}
-                      disabled={createDisabled}
-                      placeholder="Ej: 4B"
-                    />
+                    <input className={styles.input} value={formCreate.internalNumber} onChange={(e) => setCreate({ internalNumber: e.target.value })} disabled={createDisabled} />
                   </Field>
 
                   <Field label="Colonia">
-                    <input
-                      className={styles.input}
-                      value={formCreate.neighborhood}
-                      onChange={(e) => setCreate({ neighborhood: e.target.value })}
-                      disabled={createDisabled}
-                      placeholder="Ej: Centro"
-                    />
+                    <input className={styles.input} value={formCreate.neighborhood} onChange={(e) => setCreate({ neighborhood: e.target.value })} disabled={createDisabled} />
                   </Field>
 
                   <Field label="Código postal" required>
@@ -947,8 +923,8 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.city}
-                      onChange={(e) => setCreate({ city: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ city: normalizeTitle(formCreate.city) })}
+                      onChange={(e) => setCreate({ city: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setCreate({ city: normalizeLettersSpacesTitle(formCreate.city) })}
                       disabled={createDisabled}
                       placeholder="Ej: Tula de Allende"
                     />
@@ -958,10 +934,9 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.municipality}
-                      onChange={(e) => setCreate({ municipality: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ municipality: normalizeTitle(formCreate.municipality) })}
+                      onChange={(e) => setCreate({ municipality: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setCreate({ municipality: normalizeLettersSpacesTitle(formCreate.municipality) })}
                       disabled={createDisabled}
-                      placeholder="Ej: Tula de Allende"
                     />
                   </Field>
 
@@ -969,10 +944,9 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.state}
-                      onChange={(e) => setCreate({ state: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ state: normalizeTitle(formCreate.state) })}
+                      onChange={(e) => setCreate({ state: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setCreate({ state: normalizeLettersSpacesTitle(formCreate.state) })}
                       disabled={createDisabled}
-                      placeholder="Ej: Hidalgo"
                     />
                   </Field>
 
@@ -980,14 +954,14 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formCreate.country}
-                      onChange={(e) => setCreate({ country: normalizeTitle(e.target.value) })}
-                      onBlur={() => setCreate({ country: normalizeTitle(formCreate.country) })}
+                      onChange={(e) => setCreate({ country: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setCreate({ country: normalizeLettersSpacesTitle(formCreate.country) })}
                       disabled={createDisabled}
-                      placeholder="Ej: México"
                     />
                   </Field>
 
                   <Field label="Activo">
+                    {/* En create sí se puede elegir */}
                     <Switch
                       checked={formCreate.active}
                       disabled={createDisabled}
@@ -1020,17 +994,12 @@ export default function BeneficiaryPage() {
                 <div className={styles.detailBox}>
                   <SectionTitle>Identidad</SectionTitle>
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
-
                   <Field label="Nombre(s)" required>
                     <input
                       className={styles.input}
                       value={formEdit.firstName}
-                      onChange={(e) => setEdit({ firstName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ firstName: normalizeTitle(formEdit.firstName) })}
+                      onChange={(e) => setEdit({ firstName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ firstName: normalizeLettersSpacesTitle(formEdit.firstName) })}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1039,8 +1008,8 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.paternalLastName}
-                      onChange={(e) => setEdit({ paternalLastName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ paternalLastName: normalizeTitle(formEdit.paternalLastName) })}
+                      onChange={(e) => setEdit({ paternalLastName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ paternalLastName: normalizeLettersSpacesTitle(formEdit.paternalLastName) })}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1049,13 +1018,13 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.maternalLastName}
-                      onChange={(e) => setEdit({ maternalLastName: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ maternalLastName: normalizeTitle(formEdit.maternalLastName) })}
+                      onChange={(e) => setEdit({ maternalLastName: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ maternalLastName: normalizeLettersSpacesTitle(formEdit.maternalLastName) })}
                       disabled={saving || loading}
                     />
                   </Field>
 
-                  <Field label="CURP" required>
+                  <Field label="CURP (18 alfanumérico)" required>
                     <input
                       className={styles.input}
                       value={formEdit.curp}
@@ -1066,13 +1035,13 @@ export default function BeneficiaryPage() {
                     />
                   </Field>
 
-                  <Field label="INE (13 números)" required>
+                  <Field label="INE (12 ó 13 números)" required>
                     <input
                       className={styles.input}
                       value={formEdit.ine}
-                      onChange={(e) => setEdit({ ine: onlyDigits(e.target.value, INE_LEN) })}
+                      onChange={(e) => setEdit({ ine: onlyDigits(e.target.value, INE_MAX) })}
                       disabled={saving || loading}
-                      maxLength={INE_LEN}
+                      maxLength={INE_MAX}
                       inputMode="numeric"
                     />
                   </Field>
@@ -1103,39 +1072,19 @@ export default function BeneficiaryPage() {
                   <SectionTitle>Domicilio</SectionTitle>
 
                   <Field label="Calle" required>
-                    <input
-                      className={styles.input}
-                      value={formEdit.street}
-                      onChange={(e) => setEdit({ street: e.target.value })}
-                      disabled={saving || loading}
-                    />
+                    <input className={styles.input} value={formEdit.street} onChange={(e) => setEdit({ street: e.target.value })} disabled={saving || loading} />
                   </Field>
 
                   <Field label="No. Exterior">
-                    <input
-                      className={styles.input}
-                      value={formEdit.externalNumber}
-                      onChange={(e) => setEdit({ externalNumber: e.target.value })}
-                      disabled={saving || loading}
-                    />
+                    <input className={styles.input} value={formEdit.externalNumber} onChange={(e) => setEdit({ externalNumber: e.target.value })} disabled={saving || loading} />
                   </Field>
 
                   <Field label="No. Interior">
-                    <input
-                      className={styles.input}
-                      value={formEdit.internalNumber}
-                      onChange={(e) => setEdit({ internalNumber: e.target.value })}
-                      disabled={saving || loading}
-                    />
+                    <input className={styles.input} value={formEdit.internalNumber} onChange={(e) => setEdit({ internalNumber: e.target.value })} disabled={saving || loading} />
                   </Field>
 
                   <Field label="Colonia">
-                    <input
-                      className={styles.input}
-                      value={formEdit.neighborhood}
-                      onChange={(e) => setEdit({ neighborhood: e.target.value })}
-                      disabled={saving || loading}
-                    />
+                    <input className={styles.input} value={formEdit.neighborhood} onChange={(e) => setEdit({ neighborhood: e.target.value })} disabled={saving || loading} />
                   </Field>
 
                   <Field label="Código postal" required>
@@ -1153,8 +1102,8 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.city}
-                      onChange={(e) => setEdit({ city: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ city: normalizeTitle(formEdit.city) })}
+                      onChange={(e) => setEdit({ city: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ city: normalizeLettersSpacesTitle(formEdit.city) })}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1163,8 +1112,8 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.municipality}
-                      onChange={(e) => setEdit({ municipality: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ municipality: normalizeTitle(formEdit.municipality) })}
+                      onChange={(e) => setEdit({ municipality: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ municipality: normalizeLettersSpacesTitle(formEdit.municipality) })}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1173,8 +1122,8 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.state}
-                      onChange={(e) => setEdit({ state: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ state: normalizeTitle(formEdit.state) })}
+                      onChange={(e) => setEdit({ state: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ state: normalizeLettersSpacesTitle(formEdit.state) })}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1183,12 +1132,13 @@ export default function BeneficiaryPage() {
                     <input
                       className={styles.input}
                       value={formEdit.country}
-                      onChange={(e) => setEdit({ country: normalizeTitle(e.target.value) })}
-                      onBlur={() => setEdit({ country: normalizeTitle(formEdit.country) })}
+                      onChange={(e) => setEdit({ country: sanitizeLettersSpacesLive(e.target.value) })}
+                      onBlur={() => setEdit({ country: normalizeLettersSpacesTitle(formEdit.country) })}
                       disabled={saving || loading}
                     />
                   </Field>
 
+                  {/* ✅ SOLO EN EDITAR se puede cambiar estatus (y se aplica al guardar) */}
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Activo</span>
                     <Switch
@@ -1211,6 +1161,7 @@ export default function BeneficiaryPage() {
                 </div>
               </form>
             ) : (
+              // VIEW (detalle)
               <div className={styles.detailBox}>
                 <SectionTitle>Identidad</SectionTitle>
 
@@ -1260,11 +1211,8 @@ export default function BeneficiaryPage() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  {/* ✅ SOLO VISUAL EN VIEW */}
+                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
                 </div>
 
                 <div className={styles.actions}>
@@ -1272,18 +1220,12 @@ export default function BeneficiaryPage() {
                     Cerrar
                   </button>
 
+                  {/* ✅ Para cambiar estatus: primero Editar */}
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
                     Editar
                   </button>
 
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onToggleStatusByCurp(!(getActive(selected) ?? false))}
-                    disabled={saving || loading}
-                  >
-                    {(getActive(selected) ?? false) ? "Desactivar" : "Activar"}
-                  </button>
+                  {/* ❌ Quitamos el botón Activar/Desactivar en VIEW */}
                 </div>
               </div>
             )}

@@ -148,7 +148,7 @@ export default function Proyect() {
       const normalized = normalizeArray(result.data);
       setRows(normalized);
 
-      // mantener selección si existe
+      // mantener selección si existe (por código)
       if (selectedCode != null) {
         const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
         setSelected(found);
@@ -193,7 +193,7 @@ export default function Proyect() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO
+   * ✅ FILTRO
    * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
    * - Con búsqueda: busca en TODOS (activos + inactivos)
    */
@@ -262,6 +262,39 @@ export default function Proyect() {
     setPage(1);
   }
 
+  // ===========================
+  // ✅ NO DUPLICADOS (FRONT)
+  // ===========================
+  function normalizeCodeInput(raw: string): string {
+    // solo dígitos (evita letras, espacios, signos)
+    const digits = raw.replace(/\D/g, "");
+    // quita ceros a la izquierda (pero permite vacío)
+    if (!digits) return "";
+    const n = Number(digits);
+    return Number.isFinite(n) ? String(n) : "";
+  }
+
+  function codeExists(code: number, excludeId?: number | null): boolean {
+    return rows.some((r) => {
+      const rCode = getCode(r);
+      if (rCode == null) return false;
+
+      // si estás editando, ignora el mismo registro
+      const rId = getIdProyect(r);
+      if (excludeId != null && rId != null && rId === excludeId) return false;
+
+      return rCode === code;
+    });
+  }
+
+  const createCodeNum = Number(create.code);
+  const createHasValidCode = Number.isFinite(createCodeNum) && createCodeNum > 0;
+  const isCreateDuplicate = createHasValidCode && codeExists(createCodeNum);
+
+  const editCodeNum = Number(edit.code);
+  const editHasValidCode = Number.isFinite(editCodeNum) && editCodeNum > 0;
+  const isEditDuplicate = editHasValidCode && codeExists(editCodeNum, selectedId);
+
   function validateForm(f: Form): string {
     const code = Number(f.code);
     if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
@@ -276,10 +309,14 @@ export default function Proyect() {
     const msg = validateForm(create);
     if (msg) return showToast("error", msg);
 
+    // ✅ bloqueo duplicado en CREATE
+    const codeNum = Number(create.code);
+    if (codeExists(codeNum)) return showToast("error", "Ese código ya existe. Usa otro.");
+
     setSaving(true);
     try {
       const payload = {
-        code: Number(create.code),
+        code: codeNum,
         description: asTrim(create.description),
         active: Boolean(create.active),
       };
@@ -312,15 +349,17 @@ export default function Proyect() {
       return showToast("error", "No pude identificar el idProyect del proyecto seleccionado.");
     }
 
+    // ✅ bloqueo duplicado en EDIT (ignorando el propio)
     const codeNum = Number(edit.code);
-    if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
+    if (codeExists(codeNum, id)) return showToast("error", "Ese código ya existe. Usa otro.");
 
     setSaving(true);
     try {
       const payload = {
-        code: codeNum,
-        description: asTrim(edit.description),
-        active: Boolean(edit.active),
+        idProyect: id,
+        Code: codeNum,
+        Description: asTrim(edit.description),
+        Active: Boolean(edit.active),
       };
 
       const result = await requestJson(`${API_BASE}/${id}`, {
@@ -343,6 +382,7 @@ export default function Proyect() {
   }
 
   const createDisabled = saving || loading;
+  const editDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -544,10 +584,15 @@ export default function Proyect() {
                       className={styles.input}
                       inputMode="numeric"
                       value={create.code}
-                      onChange={(e) => setCreate((p) => ({ ...p, code: e.target.value }))}
+                      onChange={(e) => setCreate((p) => ({ ...p, code: normalizeCodeInput(e.target.value) }))}
                       disabled={createDisabled}
                       placeholder="Ej: 101"
                     />
+                    {isCreateDuplicate && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: "#b00020" }}>
+                        Ese código ya existe.
+                      </div>
+                    )}
                   </Field>
 
                   <Field label="Descripción" required>
@@ -575,7 +620,12 @@ export default function Proyect() {
                     Cancelar
                   </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={createDisabled || isCreateDuplicate}
+                    title={isCreateDuplicate ? "Ese código ya existe" : undefined}
+                  >
                     {saving ? "Guardando..." : "Guardar"}
                   </button>
                 </div>
@@ -591,22 +641,28 @@ export default function Proyect() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdProyect(selected) ?? "—"}</span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: normalizeCodeInput(e.target.value) }))}
+                      disabled={editDisabled}
+                      placeholder="Ej: 101"
+                    />
+                    {isEditDuplicate && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: "#b00020" }}>
+                        Ese código ya existe.
+                      </div>
+                    )}
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
                       className={styles.input}
                       value={edit.description}
                       onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
-                      disabled={saving || loading}
+                      disabled={editDisabled}
                       placeholder="Descripción"
                     />
                   </Field>
@@ -615,7 +671,7 @@ export default function Proyect() {
                     <span className={styles.detailLabel}>Activo</span>
                     <Switch
                       checked={edit.active}
-                      disabled={saving || loading}
+                      disabled={editDisabled}
                       label={edit.active ? "Activo" : "Inactivo"}
                       onChange={(next) => setEdit((p) => ({ ...p, active: next }))}
                     />
@@ -627,18 +683,18 @@ export default function Proyect() {
                     Cancelar
                   </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={saving}>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={saving || isEditDuplicate}
+                    title={isEditDuplicate ? "Ese código ya existe" : undefined}
+                  >
                     {saving ? "Guardando..." : "Guardar cambios"}
                   </button>
                 </div>
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdProyect(selected) ?? "—"}</span>
-                </div>
-
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
                   <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>

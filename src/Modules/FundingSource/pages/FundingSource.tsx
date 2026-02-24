@@ -1,3 +1,4 @@
+// src/Modules/FundingSource/pages/FundingSource.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/FundingSource.module.css";
 
@@ -67,7 +68,6 @@ export default function FundingSource() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
   const selectedId = useMemo(() => getIdFundingSource(selected), [selected]);
 
   useEffect(() => {
@@ -148,9 +148,9 @@ export default function FundingSource() {
       const normalized = normalizeArray(result.data);
       setRows(normalized);
 
-      // mantener selección si existe
-      if (selectedCode != null) {
-        const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
+      // mantener selección por ID (no por código, porque ahora el código se edita)
+      if (selectedId != null) {
+        const found = normalized.find((r) => getIdFundingSource(r) === selectedId) ?? null;
         setSelected(found);
 
         if (found && mode === "edit") {
@@ -186,12 +186,11 @@ export default function FundingSource() {
       obj.Fondos;
 
     if (Array.isArray(possible)) return possible as FundingRow[];
-
     return [];
   }
 
   /**
-   * ✅ FILTRO CORREGIDO:
+   * ✅ FILTRO:
    * - Si hay búsqueda: busca en TODOS (activos e inactivos)
    * - Si NO hay búsqueda: respeta showInactive (vista activos/inactivos)
    */
@@ -260,26 +259,41 @@ export default function FundingSource() {
     setPage(1);
   }
 
-  function validateForm(f: Form): string {
-    const code = Number(f.code);
-    if (!Number.isFinite(code) || code <= 0) return "El código debe ser un número mayor a 0.";
+  function codeExists(codeNum: number, ignoreId?: number | null): boolean {
+    return rows.some((r) => {
+      const rCode = getCode(r);
+      if (rCode == null) return false;
+      if (rCode !== codeNum) return false;
+      const rId = getIdFundingSource(r);
+      if (ignoreId != null && rId != null && rId === ignoreId) return false;
+      return true;
+    });
+  }
+
+  function validateForm(f: Form, ignoreId?: number | null): string {
+    const codeNum = Number(f.code);
+    if (!Number.isFinite(codeNum) || codeNum <= 0) return "El código debe ser un número mayor a 0.";
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
+
+    // ✅ evitar duplicados en front
+    if (codeExists(codeNum, ignoreId ?? null)) return "Ese código ya existe.";
 
     return "";
   }
 
   async function onCreate() {
-    const msg = validateForm(create);
+    const msg = validateForm(create, null);
     if (msg) return showToast("error", msg);
 
     setSaving(true);
     try {
+      // Tu backend usa Code/Description/Active en el command (case-insensitive funciona, pero lo dejamos igual)
       const payload = {
-        code: Number(create.code),
-        description: asTrim(create.description),
-        active: Boolean(create.active),
+        Code: Number(create.code),
+        Description: asTrim(create.description),
+        Active: Boolean(create.active),
       };
 
       const result = await requestJson(`${API_BASE}`, {
@@ -302,13 +316,13 @@ export default function FundingSource() {
   }
 
   async function onSaveEdit() {
-    const msg = validateForm(edit);
-    if (msg) return showToast("error", msg);
-
     const id = selectedId;
     if (id == null || id <= 0) {
       return showToast("error", "No pude identificar el idFundingSource del fondo seleccionado.");
     }
+
+    const msg = validateForm(edit, id);
+    if (msg) return showToast("error", msg);
 
     const codeNum = Number(edit.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
@@ -316,9 +330,10 @@ export default function FundingSource() {
     setSaving(true);
     try {
       const payload = {
-        code: codeNum,
-        description: asTrim(edit.description),
-        active: Boolean(edit.active),
+        // 👇 backend UpdateFundingSourceCommand espera: Code, Description, Active
+        Code: codeNum,
+        Description: asTrim(edit.description),
+        Active: Boolean(edit.active),
       };
 
       const result = await requestJson(`${API_BASE}/${id}`, {
@@ -494,9 +509,11 @@ export default function FundingSource() {
                   </tr>
                 ) : (
                   pagedRows.map((c, idx) => {
+                    const id = getIdFundingSource(c);
                     const code = getCode(c);
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                    const key = id != null ? `id-${id}` : code != null ? `code-${code}` : `row-${idx}`;
+
+                    const isSelected = selectedId != null && id != null && id === selectedId;
                     const active = getActive(c) ?? false;
 
                     return (
@@ -589,15 +606,18 @@ export default function FundingSource() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdFundingSource(selected) ?? "—"}</span>
-                  </div>
+                  {/* ✅ NO MOSTRAR ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Ej: 101"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -632,10 +652,7 @@ export default function FundingSource() {
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdFundingSource(selected) ?? "—"}</span>
-                </div>
+                {/* ✅ NO MOSTRAR ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
@@ -649,10 +666,14 @@ export default function FundingSource() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
-                {/* ✅ Acciones sin Activar/Desactivar */}
+                {/* ✅ Acciones */}
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
                     Cerrar

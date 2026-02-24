@@ -1,3 +1,4 @@
+// src/Modules/Cog/pages/Cog.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/Cog.module.css";
 
@@ -67,7 +68,7 @@ export default function Cog() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
+  // ✅ IMPORTANTE: ahora “anclamos” por ID (el código puede cambiar)
   const selectedId = useMemo(() => getIdCog(selected), [selected]);
 
   useEffect(() => {
@@ -112,7 +113,15 @@ export default function Cog() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg = isRecord(parsed) ? getStringProp(parsed, "message") ?? "" : "";
+      // intenta sacar un mensaje amigable
+      const apiMsg =
+        isRecord(parsed)
+          ? (getStringProp(parsed, "message") ??
+              // ASP.NET a veces manda "title" o "errors"
+              getStringProp(parsed, "title") ??
+              "")
+          : "";
+
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
@@ -149,9 +158,9 @@ export default function Cog() {
       const normalized = normalizeCogArray(result.data);
       setRows(normalized);
 
-      // mantener selección si existe
-      if (selectedCode != null) {
-        const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
+      // ✅ mantener selección por ID (no por código)
+      if (selectedId != null) {
+        const found = normalized.find((r) => getIdCog(r) === selectedId) ?? null;
         setSelected(found);
 
         if (found && mode === "edit") {
@@ -183,7 +192,7 @@ export default function Cog() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO:
+   * ✅ FILTRO:
    * - Si hay búsqueda: busca en TODOS (activos e inactivos)
    * - Si NO hay búsqueda: respeta showInactive (vista activos/inactivos)
    */
@@ -307,6 +316,7 @@ export default function Cog() {
 
     setSaving(true);
     try {
+      // ✅ coincide con tu UpdateCogCommand: Code, Description, Active
       const payload = {
         code: codeNum,
         description: asTrim(edit.description),
@@ -486,9 +496,10 @@ export default function Cog() {
                   </tr>
                 ) : (
                   pagedRows.map((c, idx) => {
+                    const id = getIdCog(c);
                     const code = getCode(c);
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                    const key = id != null ? `id-${id}` : code != null ? `code-${code}` : `row-${idx}`;
+                    const isSelected = selectedId != null && id != null && id === selectedId;
                     const active = getActive(c) ?? false;
 
                     return (
@@ -581,15 +592,18 @@ export default function Cog() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
-                  </div>
+                  {/* ✅ ID oculto */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Código"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -624,11 +638,7 @@ export default function Cog() {
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdCog(selected) ?? "—"}</span>
-                </div>
-
+                {/* ✅ ID oculto */}
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>
                   <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>

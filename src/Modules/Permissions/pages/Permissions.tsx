@@ -26,7 +26,6 @@ type Role = {
   [key: string]: unknown;
 };
 
-// Respuesta del back (Dto)
 type PermissionApi = {
   IdPermiso?: number;
   Modulo?: string | null;
@@ -67,7 +66,6 @@ const ROLES_ENDPOINTS = [
 type ConfirmIntent = "switchRole" | "clearAll";
 
 export default function PermissionsByRole() {
-  // Roles
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [roleSearch, setRoleSearch] = useState("");
@@ -75,22 +73,18 @@ export default function PermissionsByRole() {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const selectedRoleId = useMemo(() => getRoleId(selectedRole), [selectedRole]);
 
-  // Permisos normalizados
   const [perms, setPerms] = useState<PermissionState[]>([]);
   const [permsLoading, setPermsLoading] = useState(false);
 
-  // UI
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [moduleSearch, setModuleSearch] = useState("");
 
-  // Confirm cambios sin guardar
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingRole, setPendingRole] = useState<Role | null>(null);
   const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>("switchRole");
 
-  // Toast
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
   const [toastMsg, setToastMsg] = useState("");
@@ -229,14 +223,20 @@ export default function PermissionsByRole() {
       const id = Number(p.IdPermiso ?? p.idPermiso);
       if (!Number.isFinite(id) || id <= 0) continue;
 
-      const modulo = String(p.Modulo ?? p.modulo ?? "").trim() || "General";
-      const accion = String(p.Accion ?? p.accion ?? "").trim() || "Ver";
+      const moduloRaw = String(p.Modulo ?? p.modulo ?? "").trim() || "General";
+      const accionRaw = String(p.Accion ?? p.accion ?? "").trim() || "Ver";
       const asignado = toBool(p.Asignado ?? p.asignado ?? false);
+
+      // ✅ mostrar solo nombre (sin /rutas ni separadores raros) y bonito
+      const modulo = toNiceLabel(moduloRaw);
+      const accion = toNiceLabel(accionRaw);
 
       out.push({ id, modulo, accion, asignado });
     }
 
+    // ✅ ORDEN: primero asignados, luego no asignados; luego por modulo/accion/id
     out.sort((a, b) => {
+      if (a.asignado !== b.asignado) return a.asignado ? -1 : 1;
       const m = a.modulo.localeCompare(b.modulo);
       if (m !== 0) return m;
       const ac = a.accion.localeCompare(b.accion);
@@ -277,7 +277,7 @@ export default function PermissionsByRole() {
     }
   }
 
-  // ========= NUEVO: limpiar todo =========
+  // ========= limpiar =========
   function clearAllSelectionImmediate() {
     setConfirmOpen(false);
     setPendingRole(null);
@@ -382,27 +382,21 @@ export default function PermissionsByRole() {
   }
 
   // ========= Derived =========
+
+  // ✅ Roles: filtrar solo por NOMBRE (sin id)
   const filteredRoles = useMemo(() => {
     const q = roleSearch.trim().toLowerCase();
     if (!q) return roles;
-
-    const maybeNum = Number(q);
-    const isNum = Number.isFinite(maybeNum) && q !== "";
-    if (isNum) return roles.filter((r) => String(getRoleId(r) ?? "").includes(q));
-
     return roles.filter((r) => (getRoleName(r) ?? "").toLowerCase().includes(q));
   }, [roles, roleSearch]);
 
+  // ✅ Permisos: filtrar por modulo/accion (sin id) y mantener orden de asignados primero
   const filteredPerms = useMemo(() => {
     const q = moduleSearch.trim().toLowerCase();
     if (!q) return perms;
 
     return perms.filter((p) => {
-      return (
-        p.modulo.toLowerCase().includes(q) ||
-        p.accion.toLowerCase().includes(q) ||
-        String(p.id).includes(q)
-      );
+      return p.modulo.toLowerCase().includes(q) || p.accion.toLowerCase().includes(q);
     });
   }, [perms, moduleSearch]);
 
@@ -449,7 +443,7 @@ export default function PermissionsByRole() {
 
             <input
               className={styles.searchInput}
-              placeholder="Buscar módulo, acción o id…"
+              placeholder="Buscar módulo o acción…"
               value={moduleSearch}
               onChange={(e) => setModuleSearch(e.target.value)}
               disabled={!selectedRoleId || saving || permsLoading}
@@ -494,7 +488,7 @@ export default function PermissionsByRole() {
 
               <input
                 className={styles.searchInput}
-                placeholder="Buscar rol por id o nombre…"
+                placeholder="Buscar rol por nombre…"
                 value={roleSearch}
                 onChange={(e) => setRoleSearch(e.target.value)}
                 disabled={saving || rolesLoading}
@@ -524,7 +518,7 @@ export default function PermissionsByRole() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>Id</th>
+                  {/* ✅ no mostrar id */}
                   <th>Nombre</th>
                   <th style={{ width: 140 }}>Activo</th>
                 </tr>
@@ -533,13 +527,13 @@ export default function PermissionsByRole() {
               <tbody>
                 {rolesLoading ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={2} className={styles.empty}>
                       Cargando roles...
                     </td>
                   </tr>
                 ) : filteredRoles.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={2} className={styles.empty}>
                       No se encontraron roles.
                     </td>
                   </tr>
@@ -559,7 +553,6 @@ export default function PermissionsByRole() {
                         onClick={() => requestSelectRole(r)}
                         title="Seleccionar rol"
                       >
-                        <td className={styles.mono}>{id != null ? String(id) : "—"}</td>
                         <td>{name}</td>
                         <td>
                           <Switch checked={active} disabled />
@@ -602,10 +595,12 @@ export default function PermissionsByRole() {
                     filteredPerms.map((p) => (
                       <div key={p.id} className={styles.actionRow}>
                         <div className={styles.actionLeft}>
+                          {/* ✅ solo nombre del modulo (sin /ruta) */}
                           <div className={styles.actionName}>
                             {p.modulo} — {p.accion}
                           </div>
-                          <div className={styles.actionId}>#{p.id}</div>
+                          {/* ✅ ocultar id */}
+                          {/* <div className={styles.actionId}>#{p.id}</div> */}
                         </div>
 
                         <Switch
@@ -643,12 +638,7 @@ export default function PermissionsByRole() {
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className={styles.btnGhost}
-                        onClick={cancelEdit}
-                        disabled={saving}
-                      >
+                      <button type="button" className={styles.btnGhost} onClick={cancelEdit} disabled={saving}>
                         Cancelar
                       </button>
 
@@ -662,12 +652,7 @@ export default function PermissionsByRole() {
                         Limpiar
                       </button>
 
-                      <button
-                        type="button"
-                        className={styles.btnSave}
-                        onClick={() => void onSave()}
-                        disabled={saving || !dirty}
-                      >
+                      <button type="button" className={styles.btnSave} onClick={() => void onSave()} disabled={saving || !dirty}>
                         {saving ? "Guardando..." : "Guardar cambios"}
                       </button>
                     </>
@@ -727,6 +712,42 @@ function getRoleActive(r: Role | null): boolean | null {
   if (!r) return null;
   const v: unknown = r.active ?? r.Active ?? r.isActive ?? r.IsActive;
   return toBoolOrNull(v);
+}
+
+function toNiceLabel(input: string): string {
+  // /home -> home ; permisos.view -> view ; "HOME" -> "Home"
+  const raw = (input ?? "").trim();
+  if (!raw) return "—";
+
+  const last = raw
+    .split(/[/\\]/) // rutas
+    .filter(Boolean)
+    .pop() ?? raw;
+
+  const last2 = last
+    .split(/[>|-]/) // separadores raros
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .pop() ?? last;
+
+  const last3 = last2
+    .split(".") // namespaces tipo Modulo.Accion
+    .pop() ?? last2;
+
+  const clean = last3.replace(/[_-]+/g, " ").trim();
+  return toTitle(clean);
+}
+
+function toTitle(s: string): string {
+  const t = s.trim();
+  if (!t) return "—";
+  // Title Case simple (Home, View, etc.)
+  return t
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 async function safeText(res: Response): Promise<string> {

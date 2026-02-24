@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/UserCreate.module.css";
-
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
+import { requestJson, authHeaders } from "../../../services/api";
 
 type UserRow = {
   idUser?: number;
@@ -50,32 +50,30 @@ type CreateForm = {
   idRole: string;
 };
 
-type AuthStored = { token?: string; Token?: string };
 type UnknownRecord = Record<string, unknown>;
 type UnknownObject = Record<string, unknown>;
 
 type RoleOption = { id: number; name: string; active?: boolean };
 type AuOption = { id: number; name: string; active?: boolean };
 
-const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/users`;
+const USERS_BASE = "/api/users";
 
 const ROLE_ENDPOINTS = [
-  `${BASE_API}/api/Roles`,
-  `${BASE_API}/api/roles`,
-  `${BASE_API}/api/Role`,
-  `${BASE_API}/api/role`,
-  `${BASE_API}/api/Roles/all`,
-  `${BASE_API}/api/roles/all`,
-  `${BASE_API}/api/Roles/get-all`,
-  `${BASE_API}/api/roles/get-all`,
+  "/api/Roles",
+  "/api/roles",
+  "/api/Role",
+  "/api/role",
+  "/api/Roles/all",
+  "/api/roles/all",
+  "/api/Roles/get-all",
+  "/api/roles/get-all",
 ];
 
 const AU_ENDPOINTS = [
-  `${BASE_API}/api/AdministrativeUnit`,
-  `${BASE_API}/api/administrativeunit`,
-  `${BASE_API}/api/AdministrativeUnits`,
-  `${BASE_API}/api/administrativeunits`,
+  "/api/AdministrativeUnit",
+  "/api/administrativeunit",
+  "/api/AdministrativeUnits",
+  "/api/administrativeunits",
 ];
 
 const initialCreate: CreateForm = {
@@ -133,68 +131,12 @@ export default function Users() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  function readToken(): string {
-    const rawAuth = localStorage.getItem("auth");
-    if (rawAuth) {
-      try {
-        const parsed = JSON.parse(rawAuth) as AuthStored;
-        const token = (parsed.token ?? parsed.Token ?? "").trim();
-        if (token) return token;
-      } catch {
-        // ignore
-      }
-    }
-    return "";
-  }
-
-  function authHeaders(): HeadersInit {
-    const token = readToken();
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function requestJson(
-    url: string,
-    init?: RequestInit
-  ): Promise<
-    | { ok: true; data: unknown; status: number }
-    | { ok: false; error: string; status: number }
-  > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
-
-    if (res.status === 204) return { ok: true, data: [], status: 204 };
-
-    const text = await safeText(res);
-    const parsed = tryParseJson(text);
-
-    if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) &&
-        typeof (parsed as Record<string, unknown>).message === "string"
-          ? String((parsed as Record<string, unknown>).message)
-          : "";
-      const msg =
-        apiMsg ||
-        (typeof parsed === "string" ? parsed : "") ||
-        text ||
-        `HTTP ${res.status}`;
-      return { ok: false, error: msg, status: res.status };
-    }
-
-    return { ok: true, data: parsed, status: res.status };
-  }
-
   async function firstWorkingEndpoint(endpoints: string[]) {
-    const headers = authHeaders();
-
-    for (const url of endpoints) {
-      const r = await requestJson(url, { method: "GET", headers });
-      if (r.ok) return { url, data: r.data as unknown };
+    for (const path of endpoints) {
+      const r = await requestJson(path, { method: "GET", headers: authHeaders() });
+      if (r.ok) return { path, data: r.data as unknown };
     }
-
-    return { url: endpoints[0] ?? "", data: [] as unknown };
+    return { path: endpoints[0] ?? "", data: [] as unknown };
   }
 
   function normalizePaged(payload: unknown): {
@@ -226,15 +168,8 @@ export default function Users() {
   async function loadPaged(nextPage: number, nextPageSize: number) {
     setLoading(true);
     try {
-      const token = readToken();
-      if (!token) {
-        showToast("error", "No hay token. Inicia sesión nuevamente.");
-        setRows([]);
-        return;
-      }
-
       const result = await requestJson(
-        `${API_BASE}/paged?page=${nextPage}&pageSize=${nextPageSize}`,
+        `${USERS_BASE}/paged?page=${nextPage}&pageSize=${nextPageSize}`,
         { method: "GET", headers: authHeaders() }
       );
 
@@ -267,14 +202,6 @@ export default function Users() {
   async function loadCombos() {
     setLoadingCombos(true);
     try {
-      const token = readToken();
-      if (!token) {
-        showToast("error", "No hay token. Inicia sesión nuevamente.");
-        setRoles([]);
-        setAdminUnits([]);
-        return;
-      }
-
       const [rolesPick, auPick] = await Promise.all([
         firstWorkingEndpoint(ROLE_ENDPOINTS),
         firstWorkingEndpoint(AU_ENDPOINTS),
@@ -289,14 +216,11 @@ export default function Users() {
       if (rolesNorm.length === 0) {
         showToast(
           "error",
-          "No se pudieron cargar Roles. Revisa la ruta del endpoint en ROLE_ENDPOINTS (y CORS/HTTPS)."
+          "No se pudieron cargar Roles. Revisa ROLE_ENDPOINTS (y CORS/HTTPS)."
         );
       }
       if (auNorm.length === 0) {
-        showToast(
-          "error",
-          "No se pudieron cargar Unidades. Revisa la ruta del endpoint en AU_ENDPOINTS."
-        );
+        showToast("error", "No se pudieron cargar Unidades. Revisa AU_ENDPOINTS.");
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -454,7 +378,7 @@ export default function Users() {
         idRole: Number(create.idRole),
       };
 
-      const result = await requestJson(`${API_BASE}`, {
+      const result = await requestJson(USERS_BASE, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -486,7 +410,7 @@ export default function Users() {
       Active: next,
     };
 
-    const result = await requestJson(`${API_BASE}/change-status`, {
+    const result = await requestJson(`${USERS_BASE}/change-status`, {
       method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify(payload),
@@ -700,7 +624,6 @@ export default function Users() {
                 )}
               </tbody>
             </table>
-
           </div>
         </section>
 
@@ -1011,24 +934,6 @@ function Field({
       {children}
     </div>
   );
-}
-
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
-}
-
-function tryParseJson(text: string): unknown {
-  const t = (text ?? "").trim();
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return text;
-  }
 }
 
 function isRecord(v: unknown): v is UnknownRecord {

@@ -66,17 +66,11 @@ export default function Sidebar({
         { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
         { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
         { label: "Comunidades", to: "/catalogos/comunidades" },
-
-        // ✅ NUEVO: Beneficiarios
         { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
-
-        // ✅ NUEVO: Proveedores
         { label: "Proveedores", to: "/catalogos/proveedores" },
-
         { label: "PROG", to: "/catalogos/prog" },
         { label: "Proyectos", to: "/catalogos/proyectos" },
         { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
-
         { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
       ],
     },
@@ -85,8 +79,7 @@ export default function Sidebar({
   []
 );
 
-
-  // ✅ Filtrado por permisos (sin dependencias faltantes)
+  // Filtrado por permisos
   const filteredMenu: MenuItem[] = useMemo(() => {
     const canSee = (path?: string) => {
       if (!path) return true;
@@ -107,7 +100,7 @@ export default function Sidebar({
       .filter((x): x is MenuItem => !!x);
   }, [menu, allowedModules]);
 
-  // ✅ Abre/cierra Catálogos al entrar a /catalogos/*
+  // Abre/cierra Catálogos
   useEffect(() => {
     if (!isInCatalogsRoute) return;
 

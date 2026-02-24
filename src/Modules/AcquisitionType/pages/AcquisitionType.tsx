@@ -192,6 +192,17 @@ export default function AcquisitionTypePage() {
     return rows.some((u) => getCode(u) === code);
   }
 
+  // ✅ nuevo: para validar duplicados en edición (excepto el registro actual)
+  function codeExistsExcept(code: number, exceptId: number | null): boolean {
+    return rows.some((r) => {
+      const rCode = getCode(r);
+      const rId = getId(r);
+      if (rCode !== code) return false;
+      if (exceptId == null) return true;
+      return rId !== exceptId;
+    });
+  }
+
   async function loadAll(keepSelectedCode?: number | null) {
     setLoading(true);
     try {
@@ -309,7 +320,13 @@ export default function AcquisitionTypePage() {
   function validateForm(f: FormDto, isCreate: boolean): string {
     const codeNum = Number(f.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
-    if (isCreate && codeExists(codeNum)) return "No se pueden repetir las claves.";
+
+    if (isCreate) {
+      if (codeExists(codeNum)) return "No se pueden repetir las claves.";
+    } else {
+      const sid = getId(selected);
+      if (codeExistsExcept(codeNum, sid)) return "No se pueden repetir las claves.";
+    }
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
@@ -360,11 +377,8 @@ export default function AcquisitionTypePage() {
 
     setSaving(true);
     try {
-      // tu controller fuerza el ID desde la URL, así que mandamos el PUT /{id}
-      // y en el body enviamos lo que tu UpdateAcquisitionTypeCommand espere.
-      // Como no pegaste el command, mando un payload "compatible" (Code/Description/Active).
       const payload = {
-        Code: Number(formEdit.code),
+        Code: Number(formEdit.code), // ✅ ahora sí editable
         Description: asTrim(formEdit.description),
         Active: Boolean(formEdit.active),
       };
@@ -377,10 +391,12 @@ export default function AcquisitionTypePage() {
 
       if (!result.ok) return showToast("error", result.error);
 
+      const newCode = Number(formEdit.code);
+
       showToast("success", "Tipo de adquisición actualizado correctamente");
       setMode("view");
       setSelected(null);
-      await loadAll(null);
+      await loadAll(Number.isFinite(newCode) ? newCode : null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -482,12 +498,7 @@ export default function AcquisitionTypePage() {
               {showInactive ? "Ver activos" : "Ver inactivos"}
             </button>
 
-            <button
-              className={styles.btnPrimary}
-              onClick={startCreate}
-              disabled={saving || mode === "create"}
-              type="button"
-            >
+            <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
               {mode === "create" ? "Creando..." : "+ Nuevo"}
             </button>
           </div>
@@ -669,13 +680,18 @@ export default function AcquisitionTypePage() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
+                  {/* ✅ Ya NO mostramos ID */}
 
-                  <Field label="Clave">
-                    <input className={styles.input} value={String(selectedCode ?? "")} disabled />
+                  {/* ✅ Clave editable */}
+                  <Field label="Clave" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.code}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      inputMode="numeric"
+                      placeholder="Ej: 1"
+                    />
                   </Field>
 
                   <Field label="Descripción" required>
@@ -716,10 +732,7 @@ export default function AcquisitionTypePage() {
                   <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
                 </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Id</span>
-                  <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                </div>
+                {/* ✅ Ya NO mostramos ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Descripción</span>
@@ -728,11 +741,7 @@ export default function AcquisitionTypePage() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
                 </div>
 
                 <div className={styles.actions}>

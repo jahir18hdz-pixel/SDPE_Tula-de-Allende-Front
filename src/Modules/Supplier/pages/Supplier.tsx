@@ -116,6 +116,11 @@ const initialForm: FormDto = {
 /** =========================
  *  INPUT HELPERS (VALIDACIÓN + FORMATEO)
  *  ========================= */
+
+function collapseSpaces(v: string): string {
+  return v.replace(/\s+/g, " ").trim();
+}
+
 function onlyLettersSpaces(v: string): string {
   // Letras con acentos/ñ, espacios, punto, guión y apóstrofe
   return v.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s.\-']/g, "");
@@ -128,6 +133,13 @@ function capitalizeWords(v: string): string {
     .split(" ")
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
     .join(" ");
+}
+
+function normalizeHumanText(v: string): string {
+  // ✅ permite múltiples palabras (con espacios), quita dobles espacios y capitaliza
+  const cleaned = onlyLettersSpaces(v);
+  const collapsed = collapseSpaces(cleaned);
+  return capitalizeWords(collapsed);
 }
 
 function onlyDigits(v: string): string {
@@ -325,9 +337,7 @@ export default function SupplierPage() {
         setSelected(found);
         setMode("view");
 
-        if (found && mode === "edit") {
-          setFormEdit(formFromSupplier(found));
-        }
+        if (found && mode === "edit") setFormEdit(formFromSupplier(found));
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -365,7 +375,7 @@ export default function SupplierPage() {
     setMode("view");
   }
 
-  /** ✅ VALIDACIONES PEDIDAS */
+  /** ✅ VALIDACIONES */
   function validateForm(f: FormDto): string {
     const rfc = normalizeRfc(f.rfc);
     if (!rfc) return "El RFC es obligatorio.";
@@ -421,13 +431,13 @@ export default function SupplierPage() {
       Neighborhood: asTrim(f.neighborhood) || null,
       PostalCode: Number(onlyDigits(f.postalCode)),
 
-      City: asTrim(f.city) || null,
-      Municipality: capitalizeWords(onlyLettersSpaces(f.municipality)),
-      State: capitalizeWords(onlyLettersSpaces(f.state)),
-      Country: capitalizeWords(onlyLettersSpaces(f.country)),
+      City: normalizeHumanText(f.city) || null,
+      Municipality: normalizeHumanText(f.municipality),
+      State: normalizeHumanText(f.state),
+      Country: normalizeHumanText(f.country),
 
       Phone: onlyDigits(f.phone) || null,
-      ContactName: capitalizeWords(onlyLettersSpaces(f.contactName)) || null,
+      ContactName: normalizeHumanText(f.contactName) || null,
       ContactPhone: onlyDigits(f.contactPhone) || null,
       Email: asTrim(f.email) || null,
 
@@ -488,8 +498,10 @@ export default function SupplierPage() {
 
       showToast("success", "Proveedor actualizado correctamente");
       setMode("view");
-      setSelected(null);
-      await loadPage(page, null);
+
+      // ✅ si cambió el RFC, vuelve a seleccionarlo por el RFC nuevo
+      const newRfc = normalizeRfc(formEdit.rfc);
+      await loadPage(page, newRfc || null);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -569,9 +581,7 @@ export default function SupplierPage() {
     });
   }, [rows, search, showInactive]);
 
-  const displayedRows = useMemo(() => {
-    return filteredRows.slice(0, pageSize);
-  }, [filteredRows, pageSize]);
+  const displayedRows = useMemo(() => filteredRows.slice(0, pageSize), [filteredRows, pageSize]);
 
   const createDisabled = saving || loading;
 
@@ -864,9 +874,7 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formCreate.city}
-                      onChange={(e) =>
-                        setFormCreate((p) => ({ ...p, city: capitalizeWords(onlyLettersSpaces(e.target.value)) }))
-                      }
+                      onChange={(e) => setFormCreate((p) => ({ ...p, city: normalizeHumanText(e.target.value) }))}
                       disabled={createDisabled}
                       placeholder="Ciudad"
                     />
@@ -876,10 +884,9 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formCreate.municipality}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormCreate((p) => ({ ...p, municipality: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormCreate((p) => ({ ...p, municipality: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={createDisabled}
                       placeholder="Municipio"
                     />
@@ -889,10 +896,7 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formCreate.state}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormCreate((p) => ({ ...p, state: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) => setFormCreate((p) => ({ ...p, state: normalizeHumanText(e.target.value) }))}
                       disabled={createDisabled}
                       placeholder="Estado"
                     />
@@ -902,10 +906,9 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formCreate.country}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormCreate((p) => ({ ...p, country: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormCreate((p) => ({ ...p, country: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={createDisabled}
                       placeholder="País"
                     />
@@ -930,12 +933,11 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formCreate.contactName}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormCreate((p) => ({ ...p, contactName: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormCreate((p) => ({ ...p, contactName: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={createDisabled}
-                      placeholder="Ej: Juan Pérez"
+                      placeholder="Ej: Juan Carlos Pérez López"
                     />
                   </Field>
 
@@ -996,15 +998,24 @@ export default function SupplierPage() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
+                  {/* ✅ YA NO MOSTRAMOS ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>RFC</span>
-                    <span className={styles.mono}>{String(selectedRfc ?? "—")}</span>
-                  </div>
+                  {/* ✅ RFC EDITABLE */}
+                  <Field label="RFC" required>
+                    <input
+                      className={styles.input}
+                      value={formEdit.rfc}
+                      onChange={(e) =>
+                        setFormEdit((p) => ({
+                          ...p,
+                          rfc: clampLen(normalizeRfc(e.target.value), 13),
+                        }))
+                      }
+                      disabled={saving || loading}
+                      placeholder="XAXX010101000"
+                      maxLength={13}
+                    />
+                  </Field>
 
                   <Field label="Razón social" required>
                     <input
@@ -1071,9 +1082,7 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formEdit.city}
-                      onChange={(e) =>
-                        setFormEdit((p) => ({ ...p, city: capitalizeWords(onlyLettersSpaces(e.target.value)) }))
-                      }
+                      onChange={(e) => setFormEdit((p) => ({ ...p, city: normalizeHumanText(e.target.value) }))}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1082,10 +1091,9 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formEdit.municipality}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormEdit((p) => ({ ...p, municipality: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormEdit((p) => ({ ...p, municipality: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1094,10 +1102,7 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formEdit.state}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormEdit((p) => ({ ...p, state: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) => setFormEdit((p) => ({ ...p, state: normalizeHumanText(e.target.value) }))}
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1106,10 +1111,9 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formEdit.country}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormEdit((p) => ({ ...p, country: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormEdit((p) => ({ ...p, country: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1132,10 +1136,9 @@ export default function SupplierPage() {
                     <input
                       className={styles.input}
                       value={formEdit.contactName}
-                      onChange={(e) => {
-                        const cleaned = onlyLettersSpaces(e.target.value);
-                        setFormEdit((p) => ({ ...p, contactName: capitalizeWords(cleaned) }));
-                      }}
+                      onChange={(e) =>
+                        setFormEdit((p) => ({ ...p, contactName: normalizeHumanText(e.target.value) }))
+                      }
                       disabled={saving || loading}
                     />
                   </Field>
@@ -1224,7 +1227,11 @@ export default function SupplierPage() {
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
+                  <Switch
+                    checked={getActive(selected) ?? false}
+                    disabled
+                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
+                  />
                 </div>
 
                 <div className={styles.actions}>

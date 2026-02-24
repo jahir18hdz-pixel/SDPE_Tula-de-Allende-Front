@@ -1,3 +1,5 @@
+import { requestJson } from "../services/api"; // ajusta la ruta según dónde esté este archivo
+
 export type LoginRequest = {
   email: string;
   password: string;
@@ -8,9 +10,6 @@ export type LoginResponse = {
   accessToken?: string;
   jwt?: string;
 };
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7197";
 
 type ProblemDetails = {
   title?: string;
@@ -29,39 +28,33 @@ function looksLikeHtml(text: string): boolean {
 function normalizeAuthError(raw: string): string | null {
   const lower = raw.toLowerCase();
 
-  // Tu caso: stacktrace con UnauthorizedAccessException + mensaje
   if (
     lower.includes("system.unauthorizedaccessexception") ||
     lower.includes("unauthorizedaccessexception") ||
     lower.includes("credenciales inválidas") ||
     lower.includes("invalid credentials") ||
-    // a veces sale "Unauthorized" por proxies/middlewares
     lower.includes("unauthorized")
   ) {
     return "Credenciales inválidas.";
   }
-
   return null;
 }
 
-async function readError(res: Response): Promise<string> {
-  const text = await res.text();
-  if (!text) return "Ocurrió un error";
+/**
+ * Convierte cualquier error (html / texto / problemdetails) a mensaje amigable.
+ * Úsalo con lo que venga en `result.error` o con strings crudos.
+ */
+function normalizeErrorMessage(status: number, raw: string): string {
+  const text = (raw ?? "").toString();
 
-  // 1) Si por status ya sabemos que es credenciales
-  if (res.status === 401) return "Credenciales inválidas.";
+  if (status === 401) return "Credenciales inválidas.";
 
-  // 2) Si viene el stacktrace / mensaje del back
   const normalized = normalizeAuthError(text);
   if (normalized) return normalized;
 
-  // 3) Si viene HTML (Developer Exception Page), no lo muestres
-  const contentType = res.headers.get("content-type") ?? "";
-  if (contentType.includes("text/html") || looksLikeHtml(text)) {
-    return "Ocurrió un error en el servidor.";
-  }
+  if (looksLikeHtml(text)) return "Ocurrió un error en el servidor.";
 
-  // 4) Si viene JSON tipo ProblemDetails
+  // ProblemDetails
   try {
     const json = JSON.parse(text) as ProblemDetails;
 
@@ -73,28 +66,29 @@ async function readError(res: Response): Promise<string> {
 
     return json.message ?? json.error ?? json.detail ?? json.title ?? "Ocurrió un error";
   } catch {
-    // 5) Texto plano
-    return text;
+    return text || "Ocurrió un error";
   }
-}
-
-export async function login(req: LoginRequest): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
-  });
-
-  if (!res.ok) {
-    // Centralizado para cubrir 401/500-stacktrace/html/json
-    throw new Error(await readError(res));
-  }
-
-  return res.json();
 }
 
 export function extractToken(data: LoginResponse): string | null {
   return data.token ?? data.accessToken ?? data.jwt ?? null;
+}
+
+// ===== AUTH =====
+
+export async function login(req: LoginRequest): Promise<LoginResponse> {
+  const result = await requestJson("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+
+  if (!result.ok) {
+    // result.error ya viene como string (puede ser html/json/texto)
+    throw new Error(normalizeErrorMessage(result.status, result.error));
+  }
+
+  // requestJson devuelve unknown, casteamos
+  return result.data as LoginResponse;
 }
 
 // ===== Password Reset =====
@@ -106,34 +100,35 @@ export type ChangePasswordRequest = { email: string; code: string; newPassword: 
 type ApiEnvelope<T> = { data: T };
 
 export async function recoverPassword(req: RecoverPasswordRequest): Promise<string> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/recover-password`, {
+  const result = await requestJson("/api/auth/recover-password", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
 
-  if (!res.ok) throw new Error(await readError(res));
-  return res.text();
+  if (!result.ok) throw new Error(normalizeErrorMessage(result.status, result.error));
+
+  // Si tu API devuelve texto: requestJson lo parsea como string cuando no es JSON
+  return String(result.data ?? "");
 }
 
 export async function validateResetCode(req: ValidateCodeRequest): Promise<string> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/validate-code`, {
+  const result = await requestJson("/api/auth/validate-code", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
 
-  if (!res.ok) throw new Error(await readError(res));
-  return res.text();
+  if (!result.ok) throw new Error(normalizeErrorMessage(result.status, result.error));
+  return String(result.data ?? "");
 }
 
 export async function changePassword(req: ChangePasswordRequest): Promise<string> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+  const payload = { data: req } satisfies ApiEnvelope<ChangePasswordRequest>;
+
+  const result = await requestJson("/api/auth/change-password", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data: req } satisfies ApiEnvelope<ChangePasswordRequest>),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error(await readError(res));
-  return res.text();
+  if (!result.ok) throw new Error(normalizeErrorMessage(result.status, result.error));
+  return String(result.data ?? "");
 }

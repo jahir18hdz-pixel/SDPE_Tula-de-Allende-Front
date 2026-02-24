@@ -77,6 +77,7 @@ export default function Roles() {
     setToastOpen(true);
   }, []);
 
+  // ✅ ID solo interno (NO se muestra)
   const selectedId = useMemo(() => getId(selected), [selected]);
 
   useEffect(() => {
@@ -217,7 +218,7 @@ export default function Roles() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO (igual que Proyect)
+   * ✅ FILTRO CORREGIDO (sin ID)
    * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
    * - Con búsqueda: busca en TODOS (activos + inactivos)
    */
@@ -233,11 +234,11 @@ export default function Roles() {
 
     if (!q) return base;
 
+    // ✅ búsqueda SOLO por nombre/descripción (sin ID)
     return base.filter((r) => {
-      const id = String(getId(r) ?? "").toLowerCase();
       const name = String(getName(r) ?? "").toLowerCase();
       const desc = String(getDescription(r) ?? "").toLowerCase();
-      return id.includes(q) || name.includes(q) || desc.includes(q);
+      return name.includes(q) || desc.includes(q);
     });
   }, [rows, search, showInactive]);
 
@@ -333,6 +334,7 @@ export default function Roles() {
   }
 
   async function onSaveEdit() {
+    // ✅ ID sigue siendo requerido para el PUT, pero NO se muestra en UI
     if (!selected || selectedId == null) {
       return showToast("error", "Selecciona un rol para editar.");
     }
@@ -403,7 +405,7 @@ export default function Roles() {
 
             <input
               className={styles.searchInput}
-              placeholder="Buscar por id, nombre o descripción…"
+              placeholder="Buscar por nombre o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               disabled={saving || loading}
@@ -425,7 +427,6 @@ export default function Roles() {
             )}
           </div>
 
-          {/* ✅ IMPORTANTE: este contenedor es el que usa el gap y responsive de Proyect */}
           <div className={styles.headerActions}>
             <button
               className={styles.btnGhost}
@@ -503,7 +504,7 @@ export default function Roles() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>Id</th>
+                  {/* ✅ SIN ID */}
                   <th>Nombre</th>
                   <th style={{ width: 170 }}>Activo</th>
                 </tr>
@@ -512,13 +513,13 @@ export default function Roles() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={2} className={styles.empty}>
                       Cargando roles...
                     </td>
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={2} className={styles.empty}>
                       {asTrim(search)
                         ? "No se encontraron roles (activos o inactivos) con esos criterios."
                         : showInactive
@@ -528,7 +529,7 @@ export default function Roles() {
                   </tr>
                 ) : (
                   pagedRows.map((r, idx) => {
-                    const id = getId(r);
+                    const id = getId(r); // ✅ solo para key/selección
                     const key = id != null ? String(id) : `row-${idx}`;
                     const isSelected = selectedId != null && id != null && id === selectedId;
                     const active = getActive(r) ?? false;
@@ -539,7 +540,7 @@ export default function Roles() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(r)}
                       >
-                        <td className={styles.mono}>{id != null ? String(id) : "—"}</td>
+                        {/* ✅ SIN ID */}
                         <td>{getName(r) ?? "—"}</td>
                         <td>
                           <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
@@ -622,10 +623,7 @@ export default function Roles() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Id</span>
-                    <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                  </div>
+                  {/* ✅ SIN ID */}
 
                   <Field label="Nombre" required>
                     <input
@@ -670,10 +668,7 @@ export default function Roles() {
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Id</span>
-                  <span className={styles.mono}>{String(selectedId ?? "—")}</span>
-                </div>
+                {/* ✅ SIN ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Nombre</span>

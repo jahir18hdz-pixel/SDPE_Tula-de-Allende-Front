@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import type { CSSProperties } from "react";
 
-import Sidebar from "../layout/Sidebar"; 
-import TopBar from "../layout/TopBar";  
+import Sidebar from "../layout/Sidebar";
+import TopBar from "../layout/TopBar";
 
 import styles from "./AppLayout.module.css";
 
@@ -15,12 +15,19 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const sidebarWidth = useMemo(() => (collapsed ? 88 : 280), [collapsed]);
+  // ✅ Sidebar responsivo: más ancho en 1920×1080
+  const sidebarWidth = useMemo(
+    () =>
+      collapsed
+        ? "clamp(80px, 7.5vw, 112px)" // colapsado responsivo
+        : "clamp(280px, 20vw, 380px)", // normal responsivo (en 1080p cae ~360-380px)
+    [collapsed]
+  );
 
   const closeMobile = () => setMobileOpen(false);
 
   const layoutStyle: LayoutVars = {
-    "--sidebar-w": `${sidebarWidth}px`,
+    "--sidebar-w": sidebarWidth,
   };
 
   return (

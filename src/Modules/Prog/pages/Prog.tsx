@@ -67,7 +67,6 @@ export default function Prog() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
   const selectedId = useMemo(() => getIdProg(selected), [selected]);
 
   useEffect(() => {
@@ -149,9 +148,9 @@ export default function Prog() {
       const normalized = normalizeArray(result.data);
       setRows(normalized);
 
-      // mantener selección si existe
-      if (selectedCode != null) {
-        const found = normalized.find((r) => getCode(r) === selectedCode) ?? null;
+      // ✅ mantener selección (por ID para que sea estable aunque edites el code)
+      if (selectedId != null) {
+        const found = normalized.find((r) => getIdProg(r) === selectedId) ?? null;
         setSelected(found);
 
         if (found && mode === "edit") {
@@ -192,7 +191,7 @@ export default function Prog() {
   }
 
   /**
-   * ✅ FILTRO CORREGIDO:
+   * ✅ FILTRO:
    * - Si hay búsqueda: busca en TODOS (activos e inactivos)
    * - Si no hay búsqueda: respeta showInactive (vista activos/inactivos)
    */
@@ -271,14 +270,27 @@ export default function Prog() {
     return "";
   }
 
+  // ✅ valida que el código no se repita (en toda la lista, activos/inactivos)
+  function codeExists(codeNum: number, excludeId?: number | null): boolean {
+    return rows.some((r) => {
+      const rCode = getCode(r);
+      const rId = getIdProg(r);
+      if (excludeId != null && rId != null && rId === excludeId) return false;
+      return rCode != null && rCode === codeNum;
+    });
+  }
+
   async function onCreate() {
     const msg = validateForm(create);
     if (msg) return showToast("error", msg);
 
+    const codeNum = Number(create.code);
+    if (codeExists(codeNum, null)) return showToast("error", "Ese código ya existe.");
+
     setSaving(true);
     try {
       const payload = {
-        code: Number(create.code),
+        code: codeNum,
         description: asTrim(create.description),
         active: Boolean(create.active),
       };
@@ -289,7 +301,10 @@ export default function Prog() {
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        // si backend manda algo tipo "already exists", lo respetamos
+        return showToast("error", result.error);
+      }
 
       showToast("success", "Prog creado correctamente");
       setMode("view");
@@ -313,6 +328,9 @@ export default function Prog() {
 
     const codeNum = Number(edit.code);
     if (!Number.isFinite(codeNum) || codeNum <= 0) return showToast("error", "Código inválido.");
+
+    // ✅ no permitir repetir (excluyendo el mismo registro)
+    if (codeExists(codeNum, id)) return showToast("error", "Ese código ya existe.");
 
     setSaving(true);
     try {
@@ -495,9 +513,12 @@ export default function Prog() {
                   </tr>
                 ) : (
                   pagedRows.map((c, idx) => {
+                    const id = getIdProg(c);
                     const code = getCode(c);
-                    const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+
+                    const key = id != null ? `id-${id}` : code != null ? `code-${code}` : `row-${idx}`;
+                    const isSelected = selectedId != null && id != null && id === selectedId;
+
                     const active = getActive(c) ?? false;
 
                     return (
@@ -590,15 +611,18 @@ export default function Prog() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>ID</span>
-                    <span className={styles.detailValue}>{getIdProg(selected) ?? "—"}</span>
-                  </div>
+                  {/* ✅ YA NO MOSTRAMOS ID */}
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Código</span>
-                    <span className={styles.detailValue}>{getCode(selected) ?? "—"}</span>
-                  </div>
+                  <Field label="Código" required>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={edit.code}
+                      onChange={(e) => setEdit((p) => ({ ...p, code: e.target.value }))}
+                      disabled={saving || loading}
+                      placeholder="Ej: 101"
+                    />
+                  </Field>
 
                   <Field label="Descripción" required>
                     <input
@@ -633,10 +657,7 @@ export default function Prog() {
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>ID</span>
-                  <span className={styles.detailValue}>{getIdProg(selected) ?? "—"}</span>
-                </div>
+                {/* ✅ YA NO MOSTRAMOS ID */}
 
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Código</span>

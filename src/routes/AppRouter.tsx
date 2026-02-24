@@ -1,12 +1,8 @@
-// src/routes/AppRouter.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
 import Splash from "../Modules/Auth/pages/Splash";
 import Login from "../Modules/Auth/pages/Login";
 import Home from "../Modules/Home/pages/home";
-
 import UserCreate from "../Modules/Users/pages/userCreate";
-
 import AdministrativeUnits from "../Modules/AdministrativeUnit/pages/AdministrativeUnits";
 import Roles from "../Modules/Roles/pages/Roles";
 import PermissionsByRole from "../Modules/Permissions/pages/Permissions";
@@ -18,13 +14,8 @@ import Prog from "../Modules/Prog/pages/Prog";
 import Proyect from "../Modules/Proyect/pages/Proyec";
 import AcquisitionClassifications from "../Modules/AcquisitionClassifications/pages/AcquisitionClassifications";
 import AcquisitionTypePage from "../Modules/AcquisitionType/pages/AcquisitionType";
-
-// ✅ NUEVO: Beneficiarios
 import BeneficiaryPage from "../Modules/Beneficiary/pages/Beneficiary";
-
-// ✅ NUEVO: Proveedores
 import SupplierPage from "../Modules/Supplier/pages/Supplier";
-
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -95,12 +86,12 @@ export default function AppRouter() {
               <Route path="/catalogos/comunidades" element={<Community />} />
             </Route>
 
-            {/* ✅ NUEVO: Beneficiarios */}
+            {/* Beneficiarios */}
             <Route element={<RequireModule modulePath="/catalogos/beneficiarios" />}>
               <Route path="/catalogos/beneficiarios" element={<BeneficiaryPage />} />
             </Route>
 
-            {/* ✅ NUEVO: Proveedores */}
+            {/* NUEVO: Proveedores */}
             <Route element={<RequireModule modulePath="/catalogos/proveedores" />}>
               <Route path="/catalogos/proveedores" element={<SupplierPage />} />
             </Route>
