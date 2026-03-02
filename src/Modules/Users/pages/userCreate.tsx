@@ -936,6 +936,7 @@ function Field({
   );
 }
 
+/** Parsing helpers (igual que tenías) */
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
 }

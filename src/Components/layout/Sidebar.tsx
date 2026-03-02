@@ -8,7 +8,6 @@ import {
   FiUser,
   FiUserPlus,
   FiLogOut,
-  FiSun,
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
@@ -121,9 +120,6 @@ export default function Sidebar({
     navigate("/login", { replace: true });
   };
 
-  const toggleTheme = () => {
-    document.body.classList.toggle("light-theme");
-  };
 
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
@@ -240,13 +236,6 @@ export default function Sidebar({
 
       {/* BOTTOM */}
       <div className={styles.bottom}>
-        <button type="button" className={styles.bottomBtn} onClick={toggleTheme}>
-          <span className={styles.icon}>
-            <FiSun />
-          </span>
-          {!collapsed && <span className={styles.label}>Modo claro</span>}
-        </button>
-
         <button type="button" className={styles.bottomBtn} onClick={handleLogout}>
           <span className={styles.icon}>
             <FiLogOut />
