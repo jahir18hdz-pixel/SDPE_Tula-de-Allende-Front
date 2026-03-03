@@ -71,6 +71,7 @@ export default function Sidebar({
         { label: "Proyectos", to: "/catalogos/proyectos" },
         { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
         { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
+        { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
       ],
     },
     { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },

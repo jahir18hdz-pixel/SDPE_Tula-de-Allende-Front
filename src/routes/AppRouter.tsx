@@ -16,6 +16,10 @@ import AcquisitionClassifications from "../Modules/AcquisitionClassifications/pa
 import AcquisitionTypePage from "../Modules/AcquisitionType/pages/AcquisitionType";
 import BeneficiaryPage from "../Modules/Beneficiary/pages/Beneficiary";
 import SupplierPage from "../Modules/Supplier/pages/Supplier";
+import DocumentType from "../Modules/Documents/pages/DocumentType";
+import AcquisitionRequest from "../Modules/AcquisitionRequest/pages/AcquisitionRequest";
+import ExpedientDocuments from "../Modules/ExpedientDocument/pages/ExpedientDocuments";
+
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -39,6 +43,18 @@ export default function AppRouter() {
             {/* Usuarios */}
             <Route element={<RequireModule modulePath="/usuarios/nuevo" />}>
               <Route path="/usuarios/nuevo" element={<UserCreate />} />
+            </Route>
+
+            {/* =========================
+                ADQUISICIONES
+            ========================== */}
+            <Route element={<RequireModule modulePath="/adquisiciones/registrar" />}>
+              <Route path="/adquisiciones/registrar" element={<AcquisitionRequest />} />
+            </Route>
+
+            {/* LISTA / CHECKLIST DE EXPEDIENTE POR SOLICITUD */}
+            <Route element={<RequireModule modulePath="/adquisiciones/expediente" />}>
+              <Route path="/adquisiciones/:id/expediente" element={<ExpedientDocuments />} />
             </Route>
 
             {/* =========================
@@ -70,10 +86,7 @@ export default function AppRouter() {
 
             {/* Fondo financiamiento */}
             <Route element={<RequireModule modulePath="/catalogos/fondo-financiamiento" />}>
-              <Route
-                path="/catalogos/fondo-financiamiento"
-                element={<FundingSource />}
-              />
+              <Route path="/catalogos/fondo-financiamiento" element={<FundingSource />} />
             </Route>
 
             {/* Acciones póliza */}
@@ -91,7 +104,7 @@ export default function AppRouter() {
               <Route path="/catalogos/beneficiarios" element={<BeneficiaryPage />} />
             </Route>
 
-            {/* NUEVO: Proveedores */}
+            {/* Proveedores */}
             <Route element={<RequireModule modulePath="/catalogos/proveedores" />}>
               <Route path="/catalogos/proveedores" element={<SupplierPage />} />
             </Route>
@@ -116,10 +129,12 @@ export default function AppRouter() {
 
             {/* Tipos de adquisición */}
             <Route element={<RequireModule modulePath="/catalogos/tipos-adquisicion" />}>
-              <Route
-                path="/catalogos/tipos-adquisicion"
-                element={<AcquisitionTypePage />}
-              />
+              <Route path="/catalogos/tipos-adquisicion" element={<AcquisitionTypePage />} />
+            </Route>
+
+            {/* Tipos de documento */}
+            <Route element={<RequireModule modulePath="/catalogos/tipos-documento" />}>
+              <Route path="/catalogos/tipos-documento" element={<DocumentType />} />
             </Route>
           </Route>
         </Route>
