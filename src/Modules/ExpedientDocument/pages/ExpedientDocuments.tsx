@@ -38,6 +38,8 @@ type ManagerInfo = {
   fullName: string;
   requestNumber?: string | null;
   administrativeUnit?: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 type AdministrativeUnitOption = {
@@ -427,6 +429,15 @@ export default function ExpedientDocuments() {
         toStringSafe(found["administrativeUnit"] ?? found["AdministrativeUnit"]).trim() || null;
       const reqNum =
         toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() || null;
+      const email =
+        toStringSafe(found["email"] ?? found["Email"]).trim() || null;
+      const phone =
+        toStringSafe(
+          found["phone"] ??
+            found["Phone"] ??
+            found["requestNumber"] ??
+            found["RequestNumber"]
+        ).trim() || null;
 
       if (!idRequestManager || !fullName) {
         setManager(null);
@@ -438,6 +449,8 @@ export default function ExpedientDocuments() {
         fullName,
         requestNumber: reqNum,
         administrativeUnit,
+        email,
+        phone,
       });
     } catch {
       setManager(null);
@@ -695,7 +708,7 @@ export default function ExpedientDocuments() {
       ...arr.map((f) => ({
         file: f,
         documentTypeId: null,
-        observations: "",
+        observations: "No hay observaciones",
       })),
     ]);
 
@@ -782,8 +795,8 @@ export default function ExpedientDocuments() {
         firstName: nameParts.firstName,
         lastName: nameParts.lastName,
         secondLastName: nameParts.secondLastName,
-        email: "",
-        phone: "",
+        email: manager.email ?? "",
+        phone: manager.phone ?? "",
       });
     } else {
       setManagerForm({
@@ -950,23 +963,23 @@ export default function ExpedientDocuments() {
       <div className={`${styles.mainContent} ${previewOpen ? styles.mainContentBlurred : ""}`}>
         <div className={styles.topActionsBar}>
           <button
-  type="button"
-  className={styles.btnBack}
-  onClick={() => navigate(-1)}
-  title="Regresar"
-  aria-label="Regresar"
->
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M15 18l-6-6 6-6"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-  <span>Regresar</span>
-</button>
+            type="button"
+            className={styles.btnBack}
+            onClick={() => navigate(-1)}
+            title="Regresar"
+            aria-label="Regresar"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Regresar</span>
+          </button>
 
           <div className={styles.topActionsRight}>
             <div className={styles.searchCompactInline}>
@@ -1003,27 +1016,27 @@ export default function ExpedientDocuments() {
                 <div className={styles.cardTitle}>Checklist de documentos</div>
 
                 <div className={styles.cardNoteInline}>
-  <div className={styles.managerBox}>
-    <span className={styles.managerInlineLabel}>Responsable:</span>
+                  <div className={styles.managerBox}>
+                    <span className={styles.managerInlineLabel}>Responsable:</span>
 
-    <span className={styles.managerHeaderName} title={getManagerDisplayName(manager)}>
-      {loadingManager ? "Cargando..." : getManagerDisplayName(manager)}
-    </span>
+                    <span className={styles.managerHeaderName} title={getManagerDisplayName(manager)}>
+                      {loadingManager ? "Cargando..." : getManagerDisplayName(manager)}
+                    </span>
 
-    {manager?.administrativeUnit && (
-      <span className={styles.metaTag}>{manager.administrativeUnit}</span>
-    )}
+                    {manager?.administrativeUnit && (
+                      <span className={styles.metaTag}>{manager.administrativeUnit}</span>
+                    )}
 
-    <button
-      type="button"
-      className={styles.managerActionBtn}
-      onClick={() => void openManagerPanel()}
-      disabled={!canUse || savingManager}
-    >
-      {manager ? "Editar responsable" : "Asignar responsable"}
-    </button>
-  </div>
-</div>
+                    <button
+                      type="button"
+                      className={styles.managerActionBtn}
+                      onClick={() => void openManagerPanel()}
+                      disabled={!canUse || savingManager}
+                    >
+                      {manager ? "Editar responsable" : "Asignar responsable"}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className={styles.headerStatsMini}>
@@ -1150,33 +1163,23 @@ export default function ExpedientDocuments() {
                           </td>
 
                           <td className={styles.tdRight}>
-                            {!hasFiles ? (
-                              <span className={styles.fileEmpty}>Sin archivo</span>
-                            ) : c.files.length === 1 ? (
-                              <button
-                                type="button"
-                                className={styles.fileLink}
-                                onClick={() => openPreviewFromFiles(c.documentName, c.files, 0)}
-                                title={c.files[0]?.name ?? "Previsualizar archivo"}
-                              >
-                                Ver archivo
-                              </button>
-                            ) : (
-                              <div className={styles.fileActionsList}>
-                                {c.files.map((file, index) => (
-                                  <button
-                                    key={`${file.id ?? "file"}-${file.name}-${index}`}
-                                    type="button"
-                                    className={styles.fileLink}
-                                    onClick={() => openPreviewFromFiles(c.documentName, c.files, index)}
-                                    title={file.name}
-                                  >
-                                    Ver {index + 1}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </td>
+  {!hasFiles ? (
+    <span className={styles.fileEmpty}>Sin archivo</span>
+  ) : (
+    <button
+      type="button"
+      className={styles.fileLink}
+      onClick={() => openPreviewFromFiles(c.documentName, c.files, 0)}
+      title={
+        c.files.length === 1
+          ? c.files[0]?.name ?? "Previsualizar archivo"
+          : `Previsualizar ${c.files.length} archivos`
+      }
+    >
+      Ver archivo
+    </button>
+  )}
+</td>
                         </tr>
                       );
                     })
@@ -1272,19 +1275,21 @@ export default function ExpedientDocuments() {
                         ))}
                       </select>
 
-                      <input
-                        className={styles.input}
-                        placeholder="Observaciones"
-                        value={u.observations}
-                        onChange={(e) =>
-                          setUploads((prev) =>
-                            prev.map((x, i) =>
-                              i === idx ? { ...x, observations: e.target.value } : x
-                            )
-                          )
-                        }
-                        disabled={uploading}
-                      />
+                      <div className={styles.formField}>
+  <label className={styles.fieldLabel}>Observaciones</label>
+  <input
+    className={styles.input}
+    value={u.observations}
+    onChange={(e) =>
+      setUploads((prev) =>
+        prev.map((x, i) =>
+          i === idx ? { ...x, observations: e.target.value } : x
+        )
+      )
+    }
+    disabled={uploading}
+  />
+</div>
 
                       <button
                         type="button"
@@ -1354,93 +1359,113 @@ export default function ExpedientDocuments() {
           </div>
 
           <div className={styles.uploadSheetBody}>
-            <div className={styles.uploadListFullscreen}>
-              <div className={styles.uploadRow}>
-                <div className={styles.uploadControls}>
-                  <select
-                    className={styles.select}
-                    value={managerForm.idAdministrativeUnit ?? ""}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({
-                        ...prev,
-                        idAdministrativeUnit: e.target.value ? Number(e.target.value) : null,
-                      }))
-                    }
-                    disabled={savingManager || loadingAdministrativeUnits}
-                  >
-                    <option value="">
-                      {loadingAdministrativeUnits
-                        ? "Cargando áreas..."
-                        : "Seleccionar área administrativa…"}
-                    </option>
-                    {administrativeUnits.map((u) => (
-                      <option key={u.idAdministrativeUnit} value={u.idAdministrativeUnit}>
-                        {u.description}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+  <div className={styles.managerFormWrap}>
+    <div className={styles.managerSectionCard}>
+      <div className={styles.managerSectionTitle}>Área administrativa</div>
 
-              <div className={styles.uploadRow}>
-                <div className={styles.uploadControls}>
-                  <input
-                    className={styles.input}
-                    placeholder="Nombre(s)"
-                    value={managerForm.firstName}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({ ...prev, firstName: e.target.value }))
-                    }
-                    disabled={savingManager}
-                  />
+      <div className={styles.formField}>
+        <label className={styles.fieldLabel}>Área</label>
+        <select
+          className={styles.select}
+          value={managerForm.idAdministrativeUnit ?? ""}
+          onChange={(e) =>
+            setManagerForm((prev) => ({
+              ...prev,
+              idAdministrativeUnit: e.target.value ? Number(e.target.value) : null,
+            }))
+          }
+          disabled={savingManager || loadingAdministrativeUnits}
+        >
+          <option value="">
+            {loadingAdministrativeUnits
+              ? "Cargando áreas..."
+              : "Seleccionar área administrativa…"}
+          </option>
+          {administrativeUnits.map((u) => (
+            <option key={u.idAdministrativeUnit} value={u.idAdministrativeUnit}>
+              {u.description}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
 
-                  <input
-                    className={styles.input}
-                    placeholder="Apellido paterno"
-                    value={managerForm.lastName}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({ ...prev, lastName: e.target.value }))
-                    }
-                    disabled={savingManager}
-                  />
+    <div className={styles.managerSectionCard}>
+      <div className={styles.managerSectionTitle}>Datos del responsable</div>
 
-                  <input
-                    className={styles.input}
-                    placeholder="Apellido materno"
-                    value={managerForm.secondLastName}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({ ...prev, secondLastName: e.target.value }))
-                    }
-                    disabled={savingManager}
-                  />
-                </div>
-              </div>
+      <div className={styles.formGridTwo}>
+        <div className={styles.formField}>
+          <label className={styles.fieldLabel}>Nombre(s)</label>
+          <input
+            className={styles.input}
+            value={managerForm.firstName}
+            onChange={(e) =>
+              setManagerForm((prev) => ({ ...prev, firstName: e.target.value }))
+            }
+            disabled={savingManager}
+          />
+        </div>
 
-              <div className={styles.uploadRow}>
-                <div className={styles.uploadControls}>
-                  <input
-                    className={styles.input}
-                    placeholder="Correo electrónico"
-                    value={managerForm.email}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({ ...prev, email: e.target.value }))
-                    }
-                    disabled={savingManager}
-                  />
+        <div className={styles.formField}>
+          <label className={styles.fieldLabel}>Apellido paterno</label>
+          <input
+            className={styles.input}
+            value={managerForm.lastName}
+            onChange={(e) =>
+              setManagerForm((prev) => ({ ...prev, lastName: e.target.value }))
+            }
+            disabled={savingManager}
+          />
+        </div>
+      </div>
 
-                  <input
-                    className={styles.input}
-                    placeholder="Teléfono"
-                    value={managerForm.phone}
-                    onChange={(e) =>
-                      setManagerForm((prev) => ({ ...prev, phone: e.target.value }))
-                    }
-                    disabled={savingManager}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className={styles.formGridOne}>
+        <div className={styles.formField}>
+          <label className={styles.fieldLabel}>Apellido materno</label>
+          <input
+            className={styles.input}
+            value={managerForm.secondLastName}
+            onChange={(e) =>
+              setManagerForm((prev) => ({ ...prev, secondLastName: e.target.value }))
+            }
+            disabled={savingManager}
+          />
+        </div>
+      </div>
+    </div>
+
+    <div className={styles.managerSectionCard}>
+      <div className={styles.managerSectionTitle}>Contacto</div>
+
+      <div className={styles.formGridTwo}>
+        <div className={styles.formField}>
+          <label className={styles.fieldLabel}>Correo electrónico</label>
+          <input
+            className={styles.input}
+            type="email"
+            value={managerForm.email}
+            onChange={(e) =>
+              setManagerForm((prev) => ({ ...prev, email: e.target.value }))
+            }
+            disabled={savingManager}
+          />
+        </div>
+
+        <div className={styles.formField}>
+          <label className={styles.fieldLabel}>Teléfono</label>
+          <input
+            className={styles.input}
+            value={managerForm.phone}
+            onChange={(e) =>
+              setManagerForm((prev) => ({ ...prev, phone: e.target.value }))
+            }
+            disabled={savingManager}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
           <div className={styles.uploadSheetFooter}>
             <button
@@ -1633,7 +1658,7 @@ export default function ExpedientDocuments() {
               {isPdfPreview && (
                 <div className={styles.previewPdfWrap}>
                   <iframe
-                    src={currentPreview.url}
+                    src={`${currentPreview.url}#view=FitH`}
                     title={currentPreview.name}
                     className={styles.previewFrame}
                   />
