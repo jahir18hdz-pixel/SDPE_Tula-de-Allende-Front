@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../styles/AcquisitionRequest.module.css";
 
@@ -10,9 +10,9 @@ type CatalogItem = { id: number; name: string };
 
 type CreateForm = {
   requestNumber: string;
-  requestDate: string; // yyyy-mm-dd
+  requestDate: string;
   justification: string;
-  authorizationDate: string; // yyyy-mm-dd
+  authorizationDate: string;
   observations: string;
 
   idAdministrativeUnit: number | null;
@@ -27,11 +27,31 @@ type CreateForm = {
   idBeneficiary: number | null;
 };
 
-const API_BASE = "/api/AcquisitionRequest";
+type ManagerForm = {
+  idAdministrativeUnit: number | null;
+  firstName: string;
+  lastName: string;
+  secondLastName: string;
+  email: string;
+  phone: string;
+};
 
-/**
- * ✅ Rutas exactas por tus controllers (Route("api/[controller]"))
- */
+type DocState = {
+  idDocumentType: number;
+  name: string;
+  requiredByRule: boolean;
+  applies: boolean;
+};
+
+type Step = "create" | "postCreate";
+
+const API_BASE = "/api/AcquisitionRequest";
+const MANAGER_API = "/api/RequestManager";
+const DOC_EXCEPTION_TOGGLE = "/api/RequestDocumentException/toggle";
+
+const DOCS_ENDPOINT = (idAcqClass: number) =>
+  `/api/ClasificationDocumentType/by-classification/${idAcqClass}`;
+
 const CATALOG_ENDPOINTS = {
   administrativeUnits: "/api/AdministrativeUnit",
   projects: "/api/Proyect",
@@ -63,16 +83,119 @@ const initialCreate: CreateForm = {
   idBeneficiary: null,
 };
 
-type NormalizeOpts = {
-  idKeys?: readonly string[];
-  nameKeys?: readonly string[];
+const initialManager: ManagerForm = {
+  idAdministrativeUnit: null,
+  firstName: "",
+  lastName: "",
+  secondLastName: "",
+  email: "",
+  phone: "",
 };
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+
+function getValue(obj: UnknownRecord, keys: readonly string[]): unknown {
+  for (const k of keys) if (k in obj) return obj[k];
+  return undefined;
+}
+
+function asArray(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+
+function toNumber(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function toStringSafe(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+}
+
+type NormalizeOpts = { idKeys?: readonly string[]; nameKeys?: readonly string[] };
+
+function normalizeCatalog(payload: unknown, opts?: NormalizeOpts): CatalogItem[] {
+  const defaultIdKeys: readonly string[] = ["id", "Id"];
+  const defaultNameKeys: readonly string[] = ["name", "Name", "description", "Description"];
+
+  const idKeys = opts?.idKeys?.length ? opts.idKeys : defaultIdKeys;
+  const nameKeys = opts?.nameKeys?.length ? opts.nameKeys : defaultNameKeys;
+
+  let list: unknown[] = [];
+
+  if (Array.isArray(payload)) list = payload;
+  else if (isRecord(payload)) {
+    const maybeItems = getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]);
+    list = asArray(maybeItems);
+  }
+
+  return list
+    .map((raw): CatalogItem | null => {
+      if (!isRecord(raw)) return null;
+
+      const id = toNumber(getValue(raw, idKeys));
+      if (!id || id <= 0) return null;
+
+      const name = toStringSafe(getValue(raw, nameKeys)).trim();
+      if (!name) return null;
+
+      return { id, name };
+    })
+    .filter((x): x is CatalogItem => x !== null);
+}
+
+function toNullableNumber(s: string): number | null {
+  const t = String(s ?? "").trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function toNullableIsoDate(yyyyMmDd: string): string | null {
+  const t = String(yyyyMmDd ?? "").trim();
+  if (!t) return null;
+  return `${t}T00:00:00.000Z`;
+}
+
+function toErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Error inesperado.";
+  }
+}
+
+function extractIdRequest(payload: unknown): number | null {
+  if (typeof payload === "number") return payload;
+
+  if (isRecord(payload)) {
+    const v = getValue(payload, ["idRequest", "IdRequest", "id", "Id"]);
+    const n = toNumber(v);
+    return n && n > 0 ? n : null;
+  }
+  return null;
+}
 
 export default function AcquisitionRequest() {
   const navigate = useNavigate();
 
+  const [step, setStep] = useState<Step>("create");
+  const [createdIdRequest, setCreatedIdRequest] = useState<number | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [create, setCreate] = useState<CreateForm>(initialCreate);
+
+  const [savingManager, setSavingManager] = useState(false);
+  const [manager, setManager] = useState<ManagerForm>(initialManager);
+  const [managerSaved, setManagerSaved] = useState(false);
 
   const [loadingCats, setLoadingCats] = useState(false);
 
@@ -86,7 +209,10 @@ export default function AcquisitionRequest() {
   const [communities, setCommunities] = useState<CatalogItem[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<CatalogItem[]>([]);
 
-  // toast
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsSaving, setDocsSaving] = useState(false);
+  const [docs, setDocs] = useState<DocState[]>([]);
+
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
   const [toastMsg, setToastMsg] = useState("");
@@ -101,10 +227,8 @@ export default function AcquisitionRequest() {
   const authDateRef = useRef<HTMLInputElement | null>(null);
 
   const createDisabled = saving || loadingCats;
+  const postDisabled = savingManager || docsSaving || docsLoading;
 
-  // -----------------------------
-  // Cargar catálogos (con normalizadores específicos cuando hace falta)
-  // -----------------------------
   const loadCatalogGeneric = useCallback(
     async (url: string, label: string, opts?: NormalizeOpts): Promise<CatalogItem[]> => {
       const result = await requestJson(url, { method: "GET", headers: authHeaders() });
@@ -115,11 +239,12 @@ export default function AcquisitionRequest() {
   );
 
   const loadProjects = useCallback(async (): Promise<CatalogItem[]> => {
-    const result = await requestJson(CATALOG_ENDPOINTS.projects, { method: "GET", headers: authHeaders() });
+    const result = await requestJson(CATALOG_ENDPOINTS.projects, {
+      method: "GET",
+      headers: authHeaders(),
+    });
     if (!result.ok) throw new Error(`Proyectos: ${result.error}`);
 
-    // Swagger:
-    // { idProyect, code, description, active }
     return normalizeCatalog(result.data, {
       idKeys: ["idProyect", "IdProyect", "id", "Id"],
       nameKeys: ["description", "Description", "name", "Name"],
@@ -127,13 +252,13 @@ export default function AcquisitionRequest() {
   }, []);
 
   const loadBeneficiaries = useCallback(async (): Promise<CatalogItem[]> => {
-    const result = await requestJson(CATALOG_ENDPOINTS.beneficiaries, { method: "GET", headers: authHeaders() });
+    const result = await requestJson(CATALOG_ENDPOINTS.beneficiaries, {
+      method: "GET",
+      headers: authHeaders(),
+    });
     if (!result.ok) throw new Error(`Beneficiarios: ${result.error}`);
 
-    // Swagger:
-    // { idBeneficiary, firstName, paternalLastName, maternalLastName, communityName, ... }
     const payload = result.data;
-
     const list: unknown[] = Array.isArray(payload)
       ? payload
       : isRecord(payload)
@@ -170,21 +295,15 @@ export default function AcquisitionRequest() {
       const tasks = [
         {
           key: "administrativeUnits",
-          label: "Unidades administrativas",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.administrativeUnits, "Unidades administrativas", {
               idKeys: ["idAdministrativeUnit", "IdAdministrativeUnit", "id", "Id"],
               nameKeys: ["description", "Description", "name", "Name"],
             }),
         },
-        {
-          key: "projects",
-          label: "Proyectos",
-          run: () => loadProjects(),
-        },
+        { key: "projects", run: () => loadProjects() },
         {
           key: "acquisitionTypes",
-          label: "Tipos de adquisición",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.acquisitionTypes, "Tipos de adquisición", {
               idKeys: ["idAcquisitionType", "IdAcquisitionType", "id", "Id"],
@@ -193,16 +312,14 @@ export default function AcquisitionRequest() {
         },
         {
           key: "suppliers",
-          label: "Proveedores",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.suppliers, "Proveedores", {
               idKeys: ["idSupplier", "IdSupplier", "id", "Id"],
-              nameKeys: ["supplierName", "SupplierName", "businessName", "BusinessName", "name", "Name", "description", "Description"],
+              nameKeys: ["supplierName", "SupplierName", "businessName", "BusinessName", "name", "Name", "description"],
             }),
         },
         {
           key: "fundingSources",
-          label: "Fuentes de financiamiento",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.fundingSources, "Fuentes de financiamiento", {
               idKeys: ["idFundingSource", "IdFundingSource", "id", "Id"],
@@ -211,25 +328,14 @@ export default function AcquisitionRequest() {
         },
         {
           key: "acqClassifications",
-          label: "Clasificación de adquisición",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.acquisitionClassifications, "Clasificación de adquisición", {
               idKeys: ["idAcquisitionClassification", "IdAcquisitionClassification", "id", "Id"],
-              nameKeys: [
-                "description",
-                "Description",
-                "classificationName",
-                "ClassificationName",
-                "acquisitionClassification",
-                "AcquisitionClassification",
-                "name",
-                "Name",
-              ],
+              nameKeys: ["description", "Description", "classificationName", "ClassificationName", "name", "Name"],
             }),
         },
         {
           key: "programs",
-          label: "Programas",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.programs, "Programas", {
               idKeys: ["idProgram", "IdProgram", "id", "Id", "idProg", "IdProg"],
@@ -238,18 +344,13 @@ export default function AcquisitionRequest() {
         },
         {
           key: "communities",
-          label: "Comunidades",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.communities, "Comunidades", {
               idKeys: ["idCommunity", "IdCommunity", "id", "Id"],
               nameKeys: ["communityName", "CommunityName", "description", "Description", "name", "Name"],
             }),
         },
-        {
-          key: "beneficiaries",
-          label: "Beneficiarios",
-          run: () => loadBeneficiaries(),
-        },
+        { key: "beneficiaries", run: () => loadBeneficiaries() },
       ] as const;
 
       const results = await Promise.allSettled(tasks.map((t) => t.run()));
@@ -257,41 +358,40 @@ export default function AcquisitionRequest() {
 
       results.forEach((r, i) => {
         const t = tasks[i];
-
-        if (r.status === "fulfilled") {
-          const list = r.value;
-
-          switch (t.key) {
-            case "administrativeUnits":
-              setAdministrativeUnits(list);
-              break;
-            case "projects":
-              setProjects(list);
-              break;
-            case "acquisitionTypes":
-              setAcquisitionTypes(list);
-              break;
-            case "suppliers":
-              setSuppliers(list);
-              break;
-            case "fundingSources":
-              setFundingSources(list);
-              break;
-            case "acqClassifications":
-              setAcqClassifications(list);
-              break;
-            case "programs":
-              setPrograms(list);
-              break;
-            case "communities":
-              setCommunities(list);
-              break;
-            case "beneficiaries":
-              setBeneficiaries(list);
-              break;
-          }
-        } else {
+        if (r.status !== "fulfilled") {
           showToast("error", r.reason instanceof Error ? r.reason.message : String(r.reason));
+          return;
+        }
+
+        const list = r.value;
+        switch (t.key) {
+          case "administrativeUnits":
+            setAdministrativeUnits(list);
+            break;
+          case "projects":
+            setProjects(list);
+            break;
+          case "acquisitionTypes":
+            setAcquisitionTypes(list);
+            break;
+          case "suppliers":
+            setSuppliers(list);
+            break;
+          case "fundingSources":
+            setFundingSources(list);
+            break;
+          case "acqClassifications":
+            setAcqClassifications(list);
+            break;
+          case "programs":
+            setPrograms(list);
+            break;
+          case "communities":
+            setCommunities(list);
+            break;
+          case "beneficiaries":
+            setBeneficiaries(list);
+            break;
         }
       });
 
@@ -304,9 +404,6 @@ export default function AcquisitionRequest() {
     };
   }, [loadCatalogGeneric, loadProjects, loadBeneficiaries, showToast]);
 
-  // -----------------------------
-  // Validación + Guardar
-  // -----------------------------
   function validateCreate(): string {
     const req = create.requestNumber.trim();
     const date = create.requestDate.trim();
@@ -317,6 +414,7 @@ export default function AcquisitionRequest() {
     if (!date) return "La fecha de solicitud es obligatoria.";
     if (!just) return "La justificación es obligatoria.";
     if (just.length < 5) return "La justificación es demasiado corta.";
+    if (!create.idAcquisitionClassification) return "Selecciona la clasificación de adquisición.";
     return "";
   }
 
@@ -338,7 +436,6 @@ export default function AcquisitionRequest() {
         idAcquisitionType: create.idAcquisitionType,
         idSupplier: create.idSupplier,
 
-        // ✅ backend lo asigna
         idApplicationStatus: 0,
 
         idFundingSource: create.idFundingSource,
@@ -356,8 +453,22 @@ export default function AcquisitionRequest() {
 
       if (!result.ok) return showToast("error", result.error);
 
-      showToast("success", "Solicitud de adquisición registrada.");
-      setCreate(initialCreate);
+      const idRequest = extractIdRequest(result.data);
+      if (!idRequest) {
+        showToast("error", "Se registró la solicitud, pero no se pudo leer el idRequest del servidor.");
+        return;
+      }
+
+      setCreatedIdRequest(idRequest);
+      setStep("postCreate");
+      setManagerSaved(false);
+
+      setManager((p) => ({
+        ...p,
+        idAdministrativeUnit: create.idAdministrativeUnit ?? null,
+      }));
+
+      showToast("success", `Solicitud registrada. Folio interno: ${idRequest}`);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -365,29 +476,181 @@ export default function AcquisitionRequest() {
     }
   }
 
-  // -----------------------------
-  // Calendario: showPicker sin any
-  // -----------------------------
+  const classificationId = create.idAcquisitionClassification;
+
+  const loadDocsByClassification = useCallback(async () => {
+    if (!classificationId) return;
+
+    setDocsLoading(true);
+    try {
+      const res = await requestJson(DOCS_ENDPOINT(classificationId), {
+        method: "GET",
+        headers: authHeaders(),
+      });
+
+      if (!res.ok) throw new Error(res.error);
+
+      const arr: unknown[] = Array.isArray(res.data) ? res.data : [];
+      const mapped: DocState[] = arr
+        .map((raw): DocState | null => {
+          if (!isRecord(raw)) return null;
+
+          const id = toNumber(
+            getValue(raw, ["documentTypeId", "DocumentTypeId", "idDocumentType", "IdDocumentType"])
+          );
+          if (!id || id <= 0) return null;
+
+          const name = toStringSafe(
+            getValue(raw, ["documentName", "DocumentName", "name", "Name", "description", "Description"])
+          ).trim();
+          if (!name) return null;
+
+          const reqRaw = getValue(raw, ["isRequired", "IsRequired", "requiredByRule", "RequiredByRule"]);
+          const requiredByRule = typeof reqRaw === "boolean" ? reqRaw : true;
+
+          return {
+            idDocumentType: id,
+            name,
+            requiredByRule,
+            applies: true,
+          };
+        })
+        .filter((x): x is DocState => x !== null);
+
+      setDocs(mapped);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+      setDocs([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  }, [classificationId, showToast]);
+
+  useEffect(() => {
+    if (step !== "postCreate") return;
+    void loadDocsByClassification();
+  }, [step, loadDocsByClassification]);
+
+  function validateManager(): string {
+    if (!createdIdRequest) return "No hay idRequest.";
+    if (!manager.idAdministrativeUnit) return "Selecciona unidad administrativa del responsable.";
+    if (!manager.firstName.trim()) return "El nombre del responsable es obligatorio.";
+    if (!manager.lastName.trim()) return "El apellido paterno es obligatorio.";
+    return "";
+  }
+
+  async function onSaveManager() {
+    const msg = validateManager();
+    if (msg) return showToast("error", msg);
+
+    setSavingManager(true);
+    try {
+      const payload = {
+        idRequest: createdIdRequest,
+        idAdministrativeUnit: manager.idAdministrativeUnit,
+        firstName: manager.firstName.trim(),
+        lastName: manager.lastName.trim(),
+        secondLastName: manager.secondLastName.trim() || null,
+        email: manager.email.trim() || null,
+        phone: manager.phone.trim() || null,
+      };
+
+      const res = await requestJson(MANAGER_API, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) return showToast("error", res.error);
+
+      setManagerSaved(true);
+      showToast("success", "Responsable registrado.");
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setSavingManager(false);
+    }
+  }
+
+  function validateDocs(): string {
+    if (!createdIdRequest) return "No hay idRequest.";
+    if (!managerSaved) return "Primero guarda el responsable.";
+
+    const bad = docs.find((d) => !Number.isFinite(d.idDocumentType) || d.idDocumentType <= 0);
+    if (bad) return `Documento con Id inválido: ${bad.name}`;
+
+    return "";
+  }
+
+  async function onSaveDocsChecklist() {
+    const msg = validateDocs();
+    if (msg) return showToast("error", msg);
+    if (!createdIdRequest) return;
+
+    setDocsSaving(true);
+    try {
+      const payload = {
+        idRequest: createdIdRequest,
+        documents: docs.map((d) => ({
+          idDocumentType: d.idDocumentType,
+          doesNotApply: !d.applies,
+          justification: "",
+        })),
+      };
+
+      const res = await requestJson(DOC_EXCEPTION_TOGGLE, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) return showToast("error", res.error);
+
+      showToast("success", "Checklist guardado correctamente.");
+
+      setStep("create");
+      setCreatedIdRequest(null);
+      setCreate(initialCreate);
+      setManager(initialManager);
+      setDocs([]);
+      setManagerSaved(false);
+    } catch (e: unknown) {
+      showToast("error", toErrorMessage(e));
+    } finally {
+      setDocsSaving(false);
+    }
+  }
+
   type DatePickerInput = HTMLInputElement & { showPicker?: () => void };
 
   function openDatePicker(ref: React.RefObject<HTMLInputElement | null>) {
     const el = ref.current as DatePickerInput | null;
     if (!el) return;
-
-    if (typeof el.showPicker === "function") {
-      el.showPicker();
-      return;
-    }
-
+    if (typeof el.showPicker === "function") return el.showPicker();
     el.focus();
     el.click();
   }
 
-  const headerHint = useMemo(() => (loadingCats ? "Cargando catálogos..." : "Completa los campos y guarda la solicitud."), [loadingCats]);
+  const headerHint = useMemo(() => {
+    if (loadingCats) return "Cargando catálogos...";
+    if (step === "postCreate") return "Ahora registra el responsable y define los documentos que no aplican.";
+    return "Completa los campos y guarda la solicitud.";
+  }, [loadingCats, step]);
+
+  const titleRight = useMemo(() => {
+    if (step === "postCreate" && createdIdRequest) return `ID Solicitud: ${createdIdRequest}`;
+    return "";
+  }, [step, createdIdRequest]);
 
   return (
     <div className={styles.page}>
-      <Toast open={toastOpen} type={toastType} message={toastMsg} onClose={() => setToastOpen(false)} durationMs={3200} />
+      <Toast
+        open={toastOpen}
+        type={toastType}
+        message={toastMsg}
+        onClose={() => setToastOpen(false)}
+        durationMs={3200}
+      />
 
       <div className={styles.header}>
         <div className={styles.headerTop}>
@@ -397,281 +660,463 @@ export default function AcquisitionRequest() {
           </div>
 
           <div className={styles.headerActions}>
-            <button className={styles.btnGhost} type="button" onClick={() => navigate("/home")} disabled={saving} title="Regresar al home">
-              Volver al inicio
-            </button>
+            <button
+  className={styles.btnBack}
+  type="button"
+  onClick={() => navigate("/home")}
+  disabled={saving || savingManager || docsSaving}
+  title="Regresar al home"
+>
+  Volver al inicio
+</button>
 
-            <button className={styles.btnGhost} type="button" onClick={() => setCreate(initialCreate)} disabled={createDisabled} title="Limpiar formulario">
-              Limpiar
-            </button>
+            {step === "create" ? (
+              <button
+  className={styles.btnWarning}
+  type="button"
+  onClick={() => setCreate(initialCreate)}
+  disabled={createDisabled}
+  title="Limpiar formulario"
+>
+  Limpiar
+</button>
+            ) : (
+              <button
+                className={styles.btnGhost}
+                type="button"
+                onClick={() => {
+                  setStep("create");
+                  setCreatedIdRequest(null);
+                  setManager(initialManager);
+                  setDocs([]);
+                  setManagerSaved(false);
+                }}
+                disabled={postDisabled}
+                title="Cerrar post-registro"
+              >
+                Cerrar formulario
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <section className={styles.card}>
         <div className={styles.cardHeader}>
-          <p className={styles.cardTitle}>Nueva solicitud</p>
+          <p className={styles.cardTitle}>{step === "create" ? "Nueva solicitud" : "Post-registro"}</p>
+          {!!titleRight && <span className={styles.badge}>{titleRight}</span>}
         </div>
 
         <div className={styles.panelBody}>
-          <form
-            className={styles.form}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void onCreate();
-            }}
-          >
-            <div className={styles.sectionTitle}>Información general</div>
+          {step === "create" && (
+            <form
+              className={styles.form}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void onCreate();
+              }}
+            >
+              <div className={styles.sectionTitle}>Información general</div>
 
-            <div className={styles.grid2}>
-              <Field label="Número de solicitud" required>
-                <input
-                  className={styles.input}
-                  value={create.requestNumber}
-                  onChange={(e) => setCreate((p) => ({ ...p, requestNumber: e.target.value }))}
-                  disabled={createDisabled}
-                  placeholder="Ej. ADQ-2026-001"
-                />
-              </Field>
-
-              <Field label="Fecha de solicitud" required>
-                <div className={styles.dateWrap}>
+              <div className={styles.grid2}>
+                <Field label="Número de solicitud" required>
                   <input
-                    ref={requestDateRef}
                     className={styles.input}
-                    type="date"
-                    value={create.requestDate}
-                    onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                    value={create.requestNumber}
+                    onChange={(e) => setCreate((p) => ({ ...p, requestNumber: e.target.value }))}
                     disabled={createDisabled}
+                    placeholder="Ej. ADQ-2026-001"
                   />
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    onClick={() => openDatePicker(requestDateRef)}
-                    disabled={createDisabled}
-                    aria-label="Abrir calendario (fecha de solicitud)"
-                    title="Calendario"
-                  >
-                    <CalendarIcon />
-                  </button>
-                </div>
-              </Field>
-            </div>
+                </Field>
 
-            <Field label="Justificación" required>
-              <textarea
-                className={styles.textarea}
-                value={create.justification}
-                onChange={(e) => setCreate((p) => ({ ...p, justification: e.target.value }))}
-                disabled={createDisabled}
-                placeholder="Describe por qué se requiere esta adquisición..."
-                rows={4}
-              />
-              <div className={styles.hint}>Tip: incluye objetivo, urgencia y beneficiarios.</div>
-            </Field>
+                <Field label="Fecha de solicitud" required>
+                  <div className={styles.dateWrap}>
+                    <input
+                      ref={requestDateRef}
+                      className={styles.input}
+                      type="date"
+                      value={create.requestDate}
+                      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                      disabled={createDisabled}
+                    />
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => openDatePicker(requestDateRef)}
+                      disabled={createDisabled}
+                      aria-label="Abrir calendario (fecha de solicitud)"
+                      title="Calendario"
+                    >
+                      <CalendarIcon />
+                    </button>
+                  </div>
+                </Field>
+              </div>
 
-            <div className={styles.grid2}>
-              <Field label="Fecha de autorización">
-                <div className={styles.dateWrap}>
-                  <input
-                    ref={authDateRef}
-                    className={styles.input}
-                    type="date"
-                    value={create.authorizationDate}
-                    onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
-                    disabled={createDisabled}
-                  />
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    onClick={() => openDatePicker(authDateRef)}
-                    disabled={createDisabled}
-                    aria-label="Abrir calendario (fecha de autorización)"
-                    title="Calendario"
-                  >
-                    <CalendarIcon />
-                  </button>
-                </div>
-              </Field>
-
-              <Field label="Observaciones">
-                <input
-                  className={styles.input}
-                  value={create.observations}
-                  onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
+              <Field label="Justificación" required>
+                <textarea
+                  className={styles.textarea}
+                  value={create.justification}
+                  onChange={(e) => setCreate((p) => ({ ...p, justification: e.target.value }))}
                   disabled={createDisabled}
-                  placeholder="Notas adicionales (opcional)"
+                  placeholder="Describe por qué se requiere esta adquisición..."
+                  rows={4}
                 />
+                <div className={styles.hint}>Tip: incluye objetivo, urgencia y beneficiarios.</div>
               </Field>
+
+              <div className={styles.grid2}>
+                <Field label="Fecha de autorización">
+                  <div className={styles.dateWrap}>
+                    <input
+                      ref={authDateRef}
+                      className={styles.input}
+                      type="date"
+                      value={create.authorizationDate}
+                      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+                      disabled={createDisabled}
+                    />
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => openDatePicker(authDateRef)}
+                      disabled={createDisabled}
+                      aria-label="Abrir calendario (fecha de autorización)"
+                      title="Calendario"
+                    >
+                      <CalendarIcon />
+                    </button>
+                  </div>
+                </Field>
+
+                <Field label="Observaciones">
+                  <input
+                    className={styles.input}
+                    value={create.observations}
+                    onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
+                    disabled={createDisabled}
+                    placeholder="Notas adicionales (opcional)"
+                  />
+                </Field>
+              </div>
+
+              <div className={styles.sectionTitle}>Relaciones</div>
+
+              <div className={styles.grid3}>
+                <Field label="Unidad administrativa">
+                  <select
+                    className={styles.select}
+                    value={create.idAdministrativeUnit ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {administrativeUnits.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Proyecto">
+                  <select
+                    className={styles.select}
+                    value={create.idProject ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idProject: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {projects.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Tipo de adquisición">
+                  <select
+                    className={styles.select}
+                    value={create.idAcquisitionType ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {acquisitionTypes.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Proveedor">
+                  <select
+                    className={styles.select}
+                    value={create.idSupplier ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idSupplier: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {suppliers.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Fuente de financiamiento">
+                  <select
+                    className={styles.select}
+                    value={create.idFundingSource ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {fundingSources.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Clasificación de adquisición" required>
+                  <select
+                    className={styles.select}
+                    value={create.idAcquisitionClassification ?? ""}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, idAcquisitionClassification: toNullableNumber(e.target.value) }))
+                    }
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {acqClassifications.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Programa">
+                  <select
+                    className={styles.select}
+                    value={create.idProgram ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idProgram: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {programs.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Comunidad">
+                  <select
+                    className={styles.select}
+                    value={create.idCommunity ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idCommunity: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {communities.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Beneficiario">
+                  <select
+                    className={styles.select}
+                    value={create.idBeneficiary ?? ""}
+                    onChange={(e) => setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))}
+                    disabled={createDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {beneficiaries.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <div className={styles.actions}>
+                <button type="button" className={styles.btnGhost} onClick={() => setCreate(initialCreate)} disabled={createDisabled}>
+                  Cancelar
+                </button>
+
+                <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {step === "postCreate" && (
+            <div className={styles.form}>
+              <div className={styles.sectionTitle}>Responsable</div>
+
+              <div className={styles.grid3}>
+                <Field label="Unidad administrativa" required>
+                  <select
+                    className={styles.select}
+                    value={manager.idAdministrativeUnit ?? ""}
+                    onChange={(e) => setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))}
+                    disabled={postDisabled}
+                  >
+                    <option value="">Selecciona...</option>
+                    {administrativeUnits.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Nombre(s)" required>
+                  <input
+                    className={styles.input}
+                    value={manager.firstName}
+                    onChange={(e) => setManager((p) => ({ ...p, firstName: e.target.value }))}
+                    disabled={postDisabled}
+                    placeholder="Ej. Juan"
+                  />
+                </Field>
+
+                <Field label="Apellido paterno" required>
+                  <input
+                    className={styles.input}
+                    value={manager.lastName}
+                    onChange={(e) => setManager((p) => ({ ...p, lastName: e.target.value }))}
+                    disabled={postDisabled}
+                    placeholder="Ej. Pérez"
+                  />
+                </Field>
+
+                <Field label="Apellido materno">
+                  <input
+                    className={styles.input}
+                    value={manager.secondLastName}
+                    onChange={(e) => setManager((p) => ({ ...p, secondLastName: e.target.value }))}
+                    disabled={postDisabled}
+                    placeholder="Ej. López"
+                  />
+                </Field>
+
+                <Field label="Email">
+                  <input
+                    className={styles.input}
+                    value={manager.email}
+                    onChange={(e) => setManager((p) => ({ ...p, email: e.target.value }))}
+                    disabled={postDisabled}
+                    placeholder="correo@dominio.com"
+                  />
+                </Field>
+
+                <Field label="Teléfono">
+                  <input
+                    className={styles.input}
+                    value={manager.phone}
+                    onChange={(e) => setManager((p) => ({ ...p, phone: e.target.value }))}
+                    disabled={postDisabled}
+                    placeholder="Ej. 7711234567"
+                  />
+                </Field>
+              </div>
+
+              <div className={styles.actions}>
+                <button type="button" className={styles.btnGhost} onClick={() => void onSaveManager()} disabled={postDisabled}>
+                  {savingManager ? "Guardando..." : managerSaved ? "Responsable guardado" : "Guardar responsable"}
+                </button>
+              </div>
+
+              <div className={styles.sectionTitle}>Documentos por clasificación</div>
+              {!managerSaved && <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>}
+
+              <div className={styles.docsWrap}>
+                {docsLoading && <div className={styles.docsHint}>Cargando documentos...</div>}
+
+                {!docsLoading && docs.length === 0 && (
+                  <div className={styles.docsHint}>No hay documentos para esta clasificación.</div>
+                )}
+
+                {docs.map((d) => (
+                  <div key={d.idDocumentType} className={styles.docRow}>
+                    <div className={styles.docLeft}>
+                      <label className={styles.docName}>
+                        <input
+                          type="checkbox"
+                          checked={d.applies}
+                          onChange={(e) =>
+                            setDocs((prev) =>
+                              prev.map((x) =>
+                                x.idDocumentType === d.idDocumentType
+                                  ? { ...x, applies: e.target.checked }
+                                  : x
+                              )
+                            )
+                          }
+                          disabled={postDisabled || !managerSaved}
+                        />
+                        <span>{d.name}</span>
+                      </label>
+
+                      <div className={styles.docMini}>
+                        {d.applies
+                          ? d.requiredByRule
+                            ? "Aplica / Obligatorio por clasificación"
+                            : "Aplica / Opcional por clasificación"
+                          : "No aplica para esta solicitud"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  onClick={() => {
+                    setStep("create");
+                    setCreatedIdRequest(null);
+                    setCreate(initialCreate);
+                    setManager(initialManager);
+                    setDocs([]);
+                    setManagerSaved(false);
+                  }}
+                  disabled={postDisabled}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.btnSave}
+                  onClick={() => void onSaveDocsChecklist()}
+                  disabled={postDisabled || !managerSaved}
+                >
+                  {docsSaving ? "Guardando..." : "Guardar checklist"}
+                </button>
+              </div>
             </div>
-
-            <div className={styles.sectionTitle}>Relaciones</div>
-
-            <div className={styles.grid3}>
-              <Field label="Unidad administrativa">
-                <select
-                  className={styles.select}
-                  value={create.idAdministrativeUnit ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {administrativeUnits.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Proyecto">
-                <select
-                  className={styles.select}
-                  value={create.idProject ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idProject: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {projects.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Tipo de adquisición">
-                <select
-                  className={styles.select}
-                  value={create.idAcquisitionType ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {acquisitionTypes.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Proveedor">
-                <select
-                  className={styles.select}
-                  value={create.idSupplier ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idSupplier: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {suppliers.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Fuente de financiamiento">
-                <select
-                  className={styles.select}
-                  value={create.idFundingSource ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {fundingSources.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Clasificación de adquisición">
-                <select
-                  className={styles.select}
-                  value={create.idAcquisitionClassification ?? ""}
-                  onChange={(e) =>
-                    setCreate((p) => ({ ...p, idAcquisitionClassification: toNullableNumber(e.target.value) }))
-                  }
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {acqClassifications.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Programa">
-                <select
-                  className={styles.select}
-                  value={create.idProgram ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idProgram: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {programs.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Comunidad">
-                <select
-                  className={styles.select}
-                  value={create.idCommunity ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idCommunity: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {communities.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Beneficiario">
-                <select
-                  className={styles.select}
-                  value={create.idBeneficiary ?? ""}
-                  onChange={(e) => setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))}
-                  disabled={createDisabled}
-                >
-                  <option value="">Selecciona...</option>
-                  {beneficiaries.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            <div className={styles.actions}>
-              <button type="button" className={styles.btnGhost} onClick={() => setCreate(initialCreate)} disabled={createDisabled}>
-                Cancelar
-              </button>
-
-              <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                {saving ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
-          </form>
+          )}
         </div>
       </section>
     </div>
   );
 }
 
-/** UI */
 function Field({
   label,
   required = false,
@@ -701,95 +1146,7 @@ function CalendarIcon() {
         strokeWidth="2"
         strokeLinecap="round"
       />
-      <path
-        d="M8 12h3M8 16h3M13 12h3M13 16h3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <path d="M8 12h3M8 16h3M13 12h3M13 16h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
-}
-
-/** Utils */
-function toNullableNumber(s: string): number | null {
-  const t = String(s ?? "").trim();
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function toNullableIsoDate(yyyyMmDd: string): string | null {
-  const t = String(yyyyMmDd ?? "").trim();
-  if (!t) return null;
-  return `${t}T00:00:00.000Z`;
-}
-
-function toErrorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (typeof e === "string") return e;
-  try {
-    return JSON.stringify(e);
-  } catch {
-    return "Error inesperado.";
-  }
-}
-
-/** Normalizador genérico */
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(v: unknown): v is UnknownRecord {
-  return typeof v === "object" && v !== null;
-}
-
-function getValue(obj: UnknownRecord, keys: readonly string[]): unknown {
-  for (const k of keys) {
-    if (k in obj) return obj[k];
-  }
-  return undefined;
-}
-
-function asArray(v: unknown): unknown[] {
-  return Array.isArray(v) ? v : [];
-}
-
-function toNumber(v: unknown): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-  return Number.isFinite(n) ? n : null;
-}
-
-function toStringSafe(v: unknown): string {
-  if (typeof v === "string") return v;
-  if (typeof v === "number") return String(v);
-  return "";
-}
-
-function normalizeCatalog(payload: unknown, opts?: NormalizeOpts): CatalogItem[] {
-  const defaultIdKeys: readonly string[] = ["id", "Id"];
-  const defaultNameKeys: readonly string[] = ["name", "Name", "description", "Description"];
-
-  const idKeys = opts?.idKeys?.length ? opts.idKeys : defaultIdKeys;
-  const nameKeys = opts?.nameKeys?.length ? opts.nameKeys : defaultNameKeys;
-
-  let list: unknown[] = [];
-
-  if (Array.isArray(payload)) list = payload;
-  else if (isRecord(payload)) {
-    const maybeItems = getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]);
-    list = asArray(maybeItems);
-  }
-
-  return list
-    .map((raw): CatalogItem | null => {
-      if (!isRecord(raw)) return null;
-
-      const id = toNumber(getValue(raw, idKeys));
-      if (!id || id <= 0) return null;
-
-      const name = toStringSafe(getValue(raw, nameKeys)).trim();
-      if (!name) return null;
-
-      return { id, name };
-    })
-    .filter((x): x is CatalogItem => x !== null);
 }

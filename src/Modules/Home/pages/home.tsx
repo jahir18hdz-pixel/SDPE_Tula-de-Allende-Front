@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FiSearch, FiRefreshCw } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
-
+import { FiSearch } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import { requestJson, authHeaders } from "../../../services/api";
 
 type ApiRow = {
   folio?: string | null;
-  idRequest: number;
+  idRequest?: number;
+  IdRequest?: number;
   acquisitionClassification?: string | null;
-  requestDate?: string | null; // ISO
+  AcquisitionClassification?: string | null;
+  requestDate?: string | null;
+  RequestDate?: string | null;
   status?: string | null;
+  Status?: string | null;
   policyNumber?: string | null;
+  PolicyNumber?: string | null;
 };
 
 type RequestOk = { ok: true; data: unknown; status: number };
@@ -24,14 +28,22 @@ type Row = {
   idRequest: number;
   folio: string;
   poliza: string;
-  adquisicion: string; // etiqueta de clasificación
-  area: string;
+  adquisicion: string;
   fecha: string;
   estado: string;
   requestDateRaw?: string | null;
 };
 
+type ChecklistItem = {
+  documentTypeId: number;
+  documentName: string;
+  requiredByRule: boolean;
+  noApplies: boolean;
+  uploaded: boolean;
+};
+
 const API_BASE = "/api/AcquisitionRequest";
+const EXPEDIENT_API = "/api/expedient-documents";
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
@@ -56,25 +68,97 @@ function getItemsFromUnknown<T>(value: unknown): T[] {
   return [];
 }
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+
+function asArray(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+
+function toBool(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    return t === "true" || t === "1" || t === "si" || t === "sí";
+  }
+  return false;
+}
+
+function toNumber(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function toStringSafe(v: unknown) {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+}
+
+function normalizeChecklist(payload: unknown): ChecklistItem[] {
+  const list = Array.isArray(payload)
+    ? payload
+    : isRecord(payload)
+      ? asArray(payload["items"] ?? payload["data"] ?? payload["result"])
+      : [];
+
+  return list
+    .map((raw): ChecklistItem | null => {
+      if (!isRecord(raw)) return null;
+
+      const documentTypeId = toNumber(raw["documentTypeId"] ?? raw["DocumentTypeId"]);
+      const documentName = toStringSafe(raw["documentName"] ?? raw["DocumentName"]).trim();
+
+      if (!documentTypeId || !documentName) return null;
+
+      return {
+        documentTypeId,
+        documentName,
+        requiredByRule: toBool(raw["requiredByRule"] ?? raw["RequiredByRule"]),
+        noApplies: toBool(raw["noApplies"] ?? raw["NoApplies"]),
+        uploaded: toBool(raw["uploaded"] ?? raw["Uploaded"]),
+      };
+    })
+    .filter((x): x is ChecklistItem => x !== null);
+}
+
 type StatusFilter = "Todos" | "Completo" | "Incompleto";
+
+function hasValidClassification(label: string) {
+  const t = (label ?? "").trim().toLowerCase();
+  if (!t) return false;
+  if (t === "—") return false;
+  if (t === "sin clasificación") return false;
+  if (t === "sin clasificacion") return false;
+  return true;
+}
+
+function computeCompletoFromChecklist(list: ChecklistItem[]) {
+  const missingRequired = list.some((x) => x.requiredByRule && !x.noApplies && !x.uploaded);
+  return missingRequired ? "Incompleto" : "Completo";
+}
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // UI
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
 
-  // Paginación (server-side)
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Data
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasNext, setHasNext] = useState(false);
 
-  // Toast
+  const [calcStatus, setCalcStatus] = useState<Record<number, "Completo" | "Incompleto">>({});
+  const statusCacheRef = useRef<Map<number, "Completo" | "Incompleto">>(new Map());
+
   const [toast, setToast] = useState<{ open: boolean; type: ToastType; message: string }>({
     open: false,
     type: "error",
@@ -83,8 +167,9 @@ export default function Home() {
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
+
     try {
       const url = `${API_BASE}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
@@ -106,16 +191,27 @@ export default function Home() {
 
       const list = getItemsFromUnknown<ApiRow>(res.data);
 
-      const mapped: Row[] = list.map((x) => ({
-        idRequest: x.idRequest,
-        folio: x.folio ?? "—",
-        poliza: x.policyNumber ?? "—",
-        adquisicion: x.acquisitionClassification ?? "—",
-        area: "—",
-        fecha: formatDate(x.requestDate),
-        estado: x.status ?? "—",
-        requestDateRaw: x.requestDate ?? null,
-      }));
+      const mapped: Row[] = list
+        .map((x) => {
+          const idRequest = x.idRequest ?? x.IdRequest ?? 0;
+          const folio = x.folio ?? "—";
+          const poliza = x.policyNumber ?? x.PolicyNumber ?? "—";
+          const adquisicion =
+            x.acquisitionClassification ?? x.AcquisitionClassification ?? "Sin clasificación";
+          const requestDate = x.requestDate ?? x.RequestDate ?? null;
+          const estado = x.status ?? x.Status ?? "Sin estatus";
+
+          return {
+            idRequest,
+            folio,
+            poliza,
+            adquisicion,
+            fecha: formatDate(requestDate),
+            estado,
+            requestDateRaw: requestDate,
+          };
+        })
+        .filter((x) => x.idRequest > 0);
 
       mapped.sort((a, b) => {
         const ta = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
@@ -136,51 +232,100 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pageNumber, pageSize]);
 
   useEffect(() => {
     void fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageNumber, pageSize]);
+  }, [fetchData, location.key]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function calcForVisibleRows() {
+      const toFetch = rows
+        .map((r) => r.idRequest)
+        .filter((id) => !statusCacheRef.current.has(id));
+
+      if (toFetch.length === 0) return;
+
+      await Promise.all(
+        toFetch.map(async (requestId) => {
+          try {
+            const res = (await requestJson(`${EXPEDIENT_API}/requests/${requestId}/checklist`, {
+              method: "GET",
+              headers: authHeaders(),
+            })) as RequestResult;
+
+            if (!res.ok) return;
+
+            const checklist = normalizeChecklist(res.data);
+            const status = computeCompletoFromChecklist(checklist);
+
+            statusCacheRef.current.set(requestId, status);
+
+            if (!cancelled) {
+              setCalcStatus((prev) => ({ ...prev, [requestId]: status }));
+            }
+          } catch {
+            // no bloquea la UI si falla
+          }
+        })
+      );
+    }
+
+    void calcForVisibleRows();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const q = normalizeText(query);
     let list = rows;
 
     if (statusFilter !== "Todos") {
-      list = list.filter((r) => normalizeText(r.estado) === normalizeText(statusFilter));
+      const wanted = normalizeText(statusFilter);
+      list = list.filter((r) => {
+        const real = calcStatus[r.idRequest] ?? (r.estado as "Completo" | "Incompleto" | string);
+        return normalizeText(real) === wanted;
+      });
     }
 
     if (!q) return list;
 
     return list.filter((r) => {
+      const real = calcStatus[r.idRequest] ?? r.estado;
+
       return (
         normalizeText(r.folio).includes(q) ||
         normalizeText(r.poliza).includes(q) ||
         normalizeText(r.adquisicion).includes(q) ||
-        normalizeText(r.area).includes(q) ||
         normalizeText(r.fecha).includes(q) ||
-        normalizeText(r.estado).includes(q)
+        normalizeText(real).includes(q)
       );
     });
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, calcStatus]);
 
   const kpiTotal = filtered.length;
-  const kpiCompleto = filtered.filter((r) => normalizeText(r.estado) === "completo").length;
-  const kpiIncompleto = filtered.filter((r) => normalizeText(r.estado) === "incompleto").length;
+  const kpiCompleto = filtered.filter(
+    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "completo"
+  ).length;
+  const kpiIncompleto = filtered.filter(
+    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "incompleto"
+  ).length;
 
   function goRegister() {
     navigate("/adquisiciones/registrar");
   }
 
-  // ✅ Ahora “Ver detalle” abre el Expediente (checklist/carga masiva)
   function goDetail(idRequest: number, classificationLabel: string) {
-    // (Opcional) Si no hay clasificación, avisa porque checklist depende de eso
-    if (!classificationLabel || classificationLabel.trim() === "—") {
+    if (!hasValidClassification(classificationLabel)) {
       setToast({
         open: true,
         type: "error",
-        message: "Esta solicitud no tiene clasificación asignada. No se puede generar el checklist del expediente.",
+        message:
+          "Esta solicitud no tiene clasificación asignada. No se puede generar el checklist del expediente.",
       });
       return;
     }
@@ -192,7 +337,6 @@ export default function Home() {
     <div className={styles.page}>
       <Toast open={toast.open} type={toast.type} message={toast.message} onClose={closeToast} />
 
-      {/* Topbar */}
       <div className={styles.topbar}>
         <div className={styles.topbarLeft}>
           <h1 className={styles.title}>Adquisiciones</h1>
@@ -215,7 +359,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className={styles.toolbar}>
         <div className={styles.search}>
           <FiSearch className={styles.searchIcon} />
@@ -252,10 +395,6 @@ export default function Home() {
             </select>
           </label>
 
-          <button type="button" className={styles.ghostBtn} onClick={() => void fetchData()} disabled={loading} title="Recargar">
-            <FiRefreshCw />
-            {loading ? "Cargando..." : "Recargar"}
-          </button>
 
           <button type="button" className={styles.primaryBtn} onClick={goRegister}>
             Registrar adquisición
@@ -263,7 +402,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Table */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>
           <div className={styles.cardTitle}>Registros</div>
@@ -277,7 +415,6 @@ export default function Home() {
                 <th>Folio</th>
                 <th>Póliza</th>
                 <th>Clasificación</th>
-                <th>Área</th>
                 <th>Fecha</th>
                 <th>Estado</th>
                 <th className={styles.thRight}>Acciones</th>
@@ -287,19 +424,22 @@ export default function Home() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className={styles.empty}>
+                  <td colSpan={6} className={styles.empty}>
                     Cargando registros...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className={styles.empty}>
+                  <td colSpan={6} className={styles.empty}>
                     No se encontraron registros con esos criterios.
                   </td>
                 </tr>
               ) : (
                 filtered.map((r) => {
-                  const st = normalizeText(r.estado);
+                  const realEstado = calcStatus[r.idRequest];
+                  const shownEstado = realEstado ?? "Calculando…";
+
+                  const st = normalizeText(realEstado ?? "");
                   const badgeClass =
                     st === "completo"
                       ? styles.badgeOk
@@ -314,10 +454,9 @@ export default function Home() {
                       <td className={styles.ellipsis} title={r.adquisicion}>
                         {r.adquisicion}
                       </td>
-                      <td className={styles.ellipsis}>{r.area}</td>
                       <td className={styles.mono}>{r.fecha}</td>
                       <td>
-                        <span className={`${styles.badge} ${badgeClass}`}>{r.estado}</span>
+                        <span className={`${styles.badge} ${badgeClass}`}>{shownEstado}</span>
                       </td>
                       <td className={styles.tdRight}>
                         <button
@@ -337,7 +476,6 @@ export default function Home() {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className={styles.pagination}>
           <button
             type="button"
