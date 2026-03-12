@@ -469,3 +469,31 @@
     align-items: flex-start;
   }
 }
+
+.policyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  max-width: 220px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+
+.policyBadgeOk {
+  background: rgba(224, 166, 74, 0.12);
+  border-color: rgba(224, 166, 74, 0.34);
+  color: #7a4a00;
+}
+
+.policyBadgeEmpty {
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: rgba(15, 23, 42, 0.68);
+}

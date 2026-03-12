@@ -57,6 +57,20 @@ type ManagerFormState = {
   phone: string;
 };
 
+type PaymentPolicyOption = {
+  idPaymentPolicy: number;
+  policyCode: string;
+  description?: string | null;
+};
+
+type PolicyFormState = {
+  idPaymentPolicy: number | null;
+};
+
+type CfdiFormState = {
+  cfdi: string;
+};
+
 type PreviewItem = {
   id: number | null;
   url: string;
@@ -271,6 +285,7 @@ const EXPEDIENT_API = "/api/expedient-documents";
 const MANAGER_API = "/api/RequestManager";
 const REQUEST_DETAIL_API = "/api/AcquisitionRequest";
 const ADMIN_UNIT_API = "/api/AdministrativeUnit";
+const PAYMENT_POLICY_API = "/api/PaymentPolicy";
 
 export default function ExpedientDocuments() {
   const navigate = useNavigate();
@@ -285,6 +300,8 @@ export default function ExpedientDocuments() {
   const canUse = requestId > 0;
 
   const [requestNumber, setRequestNumber] = useState<string>("");
+  const [policyNumber, setPolicyNumber] = useState<string>("");
+  const [cfdi, setCfdi] = useState<string>("");
 
   const [loadingManager, setLoadingManager] = useState(false);
   const [manager, setManager] = useState<ManagerInfo | null>(null);
@@ -316,6 +333,20 @@ export default function ExpedientDocuments() {
     secondLastName: "",
     email: "",
     phone: "",
+  });
+
+  const [policyPanelOpen, setPolicyPanelOpen] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>([]);
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>({
+    idPaymentPolicy: null,
+  });
+
+  const [cfdiPanelOpen, setCfdiPanelOpen] = useState(false);
+  const [savingCfdi, setSavingCfdi] = useState(false);
+  const [cfdiForm, setCfdiForm] = useState<CfdiFormState>({
+    cfdi: "",
   });
 
   const [toastOpen, setToastOpen] = useState(false);
@@ -351,6 +382,14 @@ export default function ExpedientDocuments() {
     setManagerPanelOpen(false);
   }, []);
 
+  const closePolicyPanel = useCallback(() => {
+    setPolicyPanelOpen(false);
+  }, []);
+
+  const closeCfdiPanel = useCallback(() => {
+    setCfdiPanelOpen(false);
+  }, []);
+
   const loadRequestDetail = useCallback(async () => {
     if (!canUse) return;
 
@@ -362,10 +401,13 @@ export default function ExpedientDocuments() {
 
       if (!res.ok) {
         setRequestNumber("");
+        setPolicyNumber("");
+        setCfdi("");
         return;
       }
 
       const data = res.data;
+
       const rn =
         (isRecord(data)
           ? toStringSafe(
@@ -379,9 +421,30 @@ export default function ExpedientDocuments() {
           : ""
         ).trim() || "";
 
+      const pn =
+        (isRecord(data)
+          ? toStringSafe(
+              data["policyNumber"] ??
+                data["PolicyNumber"] ??
+                data["paymentPolicy"] ??
+                data["PaymentPolicy"]
+            )
+          : ""
+        ).trim() || "";
+
+      const cfdiValue =
+        (isRecord(data)
+          ? toStringSafe(data["cfdi"] ?? data["CFDI"] ?? data["cdfi"] ?? data["CDFI"])
+          : ""
+        ).trim() || "";
+
       setRequestNumber(rn);
+      setPolicyNumber(pn);
+      setCfdi(cfdiValue);
     } catch {
       setRequestNumber("");
+      setPolicyNumber("");
+      setCfdi("");
     }
   }, [canUse, requestId]);
 
@@ -429,15 +492,8 @@ export default function ExpedientDocuments() {
         toStringSafe(found["administrativeUnit"] ?? found["AdministrativeUnit"]).trim() || null;
       const reqNum =
         toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() || null;
-      const email =
-        toStringSafe(found["email"] ?? found["Email"]).trim() || null;
-      const phone =
-        toStringSafe(
-          found["phone"] ??
-            found["Phone"] ??
-            found["requestNumber"] ??
-            found["RequestNumber"]
-        ).trim() || null;
+      const email = toStringSafe(found["email"] ?? found["Email"]).trim() || null;
+      const phone = toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
 
       if (!idRequestManager || !fullName) {
         setManager(null);
@@ -478,14 +534,30 @@ export default function ExpedientDocuments() {
       const list = normalizeChecklist(res.data);
 
       list.sort((a, b) => {
-        const aRequiredApplies = a.requiredByRule && !a.noApplies;
-        const bRequiredApplies = b.requiredByRule && !b.noApplies;
+  const aRequiredApplies = a.requiredByRule && !a.noApplies;
+  const bRequiredApplies = b.requiredByRule && !b.noApplies;
 
-        if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
-        if (aRequiredApplies !== bRequiredApplies) return aRequiredApplies ? -1 : 1;
+  // 1) Los "No aplica" siempre al final
+  if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
 
-        return a.documentName.localeCompare(b.documentName, "es");
-      });
+  // 2) Los obligatorios primero
+  if (aRequiredApplies !== bRequiredApplies) return aRequiredApplies ? -1 : 1;
+
+  // 3) Dentro de obligatorios:
+  //    primero pendientes, luego completos
+  if (aRequiredApplies && bRequiredApplies && a.uploaded !== b.uploaded) {
+    return a.uploaded ? 1 : -1;
+  }
+
+  // 4) Dentro de opcionales:
+  //    primero sin archivo, luego completos
+  if (!aRequiredApplies && !bRequiredApplies && a.uploaded !== b.uploaded) {
+    return a.uploaded ? 1 : -1;
+  }
+
+  // 5) Finalmente por nombre
+  return a.documentName.localeCompare(b.documentName, "es");
+});
 
       setChecklist(list);
     } catch {
@@ -813,6 +885,86 @@ export default function ExpedientDocuments() {
     setManagerPanelOpen(true);
   }
 
+  async function openPolicyPanel() {
+    if (!canUse) return;
+
+    let policies = paymentPolicies;
+
+    if (policies.length === 0) {
+      setLoadingPolicies(true);
+      try {
+        const res = (await requestJson(`${PAYMENT_POLICY_API}/available-policies`, {
+          method: "GET",
+          headers: authHeaders(),
+        })) as RequestResult;
+
+        if (res.ok) {
+          const list = unwrapList(res.data);
+
+          policies = list
+            .map((raw): PaymentPolicyOption | null => {
+              if (!isRecord(raw)) return null;
+
+              const idPaymentPolicy = toNumber(
+                raw["idPaymentPolicy"] ??
+                  raw["IdPaymentPolicy"] ??
+                  raw["id"] ??
+                  raw["Id"]
+              );
+
+              const policyCode = toStringSafe(
+                raw["policyCode"] ?? raw["PolicyCode"] ?? raw["code"] ?? raw["Code"]
+              ).trim();
+
+              const description =
+                toStringSafe(
+                  raw["description"] ??
+                    raw["Description"] ??
+                    raw["name"] ??
+                    raw["Name"]
+                ).trim() || null;
+
+              if (!idPaymentPolicy || !policyCode) return null;
+
+              return {
+                idPaymentPolicy,
+                policyCode,
+                description,
+              };
+            })
+            .filter((x): x is PaymentPolicyOption => x !== null);
+
+          setPaymentPolicies(policies);
+        }
+      } catch {
+        policies = [];
+      } finally {
+        setLoadingPolicies(false);
+      }
+    }
+
+    const matchedPolicy =
+      policies.find(
+        (p) => p.policyCode.trim().toLowerCase() === policyNumber.trim().toLowerCase()
+      ) ?? null;
+
+    setPolicyForm({
+      idPaymentPolicy: matchedPolicy?.idPaymentPolicy ?? null,
+    });
+
+    setPolicyPanelOpen(true);
+  }
+
+  async function openCfdiPanel() {
+    if (!canUse) return;
+
+    setCfdiForm({
+      cfdi: cfdi?.trim() || "",
+    });
+
+    setCfdiPanelOpen(true);
+  }
+
   async function onSaveManager() {
     if (!canUse) {
       showToast("error", "Solicitud inválida.");
@@ -879,6 +1031,76 @@ export default function ExpedientDocuments() {
       showToast("error", "Error inesperado al guardar el responsable.");
     } finally {
       setSavingManager(false);
+    }
+  }
+
+  async function onSavePolicy() {
+    if (!canUse) {
+      showToast("error", "Solicitud inválida.");
+      return;
+    }
+
+    if (!policyForm.idPaymentPolicy) {
+      showToast("error", "Selecciona una póliza.");
+      return;
+    }
+
+    setSavingPolicy(true);
+
+    try {
+      const res = (await requestJson(`${REQUEST_DETAIL_API}/${requestId}/payment-policy`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showToast("error", res.error || "No se pudo guardar la póliza.");
+        return;
+      }
+
+      showToast("success", "Póliza asignada correctamente.");
+      setPolicyPanelOpen(false);
+      await loadRequestDetail();
+    } catch {
+      showToast("error", "Error inesperado al guardar la póliza.");
+    } finally {
+      setSavingPolicy(false);
+    }
+  }
+
+  async function onSaveCfdi() {
+    if (!canUse) {
+      showToast("error", "Solicitud inválida.");
+      return;
+    }
+
+    if (!cfdiForm.cfdi.trim()) {
+      showToast("error", "Captura el CFDI.");
+      return;
+    }
+
+    setSavingCfdi(true);
+
+    try {
+      const res = (await requestJson(`${REQUEST_DETAIL_API}/${requestId}/CFDI`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(cfdiForm.cfdi.trim()),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showToast("error", res.error || "No se pudo guardar el CFDI.");
+        return;
+      }
+
+      showToast("success", "CFDI guardado correctamente.");
+      setCfdiPanelOpen(false);
+      await loadRequestDetail();
+    } catch {
+      showToast("error", "Error inesperado al guardar el CFDI.");
+    } finally {
+      setSavingCfdi(false);
     }
   }
 
@@ -1016,33 +1238,71 @@ export default function ExpedientDocuments() {
                 <div className={styles.cardTitle}>Checklist de documentos</div>
 
                 <div className={styles.cardNoteInline}>
-                  <div className={styles.managerBox}>
-                    <span className={styles.managerInlineLabel}>Responsable:</span>
+                  <div className={styles.inlineInfoGroup}>
+                    <div className={styles.managerBox}>
+                      <span className={styles.managerInlineLabel}>Responsable:</span>
 
-                    <span className={styles.managerHeaderName} title={getManagerDisplayName(manager)}>
-                      {loadingManager ? "Cargando..." : getManagerDisplayName(manager)}
-                    </span>
+                      <span
+                        className={styles.managerHeaderName}
+                        title={getManagerDisplayName(manager)}
+                      >
+                        {loadingManager ? "Cargando..." : getManagerDisplayName(manager)}
+                      </span>
 
-                    {manager?.administrativeUnit && (
-                      <span className={styles.metaTag}>{manager.administrativeUnit}</span>
-                    )}
+                      <button
+                        type="button"
+                        className={styles.managerActionBtn}
+                        onClick={() => void openManagerPanel()}
+                        disabled={!canUse || savingManager}
+                      >
+                        {manager ? "Editar responsable" : "Asignar responsable"}
+                      </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      className={styles.managerActionBtn}
-                      onClick={() => void openManagerPanel()}
-                      disabled={!canUse || savingManager}
-                    >
-                      {manager ? "Editar responsable" : "Asignar responsable"}
-                    </button>
+                    <div className={styles.policyBox}>
+                      <span className={styles.policyInlineLabel}>Póliza:</span>
+
+                      <span
+                        className={styles.policyHeaderName}
+                        title={policyNumber?.trim() || "Sin póliza"}
+                      >
+                        {policyNumber?.trim() || "Sin póliza"}
+                      </span>
+
+                      <button
+                        type="button"
+                        className={styles.policyActionBtn}
+                        onClick={() => void openPolicyPanel()}
+                        disabled={!canUse || savingPolicy}
+                      >
+                        {policyNumber?.trim() ? "Editar póliza" : "Agregar póliza"}
+                      </button>
+                    </div>
+
+                    <div className={styles.cfdiBox}>
+                      <span className={styles.cfdiInlineLabel}>CFDI:</span>
+
+                      <span
+                        className={styles.cfdiHeaderName}
+                        title={cfdi?.trim() || "Sin CFDI"}
+                      >
+                        {cfdi?.trim() || "Sin CFDI"}
+                      </span>
+
+                      <button
+                        type="button"
+                        className={styles.cfdiActionBtn}
+                        onClick={() => void openCfdiPanel()}
+                        disabled={!canUse || savingCfdi}
+                      >
+                        {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className={styles.headerStatsMini}>
-                <span className={`${styles.miniStat} ${styles.miniWarn}`}>
-                  Obligatorios: <b>{stats.required}</b>
-                </span>
                 <span className={`${styles.miniStat} ${styles.miniOk}`}>
                   Cargados: <b>{stats.uploadedOk}</b>
                 </span>
@@ -1163,23 +1423,23 @@ export default function ExpedientDocuments() {
                           </td>
 
                           <td className={styles.tdRight}>
-  {!hasFiles ? (
-    <span className={styles.fileEmpty}>Sin archivo</span>
-  ) : (
-    <button
-      type="button"
-      className={styles.fileLink}
-      onClick={() => openPreviewFromFiles(c.documentName, c.files, 0)}
-      title={
-        c.files.length === 1
-          ? c.files[0]?.name ?? "Previsualizar archivo"
-          : `Previsualizar ${c.files.length} archivos`
-      }
-    >
-      Ver archivo
-    </button>
-  )}
-</td>
+                            {!hasFiles ? (
+                              <span className={styles.fileEmpty}>Sin archivo</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className={styles.fileLink}
+                                onClick={() => openPreviewFromFiles(c.documentName, c.files, 0)}
+                                title={
+                                  c.files.length === 1
+                                    ? c.files[0]?.name ?? "Previsualizar archivo"
+                                    : `Previsualizar ${c.files.length} archivos`
+                                }
+                              >
+                                Ver archivo
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })
@@ -1276,20 +1536,20 @@ export default function ExpedientDocuments() {
                       </select>
 
                       <div className={styles.formField}>
-  <label className={styles.fieldLabel}>Observaciones</label>
-  <input
-    className={styles.input}
-    value={u.observations}
-    onChange={(e) =>
-      setUploads((prev) =>
-        prev.map((x, i) =>
-          i === idx ? { ...x, observations: e.target.value } : x
-        )
-      )
-    }
-    disabled={uploading}
-  />
-</div>
+                        <label className={styles.fieldLabel}>Observaciones</label>
+                        <input
+                          className={styles.input}
+                          value={u.observations}
+                          onChange={(e) =>
+                            setUploads((prev) =>
+                              prev.map((x, i) =>
+                                i === idx ? { ...x, observations: e.target.value } : x
+                              )
+                            )
+                          }
+                          disabled={uploading}
+                        />
+                      </div>
 
                       <button
                         type="button"
@@ -1359,113 +1619,116 @@ export default function ExpedientDocuments() {
           </div>
 
           <div className={styles.uploadSheetBody}>
-  <div className={styles.managerFormWrap}>
-    <div className={styles.managerSectionCard}>
-      <div className={styles.managerSectionTitle}>Área administrativa</div>
+            <div className={styles.managerFormWrap}>
+              <div className={styles.managerSectionCard}>
+                <div className={styles.managerSectionTitle}>Área administrativa</div>
 
-      <div className={styles.formField}>
-        <label className={styles.fieldLabel}>Área</label>
-        <select
-          className={styles.select}
-          value={managerForm.idAdministrativeUnit ?? ""}
-          onChange={(e) =>
-            setManagerForm((prev) => ({
-              ...prev,
-              idAdministrativeUnit: e.target.value ? Number(e.target.value) : null,
-            }))
-          }
-          disabled={savingManager || loadingAdministrativeUnits}
-        >
-          <option value="">
-            {loadingAdministrativeUnits
-              ? "Cargando áreas..."
-              : "Seleccionar área administrativa…"}
-          </option>
-          {administrativeUnits.map((u) => (
-            <option key={u.idAdministrativeUnit} value={u.idAdministrativeUnit}>
-              {u.description}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>Área</label>
+                  <select
+                    className={styles.select}
+                    value={managerForm.idAdministrativeUnit ?? ""}
+                    onChange={(e) =>
+                      setManagerForm((prev) => ({
+                        ...prev,
+                        idAdministrativeUnit: e.target.value ? Number(e.target.value) : null,
+                      }))
+                    }
+                    disabled={savingManager || loadingAdministrativeUnits}
+                  >
+                    <option value="">
+                      {loadingAdministrativeUnits
+                        ? "Cargando áreas..."
+                        : "Seleccionar área administrativa…"}
+                    </option>
+                    {administrativeUnits.map((u) => (
+                      <option key={u.idAdministrativeUnit} value={u.idAdministrativeUnit}>
+                        {u.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-    <div className={styles.managerSectionCard}>
-      <div className={styles.managerSectionTitle}>Datos del responsable</div>
+              <div className={styles.managerSectionCard}>
+                <div className={styles.managerSectionTitle}>Datos del responsable</div>
 
-      <div className={styles.formGridTwo}>
-        <div className={styles.formField}>
-          <label className={styles.fieldLabel}>Nombre(s)</label>
-          <input
-            className={styles.input}
-            value={managerForm.firstName}
-            onChange={(e) =>
-              setManagerForm((prev) => ({ ...prev, firstName: e.target.value }))
-            }
-            disabled={savingManager}
-          />
-        </div>
+                <div className={styles.formGridTwo}>
+                  <div className={styles.formField}>
+                    <label className={styles.fieldLabel}>Nombre(s)</label>
+                    <input
+                      className={styles.input}
+                      value={managerForm.firstName}
+                      onChange={(e) =>
+                        setManagerForm((prev) => ({ ...prev, firstName: e.target.value }))
+                      }
+                      disabled={savingManager}
+                    />
+                  </div>
 
-        <div className={styles.formField}>
-          <label className={styles.fieldLabel}>Apellido paterno</label>
-          <input
-            className={styles.input}
-            value={managerForm.lastName}
-            onChange={(e) =>
-              setManagerForm((prev) => ({ ...prev, lastName: e.target.value }))
-            }
-            disabled={savingManager}
-          />
-        </div>
-      </div>
+                  <div className={styles.formField}>
+                    <label className={styles.fieldLabel}>Apellido paterno</label>
+                    <input
+                      className={styles.input}
+                      value={managerForm.lastName}
+                      onChange={(e) =>
+                        setManagerForm((prev) => ({ ...prev, lastName: e.target.value }))
+                      }
+                      disabled={savingManager}
+                    />
+                  </div>
+                </div>
 
-      <div className={styles.formGridOne}>
-        <div className={styles.formField}>
-          <label className={styles.fieldLabel}>Apellido materno</label>
-          <input
-            className={styles.input}
-            value={managerForm.secondLastName}
-            onChange={(e) =>
-              setManagerForm((prev) => ({ ...prev, secondLastName: e.target.value }))
-            }
-            disabled={savingManager}
-          />
-        </div>
-      </div>
-    </div>
+                <div className={styles.formGridOne}>
+                  <div className={styles.formField}>
+                    <label className={styles.fieldLabel}>Apellido materno</label>
+                    <input
+                      className={styles.input}
+                      value={managerForm.secondLastName}
+                      onChange={(e) =>
+                        setManagerForm((prev) => ({
+                          ...prev,
+                          secondLastName: e.target.value,
+                        }))
+                      }
+                      disabled={savingManager}
+                    />
+                  </div>
+                </div>
+              </div>
 
-    <div className={styles.managerSectionCard}>
-      <div className={styles.managerSectionTitle}>Contacto</div>
+              <div className={styles.managerSectionCard}>
+                <div className={styles.managerSectionTitle}>Contacto</div>
 
-      <div className={styles.formGridTwo}>
-        <div className={styles.formField}>
-          <label className={styles.fieldLabel}>Correo electrónico</label>
-          <input
-            className={styles.input}
-            type="email"
-            value={managerForm.email}
-            onChange={(e) =>
-              setManagerForm((prev) => ({ ...prev, email: e.target.value }))
-            }
-            disabled={savingManager}
-          />
-        </div>
+                <div className={styles.formGridTwo}>
+                  <div className={styles.formField}>
+                    <label className={styles.fieldLabel}>Correo electrónico</label>
+                    <input
+                      className={styles.input}
+                      type="email"
+                      value={managerForm.email}
+                      onChange={(e) =>
+                        setManagerForm((prev) => ({ ...prev, email: e.target.value }))
+                      }
+                      disabled={savingManager}
+                    />
+                  </div>
 
-        <div className={styles.formField}>
-          <label className={styles.fieldLabel}>Teléfono</label>
-          <input
-            className={styles.input}
-            value={managerForm.phone}
-            onChange={(e) =>
-              setManagerForm((prev) => ({ ...prev, phone: e.target.value }))
-            }
-            disabled={savingManager}
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                  <div className={styles.formField}>
+                    <label className={styles.fieldLabel}>Teléfono</label>
+                    <input
+                      className={styles.input}
+                      value={managerForm.phone}
+                      onChange={(e) =>
+                        setManagerForm((prev) => ({ ...prev, phone: e.target.value }))
+                      }
+                      disabled={savingManager}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div className={styles.uploadSheetFooter}>
             <button
@@ -1484,6 +1747,191 @@ export default function ExpedientDocuments() {
               disabled={savingManager}
             >
               {savingManager ? "Guardando..." : "Guardar responsable"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`${styles.uploadOverlay} ${
+          policyPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+        }`}
+        aria-hidden={!policyPanelOpen}
+      >
+        <div className={styles.uploadSheet}>
+          <div className={styles.uploadSheetHeader}>
+            <div className={styles.uploadSheetTitleWrap}>
+              <div className={styles.uploadHandle} />
+              <div className={styles.uploadSheetTitle}>
+                {policyNumber?.trim() ? "Editar póliza" : "Agregar póliza"}
+              </div>
+              <div className={styles.uploadSheetNote}>
+                Selecciona la póliza disponible que deseas asociar a esta solicitud
+              </div>
+            </div>
+
+            <div className={styles.uploadSheetActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closePolicyPanel}
+                disabled={savingPolicy}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.uploadSheetBody}>
+            <div className={styles.policyFormWrap}>
+              <div className={styles.managerSectionCard}>
+                <div className={styles.managerSectionTitle}>Datos de la póliza</div>
+
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>Póliza</label>
+                  <select
+                    className={styles.select}
+                    value={policyForm.idPaymentPolicy ?? ""}
+                    onChange={(e) =>
+                      setPolicyForm({
+                        idPaymentPolicy: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    disabled={savingPolicy || loadingPolicies}
+                  >
+                    <option value="">
+                      {loadingPolicies ? "Cargando pólizas..." : "Seleccionar póliza…"}
+                    </option>
+
+                    {paymentPolicies.map((p) => (
+                      <option key={p.idPaymentPolicy} value={p.idPaymentPolicy}>
+                        {p.policyCode}
+                        {p.description ? ` — ${p.description}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {policyForm.idPaymentPolicy && (
+                  <div className={styles.policyPreviewCard}>
+                    <div className={styles.policyPreviewCode}>
+                      {paymentPolicies.find(
+                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy
+                      )?.policyCode ?? "Póliza seleccionada"}
+                    </div>
+
+                    <div className={styles.policyPreviewDesc}>
+                      {paymentPolicies.find(
+                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy
+                      )?.description || "Sin descripción adicional."}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.uploadSheetFooter}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={closePolicyPanel}
+              disabled={savingPolicy}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className={styles.saveBtn}
+              onClick={() => void onSavePolicy()}
+              disabled={savingPolicy}
+            >
+              {savingPolicy ? "Guardando..." : "Guardar póliza"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`${styles.uploadOverlay} ${
+          cfdiPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+        }`}
+        aria-hidden={!cfdiPanelOpen}
+      >
+        <div className={styles.uploadSheet}>
+          <div className={styles.uploadSheetHeader}>
+            <div className={styles.uploadSheetTitleWrap}>
+              <div className={styles.uploadHandle} />
+              <div className={styles.uploadSheetTitle}>
+                {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
+              </div>
+              <div className={styles.uploadSheetNote}>
+                Captura el folio o valor del CFDI para asociarlo a esta solicitud
+              </div>
+            </div>
+
+            <div className={styles.uploadSheetActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeCfdiPanel}
+                disabled={savingCfdi}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.uploadSheetBody}>
+            <div className={styles.policyFormWrap}>
+              <div className={styles.managerSectionCard}>
+                <div className={styles.managerSectionTitle}>Datos del CFDI</div>
+
+                <div className={styles.formField}>
+                  <label className={styles.fieldLabel}>CFDI</label>
+                  <input
+                    className={styles.input}
+                    value={cfdiForm.cfdi}
+                    onChange={(e) =>
+                      setCfdiForm({
+                        cfdi: e.target.value,
+                      })
+                    }
+                    placeholder="Captura el CFDI…"
+                    disabled={savingCfdi}
+                  />
+                </div>
+
+                {cfdiForm.cfdi.trim() && (
+                  <div className={styles.cfdiPreviewCard}>
+                    <div className={styles.cfdiPreviewCode}>{cfdiForm.cfdi.trim()}</div>
+                    <div className={styles.cfdiPreviewDesc}>
+                      CFDI que se asociará a esta solicitud.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.uploadSheetFooter}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={closeCfdiPanel}
+              disabled={savingCfdi}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className={styles.saveBtn}
+              onClick={() => void onSaveCfdi()}
+              disabled={savingCfdi}
+            >
+              {savingCfdi ? "Guardando..." : "Guardar CFDI"}
             </button>
           </div>
         </div>

@@ -17,9 +17,9 @@ import AcquisitionTypePage from "../Modules/AcquisitionType/pages/AcquisitionTyp
 import BeneficiaryPage from "../Modules/Beneficiary/pages/Beneficiary";
 import SupplierPage from "../Modules/Supplier/pages/Supplier";
 import DocumentType from "../Modules/Documents/pages/DocumentType";
+import PaymentPolicy from "../Modules/Policy/pages/PaymentPolicy";
 import AcquisitionRequest from "../Modules/AcquisitionRequest/pages/AcquisitionRequest";
 import ExpedientDocuments from "../Modules/ExpedientDocument/pages/ExpedientDocuments";
-
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -92,6 +92,11 @@ export default function AppRouter() {
             {/* Acciones póliza */}
             <Route element={<RequireModule modulePath="/catalogos/acciones-poliza" />}>
               <Route path="/catalogos/acciones-poliza" element={<ActionsPolicy />} />
+            </Route>
+
+            {/* Pólizas de pago */}
+            <Route element={<RequireModule modulePath="/catalogos/polizas" />}>
+              <Route path="/catalogos/polizas" element={<PaymentPolicy />} />
             </Route>
 
             {/* Comunidades */}

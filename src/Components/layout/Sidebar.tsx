@@ -51,33 +51,34 @@ export default function Sidebar({
 
   const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
 
- const menu: MenuItem[] = useMemo(
-  () => [
-    { label: "Inicio", to: "/home", icon: <FiHome /> },
-    {
-      label: "Catálogos",
-      icon: <FiFolder />,
-      children: [
-        { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
-        { label: "Roles", to: "/catalogos/roles" },
-        { label: "Permisos", to: "/catalogos/permisos" },
-        { label: "COG", to: "/catalogos/cog" },
-        { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
-        { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
-        { label: "Comunidades", to: "/catalogos/comunidades" },
-        { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
-        { label: "Proveedores", to: "/catalogos/proveedores" },
-        { label: "PROG", to: "/catalogos/prog" },
-        { label: "Proyectos", to: "/catalogos/proyectos" },
-        { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
-        { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
-        { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
-      ],
-    },
-    { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
-  ],
-  []
-);
+  const menu: MenuItem[] = useMemo(
+    () => [
+      { label: "Inicio", to: "/home", icon: <FiHome /> },
+      {
+        label: "Catálogos",
+        icon: <FiFolder />,
+        children: [
+          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
+          { label: "Roles", to: "/catalogos/roles" },
+          { label: "Permisos", to: "/catalogos/permisos" },
+          { label: "COG", to: "/catalogos/cog" },
+          { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
+          { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
+          { label: "Pólizas de Pago", to: "/catalogos/polizas" },
+          { label: "Comunidades", to: "/catalogos/comunidades" },
+          { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
+          { label: "Proveedores", to: "/catalogos/proveedores" },
+          { label: "PROG", to: "/catalogos/prog" },
+          { label: "Proyectos", to: "/catalogos/proyectos" },
+          { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
+          { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
+          { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
+        ],
+      },
+      { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
+    ],
+    []
+  );
 
   // Filtrado por permisos
   const filteredMenu: MenuItem[] = useMemo(() => {
@@ -120,7 +121,6 @@ export default function Sidebar({
     logout();
     navigate("/login", { replace: true });
   };
-
 
   const handleCatalogClick = () => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();

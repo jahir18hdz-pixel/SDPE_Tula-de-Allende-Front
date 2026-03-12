@@ -18,6 +18,8 @@ type ApiRow = {
   Status?: string | null;
   policyNumber?: string | null;
   PolicyNumber?: string | null;
+  cfdi?: string | null;
+  CFDI?: string | null;
 };
 
 type RequestOk = { ok: true; data: unknown; status: number };
@@ -28,6 +30,7 @@ type Row = {
   idRequest: number;
   folio: string;
   poliza: string;
+  cfdi: string;
   adquisicion: string;
   fecha: string;
   estado: string;
@@ -142,6 +145,16 @@ function computeCompletoFromChecklist(list: ChecklistItem[]) {
   return missingRequired ? "Incompleto" : "Completo";
 }
 
+function hasPolicy(value: string) {
+  const t = (value ?? "").trim().toLowerCase();
+  return !!t && t !== "—" && t !== "sin póliza" && t !== "sin poliza";
+}
+
+function hasCfdi(value: string) {
+  const t = (value ?? "").trim().toLowerCase();
+  return !!t && t !== "—" && t !== "sin cfdi";
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -195,7 +208,13 @@ export default function Home() {
         .map((x) => {
           const idRequest = x.idRequest ?? x.IdRequest ?? 0;
           const folio = x.folio ?? "—";
-          const poliza = x.policyNumber ?? x.PolicyNumber ?? "—";
+
+          const rawPoliza = (x.policyNumber ?? x.PolicyNumber ?? "").trim();
+          const poliza = rawPoliza || "Sin póliza";
+
+          const rawCfdi = (x.cfdi ?? x.CFDI ?? "").trim();
+          const cfdi = rawCfdi || "Sin CFDI";
+
           const adquisicion =
             x.acquisitionClassification ?? x.AcquisitionClassification ?? "Sin clasificación";
           const requestDate = x.requestDate ?? x.RequestDate ?? null;
@@ -205,6 +224,7 @@ export default function Home() {
             idRequest,
             folio,
             poliza,
+            cfdi,
             adquisicion,
             fecha: formatDate(requestDate),
             estado,
@@ -300,6 +320,7 @@ export default function Home() {
       return (
         normalizeText(r.folio).includes(q) ||
         normalizeText(r.poliza).includes(q) ||
+        normalizeText(r.cfdi).includes(q) ||
         normalizeText(r.adquisicion).includes(q) ||
         normalizeText(r.fecha).includes(q) ||
         normalizeText(real).includes(q)
@@ -365,7 +386,7 @@ export default function Home() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por folio, póliza, clasificación, estado…"
+            placeholder="Buscar por folio, póliza, CFDI, clasificación, estado…"
             aria-label="Buscar adquisición"
           />
         </div>
@@ -395,7 +416,6 @@ export default function Home() {
             </select>
           </label>
 
-
           <button type="button" className={styles.primaryBtn} onClick={goRegister}>
             Registrar adquisición
           </button>
@@ -414,6 +434,7 @@ export default function Home() {
               <tr>
                 <th>Folio</th>
                 <th>Póliza</th>
+                <th>CFDI</th>
                 <th>Clasificación</th>
                 <th>Fecha</th>
                 <th>Estado</th>
@@ -424,13 +445,13 @@ export default function Home() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className={styles.empty}>
+                  <td colSpan={7} className={styles.empty}>
                     Cargando registros...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={styles.empty}>
+                  <td colSpan={7} className={styles.empty}>
                     No se encontraron registros con esos criterios.
                   </td>
                 </tr>
@@ -447,17 +468,59 @@ export default function Home() {
                         ? styles.badgeBad
                         : styles.badgeNeutral;
 
+                  const policyExists = hasPolicy(r.poliza);
+                  const cfdiExists = hasCfdi(r.cfdi);
+
                   return (
                     <tr key={r.idRequest}>
                       <td className={styles.mono}>{r.folio}</td>
-                      <td className={styles.mono}>{r.poliza}</td>
+
+                      <td>
+                        {policyExists ? (
+                          <span
+                            className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
+                            title={r.poliza}
+                          >
+                            {r.poliza}
+                          </span>
+                        ) : (
+                          <span
+                            className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
+                            title="Sin póliza asignada"
+                          >
+                            Sin póliza
+                          </span>
+                        )}
+                      </td>
+
+                      <td>
+                        {cfdiExists ? (
+                          <span
+                            className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
+                            title={r.cfdi}
+                          >
+                            {r.cfdi}
+                          </span>
+                        ) : (
+                          <span
+                            className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
+                            title="Sin CFDI asignado"
+                          >
+                            Sin CFDI
+                          </span>
+                        )}
+                      </td>
+
                       <td className={styles.ellipsis} title={r.adquisicion}>
                         {r.adquisicion}
                       </td>
+
                       <td className={styles.mono}>{r.fecha}</td>
+
                       <td>
                         <span className={`${styles.badge} ${badgeClass}`}>{shownEstado}</span>
                       </td>
+
                       <td className={styles.tdRight}>
                         <button
                           type="button"

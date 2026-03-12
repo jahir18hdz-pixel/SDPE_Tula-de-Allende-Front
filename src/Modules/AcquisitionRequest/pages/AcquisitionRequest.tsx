@@ -14,6 +14,7 @@ type CreateForm = {
   justification: string;
   authorizationDate: string;
   observations: string;
+  cfdi: string;
 
   idAdministrativeUnit: number | null;
   idProject: number | null;
@@ -70,6 +71,7 @@ const initialCreate: CreateForm = {
   justification: "",
   authorizationDate: "",
   observations: "",
+  cfdi: "",
 
   idAdministrativeUnit: null,
   idProject: null,
@@ -430,6 +432,7 @@ export default function AcquisitionRequest() {
         justification: create.justification.trim() || null,
         authorizationDate: toNullableIsoDate(create.authorizationDate),
         observations: create.observations.trim() || null,
+        cfdi: create.cfdi.trim() || null,
 
         idAdministrativeUnit: create.idAdministrativeUnit,
         idProject: create.idProject,
@@ -661,25 +664,25 @@ export default function AcquisitionRequest() {
 
           <div className={styles.headerActions}>
             <button
-  className={styles.btnBack}
-  type="button"
-  onClick={() => navigate("/home")}
-  disabled={saving || savingManager || docsSaving}
-  title="Regresar al home"
->
-  Volver al inicio
-</button>
+              className={styles.btnBack}
+              type="button"
+              onClick={() => navigate("/home")}
+              disabled={saving || savingManager || docsSaving}
+              title="Regresar al home"
+            >
+              Volver al inicio
+            </button>
 
             {step === "create" ? (
               <button
-  className={styles.btnWarning}
-  type="button"
-  onClick={() => setCreate(initialCreate)}
-  disabled={createDisabled}
-  title="Limpiar formulario"
->
-  Limpiar
-</button>
+                className={styles.btnWarning}
+                type="button"
+                onClick={() => setCreate(initialCreate)}
+                disabled={createDisabled}
+                title="Limpiar formulario"
+              >
+                Limpiar
+              </button>
             ) : (
               <button
                 className={styles.btnGhost}
@@ -730,27 +733,27 @@ export default function AcquisitionRequest() {
                 </Field>
 
                 <Field label="Fecha de solicitud" required>
-                  <div className={styles.dateWrap}>
-                    <input
-                      ref={requestDateRef}
-                      className={styles.input}
-                      type="date"
-                      value={create.requestDate}
-                      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
-                      disabled={createDisabled}
-                    />
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      onClick={() => openDatePicker(requestDateRef)}
-                      disabled={createDisabled}
-                      aria-label="Abrir calendario (fecha de solicitud)"
-                      title="Calendario"
-                    >
-                      <CalendarIcon />
-                    </button>
-                  </div>
-                </Field>
+  <div className={styles.dateWrap}>
+    <input
+      ref={requestDateRef}
+      className={`${styles.input} ${styles.dateInput}`}
+      type="date"
+      value={create.requestDate}
+      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+      disabled={createDisabled}
+    />
+    <button
+      type="button"
+      className={styles.iconBtn}
+      onClick={() => openDatePicker(requestDateRef)}
+      disabled={createDisabled}
+      aria-label="Abrir calendario (fecha de solicitud)"
+      title="Calendario"
+    >
+      <CalendarIcon />
+    </button>
+  </div>
+</Field>
               </div>
 
               <Field label="Justificación" required>
@@ -767,38 +770,48 @@ export default function AcquisitionRequest() {
 
               <div className={styles.grid2}>
                 <Field label="Fecha de autorización">
-                  <div className={styles.dateWrap}>
-                    <input
-                      ref={authDateRef}
-                      className={styles.input}
-                      type="date"
-                      value={create.authorizationDate}
-                      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
-                      disabled={createDisabled}
-                    />
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      onClick={() => openDatePicker(authDateRef)}
-                      disabled={createDisabled}
-                      aria-label="Abrir calendario (fecha de autorización)"
-                      title="Calendario"
-                    >
-                      <CalendarIcon />
-                    </button>
-                  </div>
-                </Field>
+  <div className={styles.dateWrap}>
+    <input
+      ref={authDateRef}
+      className={`${styles.input} ${styles.dateInput}`}
+      type="date"
+      value={create.authorizationDate}
+      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+      disabled={createDisabled}
+    />
+    <button
+      type="button"
+      className={styles.iconBtn}
+      onClick={() => openDatePicker(authDateRef)}
+      disabled={createDisabled}
+      aria-label="Abrir calendario (fecha de autorización)"
+      title="Calendario"
+    >
+      <CalendarIcon />
+    </button>
+  </div>
+</Field>
 
-                <Field label="Observaciones">
+                <Field label="CFDI">
                   <input
                     className={styles.input}
-                    value={create.observations}
-                    onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
+                    value={create.cfdi}
+                    onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
                     disabled={createDisabled}
-                    placeholder="Notas adicionales (opcional)"
+                    placeholder="Ej. UUID, folio o referencia CFDI"
                   />
                 </Field>
               </div>
+
+              <Field label="Observaciones">
+                <input
+                  className={styles.input}
+                  value={create.observations}
+                  onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
+                  disabled={createDisabled}
+                  placeholder="Notas adicionales (opcional)"
+                />
+              </Field>
 
               <div className={styles.sectionTitle}>Relaciones</div>
 
@@ -1141,12 +1154,32 @@ function CalendarIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M7 3v3M17 3v3M4 8h16M6 21h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z"
+        d="M8 2v3M16 2v3"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
       />
-      <path d="M8 12h3M8 16h3M13 12h3M13 16h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M3 9h18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="17"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 13h3M8 17h3M14 13h2.5M14 17h2.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
