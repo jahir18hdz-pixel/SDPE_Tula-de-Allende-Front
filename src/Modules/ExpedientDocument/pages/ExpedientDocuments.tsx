@@ -71,6 +71,14 @@ type CfdiFormState = {
   cfdi: string;
 };
 
+type ChecklistExceptionRow = {
+  documentTypeId: number;
+  documentName: string;
+  doesNotApply: boolean;
+  justification: string;
+  uploaded: boolean;
+};
+
 type PreviewItem = {
   id: number | null;
   url: string;
@@ -286,6 +294,7 @@ const MANAGER_API = "/api/RequestManager";
 const REQUEST_DETAIL_API = "/api/AcquisitionRequest";
 const ADMIN_UNIT_API = "/api/AdministrativeUnit";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy";
+const REQUEST_DOCUMENT_EXCEPTION_API = "/api/RequestDocumentException";
 
 export default function ExpedientDocuments() {
   const navigate = useNavigate();
@@ -349,6 +358,10 @@ export default function ExpedientDocuments() {
     cfdi: "",
   });
 
+  const [checklistPanelOpen, setChecklistPanelOpen] = useState(false);
+  const [savingChecklist, setSavingChecklist] = useState(false);
+  const [checklistExceptionRows, setChecklistExceptionRows] = useState<ChecklistExceptionRow[]>([]);
+
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
   const [toastMsg, setToastMsg] = useState("");
@@ -388,6 +401,10 @@ export default function ExpedientDocuments() {
 
   const closeCfdiPanel = useCallback(() => {
     setCfdiPanelOpen(false);
+  }, []);
+
+  const closeChecklistPanel = useCallback(() => {
+    setChecklistPanelOpen(false);
   }, []);
 
   const loadRequestDetail = useCallback(async () => {
@@ -534,30 +551,22 @@ export default function ExpedientDocuments() {
       const list = normalizeChecklist(res.data);
 
       list.sort((a, b) => {
-  const aRequiredApplies = a.requiredByRule && !a.noApplies;
-  const bRequiredApplies = b.requiredByRule && !b.noApplies;
+        const aRequiredApplies = a.requiredByRule && !a.noApplies;
+        const bRequiredApplies = b.requiredByRule && !b.noApplies;
 
-  // 1) Los "No aplica" siempre al final
-  if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
+        if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
+        if (aRequiredApplies !== bRequiredApplies) return aRequiredApplies ? -1 : 1;
 
-  // 2) Los obligatorios primero
-  if (aRequiredApplies !== bRequiredApplies) return aRequiredApplies ? -1 : 1;
+        if (aRequiredApplies && bRequiredApplies && a.uploaded !== b.uploaded) {
+          return a.uploaded ? 1 : -1;
+        }
 
-  // 3) Dentro de obligatorios:
-  //    primero pendientes, luego completos
-  if (aRequiredApplies && bRequiredApplies && a.uploaded !== b.uploaded) {
-    return a.uploaded ? 1 : -1;
-  }
+        if (!aRequiredApplies && !bRequiredApplies && a.uploaded !== b.uploaded) {
+          return a.uploaded ? 1 : -1;
+        }
 
-  // 4) Dentro de opcionales:
-  //    primero sin archivo, luego completos
-  if (!aRequiredApplies && !bRequiredApplies && a.uploaded !== b.uploaded) {
-    return a.uploaded ? 1 : -1;
-  }
-
-  // 5) Finalmente por nombre
-  return a.documentName.localeCompare(b.documentName, "es");
-});
+        return a.documentName.localeCompare(b.documentName, "es");
+      });
 
       setChecklist(list);
     } catch {
@@ -800,6 +809,75 @@ export default function ExpedientDocuments() {
     setUploads((prev) =>
       prev.map((u, i) => (i === uploadIdx ? { ...u, documentTypeId: docTypeId } : u))
     );
+  }
+
+  function openChecklistPanel() {
+    if (!canUse) return;
+
+    const rows: ChecklistExceptionRow[] = checklist
+      .filter((item) => item.requiredByRule)
+      .map((item) => ({
+        documentTypeId: item.documentTypeId,
+        documentName: item.documentName,
+        doesNotApply: item.noApplies,
+        justification: item.observations?.trim() || "No aplica",
+        uploaded: item.uploaded,
+      }));
+
+    rows.sort((a, b) => a.documentName.localeCompare(b.documentName, "es"));
+
+    setChecklistExceptionRows(rows);
+    setChecklistPanelOpen(true);
+  }
+
+  async function onSaveChecklistExceptions() {
+    if (!canUse) {
+      showToast("error", "Solicitud inválida.");
+      return;
+    }
+
+    const rowsToSave = checklistExceptionRows.filter((row) => row.doesNotApply);
+    const invalidRow = rowsToSave.find((row) => !row.justification.trim());
+
+    if (invalidRow) {
+      showToast(
+        "error",
+        `Captura la justificación del documento "${invalidRow.documentName}".`
+      );
+      return;
+    }
+
+    setSavingChecklist(true);
+
+    try {
+      const payload = {
+        idRequest: requestId,
+        documents: checklistExceptionRows.map((row) => ({
+          idDocumentType: row.documentTypeId,
+          doesNotApply: row.doesNotApply,
+          justification: row.doesNotApply ? row.justification.trim() : "",
+        })),
+      };
+
+      const res = (await requestJson(`${REQUEST_DOCUMENT_EXCEPTION_API}/toggle`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showToast("error", res.error || "No se pudo guardar la edición del checklist.");
+        return;
+      }
+
+      showToast("success", "Checklist actualizado correctamente.");
+      setChecklistPanelOpen(false);
+      await loadChecklist();
+    } catch {
+      showToast("error", "Error inesperado al guardar la edición del checklist.");
+    } finally {
+      setSavingChecklist(false);
+    }
   }
 
   async function openManagerPanel() {
@@ -1282,10 +1360,7 @@ export default function ExpedientDocuments() {
                     <div className={styles.cfdiBox}>
                       <span className={styles.cfdiInlineLabel}>CFDI:</span>
 
-                      <span
-                        className={styles.cfdiHeaderName}
-                        title={cfdi?.trim() || "Sin CFDI"}
-                      >
+                      <span className={styles.cfdiHeaderName} title={cfdi?.trim() || "Sin CFDI"}>
                         {cfdi?.trim() || "Sin CFDI"}
                       </span>
 
@@ -1449,10 +1524,21 @@ export default function ExpedientDocuments() {
             </div>
 
             {missingRequiredList.length > 0 && (
-              <div className={styles.footerHint}>
-                <b>Faltan obligatorios:</b>{" "}
-                {missingRequiredList.slice(0, 4).map((x) => x.documentName).join(", ")}
-                {missingRequiredList.length > 4 ? "…" : ""}
+              <div className={styles.footerHintRow}>
+                <div className={styles.footerHint}>
+                  <b>Faltan obligatorios:</b>{" "}
+                  {missingRequiredList.slice(0, 4).map((x) => x.documentName).join(", ")}
+                  {missingRequiredList.length > 4 ? "…" : ""}
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.footerEditChecklistBtn}
+                  onClick={openChecklistPanel}
+                  disabled={!canUse || savingChecklist}
+                >
+                  Editar checklist
+                </button>
               </div>
             )}
           </section>
@@ -1932,6 +2018,183 @@ export default function ExpedientDocuments() {
               disabled={savingCfdi}
             >
               {savingCfdi ? "Guardando..." : "Guardar CFDI"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`${styles.uploadOverlay} ${
+          checklistPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+        }`}
+        aria-hidden={!checklistPanelOpen}
+      >
+        <div className={styles.uploadSheet}>
+          <div className={styles.uploadSheetHeader}>
+            <div className={styles.uploadSheetTitleWrap}>
+              <div className={styles.uploadHandle} />
+              <div className={styles.uploadSheetTitle}>Editar checklist</div>
+              <div className={styles.uploadSheetNote}>
+                Define claramente si cada documento es obligatorio o no aplica
+              </div>
+            </div>
+
+            <div className={styles.uploadSheetActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeChecklistPanel}
+                disabled={savingChecklist}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+
+                    <div className={styles.uploadSheetBody}>
+            {checklistExceptionRows.length === 0 ? (
+              <div className={styles.emptyUploadState}>
+                No hay documentos obligatorios para editar.
+              </div>
+            ) : (
+              <div className={styles.checklistCompactWrap}>
+                <div className={styles.checklistCompactHeader}>
+                  <div className={styles.checklistCompactHeaderDoc}>Documento</div>
+                  <div className={styles.checklistCompactHeaderState}>Estado</div>
+                </div>
+
+                <div className={styles.checklistCompactList}>
+                  {checklistExceptionRows.map((row) => {
+                    const isRequired = !row.doesNotApply;
+
+                    return (
+                      <div
+  key={row.documentTypeId}
+  className={`${styles.checklistCompactCard} ${
+    row.uploaded
+      ? styles.checklistStateUploaded
+      : row.doesNotApply
+      ? styles.checklistStateNoApply
+      : styles.checklistStateRequired
+  }`}
+>
+                        <div className={styles.checklistCompactTop}>
+                          <div className={styles.checklistCompactDocBlock}>
+                            <div className={styles.checklistCompactDocName}>
+                              {row.documentName}
+                            </div>
+
+                            <div className={styles.checklistCompactBadges}>
+                              {row.uploaded && (
+                                <span className={styles.checklistCompactBadgeOk}>Completo</span>
+                              )}
+
+                              <span
+                                className={
+                                  row.doesNotApply
+                                    ? styles.checklistCompactBadgeNeutral
+                                    : styles.checklistCompactBadgeWarn
+                                }
+                              >
+                                {row.doesNotApply ? "No aplica" : "Obligatorio"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className={styles.checklistCompactStateBlock}>
+                            <label className={styles.checklistCompactOption}>
+                              <span className={styles.checklistCompactOptionLabel}>No aplica</span>
+                              <input
+                                type="radio"
+                                name={`checklist-state-${row.documentTypeId}`}
+                                checked={row.doesNotApply}
+                                onChange={() =>
+                                  setChecklistExceptionRows((prev) =>
+                                    prev.map((item) =>
+                                      item.documentTypeId === row.documentTypeId
+                                        ? {
+                                            ...item,
+                                            doesNotApply: true,
+                                            justification:
+                                              item.justification.trim() || "No aplica",
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                                disabled={savingChecklist}
+                              />
+                            </label>
+
+                            <label className={styles.checklistCompactOption}>
+                              <span className={styles.checklistCompactOptionLabel}>
+                                Obligatorio
+                              </span>
+                              <input
+                                type="radio"
+                                name={`checklist-state-${row.documentTypeId}`}
+                                checked={isRequired}
+                                onChange={() =>
+                                  setChecklistExceptionRows((prev) =>
+                                    prev.map((item) =>
+                                      item.documentTypeId === row.documentTypeId
+                                        ? {
+                                            ...item,
+                                            doesNotApply: false,
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                                disabled={savingChecklist}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className={styles.checklistCompactBottom}>
+                          <label className={styles.fieldLabel}>Justificación</label>
+                          <textarea
+                            className={styles.checklistCompactTextarea}
+                            value={row.doesNotApply ? row.justification : "Aplica"}
+                            onChange={(e) =>
+                              setChecklistExceptionRows((prev) =>
+                                prev.map((item) =>
+                                  item.documentTypeId === row.documentTypeId
+                                    ? { ...item, justification: e.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                            disabled={savingChecklist}
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.uploadSheetFooter}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={closeChecklistPanel}
+              disabled={savingChecklist}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              className={styles.saveBtn}
+              onClick={() => void onSaveChecklistExceptions()}
+              disabled={savingChecklist}
+            >
+              {savingChecklist ? "Guardando..." : "Guardar checklist"}
             </button>
           </div>
         </div>

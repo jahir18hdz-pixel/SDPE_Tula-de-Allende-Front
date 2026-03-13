@@ -1964,3 +1964,432 @@ transition: opacity 600ms ease;  overflow: hidden;
   color: rgba(17, 24, 39, 0.78);
   line-height: 1.45;
 }
+/* =========================
+   CHECKLIST COMPACT EDITOR
+========================= */
+.checklistCompactWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.checklistCompactHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 14px;
+  align-items: center;
+  padding: 0 6px 8px;
+  border-bottom: 1px solid rgba(230, 230, 234, 0.92);
+}
+
+.checklistCompactHeaderDoc,
+.checklistCompactHeaderState {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  color: rgba(17, 24, 39, 0.78);
+}
+
+.checklistCompactHeaderState {
+  text-align: center;
+}
+
+.checklistCompactList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checklistCompactCard {
+  border: 1px solid rgba(230, 230, 234, 0.95);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 250, 252, 0.98));
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.035);
+  display: grid;
+  gap: 12px;
+}
+
+.checklistCompactTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 14px;
+  align-items: start;
+}
+
+.checklistCompactDocBlock {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.checklistCompactDocName {
+  font-size: 14px;
+  font-weight: 900;
+  color: #111827;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.checklistCompactBadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.checklistCompactBadgeWarn,
+.checklistCompactBadgeNeutral,
+.checklistCompactBadgeOk {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.checklistCompactBadgeWarn {
+  border: 1px solid rgba(182, 138, 42, 0.42);
+  background: rgba(182, 138, 42, 0.12);
+}
+
+.checklistCompactBadgeNeutral {
+  border: 1px solid rgba(107, 114, 128, 0.42);
+  background: rgba(107, 114, 128, 0.12);
+}
+
+.checklistCompactBadgeOk {
+  border: 1px solid rgba(22, 163, 74, 0.42);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.checklistCompactStateBlock {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.checklistCompactOption {
+  min-height: 72px;
+  border-radius: 14px;
+  border: 1px solid rgba(215, 215, 221, 1);
+  background: linear-gradient(180deg, #ffffff, #fbfbfc);
+
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+
+  padding: 10px 8px;
+  text-align: center;
+
+  transition: all 0.15s ease;
+}
+
+.checklistCompactOption:hover {
+  border-color: var(--gold);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.checklistCompactOptionLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.checklistCompactOption input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #65001f;
+  cursor: pointer;
+}
+
+.checklistCompactBottom {
+  display: grid;
+  gap: 6px;
+}
+
+.checklistCompactTextarea {
+  width: 100%;
+  min-height: 60px;
+  max-height: 110px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(215, 215, 221, 1);
+
+  padding: 10px 12px;
+  outline: none;
+
+  font-size: 13px;
+  background: #fff;
+
+  color: #111827 !important;
+
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+
+  font-family: inherit;
+  box-sizing: border-box;
+
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.checklistCompactTextarea:disabled {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.35);
+  font-weight: 700;
+  color: #166534 !important;
+}
+
+.checklistCompactTextarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.16);
+}
+
+.checklistCompactTextarea:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 980px) {
+  .checklistCompactHeader,
+  .checklistCompactTop {
+    grid-template-columns: 1fr;
+  }
+
+  .checklistCompactHeaderState {
+    text-align: left;
+  }
+
+  .checklistCompactStateBlock {
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 640px) {
+  .checklistCompactCard {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .checklistCompactStateBlock {
+    grid-template-columns: 1fr 1fr;
+    max-width: none;
+    width: 100%;
+  }
+
+  .checklistCompactOption {
+    min-height: 64px;
+    padding: 8px;
+  }
+
+  .checklistCompactOptionLabel {
+    font-size: 11px;
+  }
+
+  .checklistCompactTextarea {
+    min-height: 58px;
+    font-size: 13px;
+  }
+}
+/* =========================
+   CHECKLIST STATE COLORS
+========================= */
+
+.checklistStateRequired {
+  border: 1px solid rgba(182, 138, 42, 0.55);
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.08),
+    rgba(255, 255, 255, 0.96)
+  );
+}
+
+.checklistStateNoApply {
+  border: 1px solid rgba(107, 114, 128, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(107, 114, 128, 0.08),
+    rgba(255, 255, 255, 0.96)
+  );
+}
+
+.checklistStateUploaded {
+  border: 1px solid rgba(22, 163, 74, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 163, 74, 0.08),
+    rgba(255, 255, 255, 0.96)
+  );
+}
+/* =========================
+   FOOTER HINT + EDIT BUTTON
+========================= */
+
+.footerHintRow {
+  flex: 0 0 auto;
+
+  padding: 12px 16px;
+
+  border-top: 1px solid rgba(230, 230, 234, 0.7);
+
+  background: rgba(255, 255, 255, 0.92);
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 14px;
+
+  flex-wrap: wrap;
+}
+
+/* texto faltantes */
+
+.footerHint {
+  flex: 1 1 auto;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  color: rgba(17, 24, 39, 0.8);
+
+  min-width: 0;
+}
+
+/* =========================
+   EDIT CHECKLIST BUTTON
+========================= */
+
+.footerEditChecklistBtn {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 8px;
+
+  min-height: 38px;
+
+  padding: 0 18px;
+
+  border-radius: 999px;
+
+  border: 1px solid rgba(182, 138, 42, 0.65);
+
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.26),
+    rgba(182, 138, 42, 0.12)
+  );
+
+  color: #111827;
+
+  font-size: 13px;
+
+  font-weight: 900;
+
+  letter-spacing: 0.25px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease;
+
+  font-family: inherit;
+
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+
+  white-space: nowrap;
+}
+
+/* hover */
+
+.footerEditChecklistBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.36),
+    rgba(182, 138, 42, 0.18)
+  );
+
+  border-color: rgba(182, 138, 42, 0.9);
+
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+}
+
+/* active */
+
+.footerEditChecklistBtn:active:not(:disabled) {
+  transform: translateY(0);
+
+  box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+}
+
+/* disabled */
+
+.footerEditChecklistBtn:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+
+  transform: none;
+
+  box-shadow: none;
+}
+
+/* icon */
+
+.footerEditChecklistBtn svg {
+  width: 16px;
+  height: 16px;
+
+  flex-shrink: 0;
+
+  opacity: 0.85;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 720px) {
+
+  .footerHintRow {
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 10px;
+  }
+
+  .footerEditChecklistBtn {
+    width: 100%;
+
+    justify-content: center;
+
+    min-height: 42px;
+
+    font-size: 14px;
+  }
+
+}

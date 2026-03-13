@@ -186,8 +186,44 @@ function extractIdRequest(payload: unknown): number | null {
   return null;
 }
 
+function hasCreateChanges(form: CreateForm): boolean {
+  return (
+    form.requestNumber.trim() !== "" ||
+    form.requestDate.trim() !== "" ||
+    form.justification.trim() !== "" ||
+    form.authorizationDate.trim() !== "" ||
+    form.observations.trim() !== "" ||
+    form.cfdi.trim() !== "" ||
+    form.idAdministrativeUnit !== null ||
+    form.idProject !== null ||
+    form.idAcquisitionType !== null ||
+    form.idSupplier !== null ||
+    form.idFundingSource !== null ||
+    form.idAcquisitionClassification !== null ||
+    form.idProgram !== null ||
+    form.idCommunity !== null ||
+    form.idBeneficiary !== null
+  );
+}
+
+function hasManagerChanges(form: ManagerForm): boolean {
+  return (
+    form.idAdministrativeUnit !== null ||
+    form.firstName.trim() !== "" ||
+    form.lastName.trim() !== "" ||
+    form.secondLastName.trim() !== "" ||
+    form.email.trim() !== "" ||
+    form.phone.trim() !== ""
+  );
+}
+
+function hasDocsChanges(docs: DocState[]): boolean {
+  return docs.length > 0;
+}
+
 export default function AcquisitionRequest() {
   const navigate = useNavigate();
+  const pageRef = useRef<HTMLDivElement | null>(null);
 
   const [step, setStep] = useState<Step>("create");
   const [createdIdRequest, setCreatedIdRequest] = useState<number | null>(null);
@@ -227,9 +263,84 @@ export default function AcquisitionRequest() {
 
   const requestDateRef = useRef<HTMLInputElement | null>(null);
   const authDateRef = useRef<HTMLInputElement | null>(null);
+  const lastOutsideToastRef = useRef(0);
 
   const createDisabled = saving || loadingCats;
   const postDisabled = savingManager || docsSaving || docsLoading;
+
+  const isCreateDirty = useMemo(() => hasCreateChanges(create), [create]);
+  const isManagerDirty = useMemo(() => hasManagerChanges(manager), [manager]);
+  const isDocsDirty = useMemo(() => hasDocsChanges(docs), [docs]);
+
+  const workflowLocked = useMemo(() => {
+    if (saving || savingManager || docsSaving || docsLoading) return true;
+    if (step === "postCreate") return true;
+    if (isCreateDirty) return true;
+    if (isManagerDirty) return true;
+    if (isDocsDirty) return true;
+    return false;
+  }, [saving, savingManager, docsSaving, docsLoading, step, isCreateDirty, isManagerDirty, isDocsDirty]);
+
+  const resetAll = useCallback(() => {
+    setStep("create");
+    setCreatedIdRequest(null);
+    setCreate(initialCreate);
+    setManager(initialManager);
+    setDocs([]);
+    setManagerSaved(false);
+  }, []);
+
+  useEffect(() => {
+    if (!workflowLocked) return;
+
+    const showOutsideClickToast = () => {
+      const now = Date.now();
+      if (now - lastOutsideToastRef.current < 1200) return;
+      lastOutsideToastRef.current = now;
+      showToast("error", "Debes terminar o cancelar el registro actual antes de salir.");
+    };
+
+    const blockOutsideInteraction = (event: Event) => {
+      const root = pageRef.current;
+      const target = event.target as Node | null;
+
+      if (!root || !target) return;
+      if (root.contains(target)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if ("stopImmediatePropagation" in event && typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
+
+      showOutsideClickToast();
+    };
+
+    document.addEventListener("pointerdown", blockOutsideInteraction, true);
+    document.addEventListener("click", blockOutsideInteraction, true);
+    document.addEventListener("touchstart", blockOutsideInteraction, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", blockOutsideInteraction, true);
+      document.removeEventListener("click", blockOutsideInteraction, true);
+      document.removeEventListener("touchstart", blockOutsideInteraction, true);
+    };
+  }, [workflowLocked, showToast]);
+
+  useEffect(() => {
+    if (!workflowLocked) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [workflowLocked]);
 
   const loadCatalogGeneric = useCallback(
     async (url: string, label: string, opts?: NormalizeOpts): Promise<CatalogItem[]> => {
@@ -610,13 +721,7 @@ export default function AcquisitionRequest() {
       if (!res.ok) return showToast("error", res.error);
 
       showToast("success", "Checklist guardado correctamente.");
-
-      setStep("create");
-      setCreatedIdRequest(null);
-      setCreate(initialCreate);
-      setManager(initialManager);
-      setDocs([]);
-      setManagerSaved(false);
+      resetAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -646,7 +751,10 @@ export default function AcquisitionRequest() {
   }, [step, createdIdRequest]);
 
   return (
-    <div className={styles.page}>
+    <div
+      ref={pageRef}
+      className={`${styles.page} ${workflowLocked ? styles.pageLocked : ""}`}
+    >
       <Toast
         open={toastOpen}
         type={toastType}
@@ -660,6 +768,12 @@ export default function AcquisitionRequest() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Registro de adquisición</h1>
             <p className={styles.sub}>{headerHint}</p>
+
+            {workflowLocked && (
+              <div className={styles.lockHint}>
+                Hay un registro en proceso. No podrás salir desde el sidebar ni hacer clic fuera de esta vista hasta terminar o cancelar aquí.
+              </div>
+            )}
           </div>
 
           <div className={styles.headerActions}>
@@ -667,39 +781,21 @@ export default function AcquisitionRequest() {
               className={styles.btnBack}
               type="button"
               onClick={() => navigate("/home")}
-              disabled={saving || savingManager || docsSaving}
+              disabled={workflowLocked || saving || savingManager || docsSaving}
               title="Regresar al home"
             >
               Volver al inicio
             </button>
 
-            {step === "create" ? (
-              <button
-                className={styles.btnWarning}
-                type="button"
-                onClick={() => setCreate(initialCreate)}
-                disabled={createDisabled}
-                title="Limpiar formulario"
-              >
-                Limpiar
-              </button>
-            ) : (
-              <button
-                className={styles.btnGhost}
-                type="button"
-                onClick={() => {
-                  setStep("create");
-                  setCreatedIdRequest(null);
-                  setManager(initialManager);
-                  setDocs([]);
-                  setManagerSaved(false);
-                }}
-                disabled={postDisabled}
-                title="Cerrar post-registro"
-              >
-                Cerrar formulario
-              </button>
-            )}
+            <button
+              className={styles.btnGhost}
+              type="button"
+              onClick={step === "create" ? () => setCreate(initialCreate) : resetAll}
+              disabled={step === "create" ? createDisabled : postDisabled}
+              title={step === "create" ? "Cancelar captura" : "Cancelar post-registro"}
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       </div>
@@ -733,27 +829,27 @@ export default function AcquisitionRequest() {
                 </Field>
 
                 <Field label="Fecha de solicitud" required>
-  <div className={styles.dateWrap}>
-    <input
-      ref={requestDateRef}
-      className={`${styles.input} ${styles.dateInput}`}
-      type="date"
-      value={create.requestDate}
-      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
-      disabled={createDisabled}
-    />
-    <button
-      type="button"
-      className={styles.iconBtn}
-      onClick={() => openDatePicker(requestDateRef)}
-      disabled={createDisabled}
-      aria-label="Abrir calendario (fecha de solicitud)"
-      title="Calendario"
-    >
-      <CalendarIcon />
-    </button>
-  </div>
-</Field>
+                  <div className={styles.dateWrap}>
+                    <input
+                      ref={requestDateRef}
+                      className={`${styles.input} ${styles.dateInput}`}
+                      type="date"
+                      value={create.requestDate}
+                      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                      disabled={createDisabled}
+                    />
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => openDatePicker(requestDateRef)}
+                      disabled={createDisabled}
+                      aria-label="Abrir calendario (fecha de solicitud)"
+                      title="Calendario"
+                    >
+                      <CalendarIcon />
+                    </button>
+                  </div>
+                </Field>
               </div>
 
               <Field label="Justificación" required>
@@ -770,27 +866,27 @@ export default function AcquisitionRequest() {
 
               <div className={styles.grid2}>
                 <Field label="Fecha de autorización">
-  <div className={styles.dateWrap}>
-    <input
-      ref={authDateRef}
-      className={`${styles.input} ${styles.dateInput}`}
-      type="date"
-      value={create.authorizationDate}
-      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
-      disabled={createDisabled}
-    />
-    <button
-      type="button"
-      className={styles.iconBtn}
-      onClick={() => openDatePicker(authDateRef)}
-      disabled={createDisabled}
-      aria-label="Abrir calendario (fecha de autorización)"
-      title="Calendario"
-    >
-      <CalendarIcon />
-    </button>
-  </div>
-</Field>
+                  <div className={styles.dateWrap}>
+                    <input
+                      ref={authDateRef}
+                      className={`${styles.input} ${styles.dateInput}`}
+                      type="date"
+                      value={create.authorizationDate}
+                      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+                      disabled={createDisabled}
+                    />
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => openDatePicker(authDateRef)}
+                      disabled={createDisabled}
+                      aria-label="Abrir calendario (fecha de autorización)"
+                      title="Calendario"
+                    >
+                      <CalendarIcon />
+                    </button>
+                  </div>
+                </Field>
 
                 <Field label="CFDI">
                   <input
@@ -820,7 +916,9 @@ export default function AcquisitionRequest() {
                   <select
                     className={styles.select}
                     value={create.idAdministrativeUnit ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                    }
                     disabled={createDisabled}
                   >
                     <option value="">Selecciona...</option>
@@ -852,7 +950,9 @@ export default function AcquisitionRequest() {
                   <select
                     className={styles.select}
                     value={create.idAcquisitionType ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))
+                    }
                     disabled={createDisabled}
                   >
                     <option value="">Selecciona...</option>
@@ -884,7 +984,9 @@ export default function AcquisitionRequest() {
                   <select
                     className={styles.select}
                     value={create.idFundingSource ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))
+                    }
                     disabled={createDisabled}
                   >
                     <option value="">Selecciona...</option>
@@ -901,7 +1003,10 @@ export default function AcquisitionRequest() {
                     className={styles.select}
                     value={create.idAcquisitionClassification ?? ""}
                     onChange={(e) =>
-                      setCreate((p) => ({ ...p, idAcquisitionClassification: toNullableNumber(e.target.value) }))
+                      setCreate((p) => ({
+                        ...p,
+                        idAcquisitionClassification: toNullableNumber(e.target.value),
+                      }))
                     }
                     disabled={createDisabled}
                   >
@@ -950,7 +1055,9 @@ export default function AcquisitionRequest() {
                   <select
                     className={styles.select}
                     value={create.idBeneficiary ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))
+                    }
                     disabled={createDisabled}
                   >
                     <option value="">Selecciona...</option>
@@ -964,10 +1071,6 @@ export default function AcquisitionRequest() {
               </div>
 
               <div className={styles.actions}>
-                <button type="button" className={styles.btnGhost} onClick={() => setCreate(initialCreate)} disabled={createDisabled}>
-                  Cancelar
-                </button>
-
                 <button type="submit" className={styles.btnSave} disabled={createDisabled}>
                   {saving ? "Guardando..." : "Guardar"}
                 </button>
@@ -984,7 +1087,9 @@ export default function AcquisitionRequest() {
                   <select
                     className={styles.select}
                     value={manager.idAdministrativeUnit ?? ""}
-                    onChange={(e) => setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))}
+                    onChange={(e) =>
+                      setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                    }
                     disabled={postDisabled}
                   >
                     <option value="">Selecciona...</option>
@@ -1048,13 +1153,20 @@ export default function AcquisitionRequest() {
               </div>
 
               <div className={styles.actions}>
-                <button type="button" className={styles.btnGhost} onClick={() => void onSaveManager()} disabled={postDisabled}>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  onClick={() => void onSaveManager()}
+                  disabled={postDisabled}
+                >
                   {savingManager ? "Guardando..." : managerSaved ? "Responsable guardado" : "Guardar responsable"}
                 </button>
               </div>
 
               <div className={styles.sectionTitle}>Documentos por clasificación</div>
-              {!managerSaved && <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>}
+              {!managerSaved && (
+                <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>
+              )}
 
               <div className={styles.docsWrap}>
                 {docsLoading && <div className={styles.docsHint}>Cargando documentos...</div>}
@@ -1097,22 +1209,6 @@ export default function AcquisitionRequest() {
               </div>
 
               <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.btnGhost}
-                  onClick={() => {
-                    setStep("create");
-                    setCreatedIdRequest(null);
-                    setCreate(initialCreate);
-                    setManager(initialManager);
-                    setDocs([]);
-                    setManagerSaved(false);
-                  }}
-                  disabled={postDisabled}
-                >
-                  Cancelar
-                </button>
-
                 <button
                   type="button"
                   className={styles.btnSave}

@@ -45,8 +45,26 @@ type ChecklistItem = {
   uploaded: boolean;
 };
 
+type PaymentPolicyPreviewRow = {
+  idPaymentPolicy?: number;
+  IdPaymentPolicy?: number;
+  policyCode?: string | null;
+  PolicyCode?: string | null;
+  description?: string | null;
+  Description?: string | null;
+  previewUrl?: string | null;
+  PreviewUrl?: string | null;
+};
+
+type PreviewItem = {
+  url: string;
+  name: string;
+  type: "pdf" | "image" | "other";
+};
+
 const API_BASE = "/api/AcquisitionRequest";
 const EXPEDIENT_API = "/api/expedient-documents";
+const PAYMENT_POLICY_API = "/api/PaymentPolicy";
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
@@ -155,6 +173,43 @@ function hasCfdi(value: string) {
   return !!t && t !== "—" && t !== "sin cfdi";
 }
 
+function getExtensionFromSource(source: string) {
+  const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
+  const parts = clean.split(".");
+  return parts.length > 1 ? parts.pop() ?? "" : "";
+}
+
+function getPreviewType(url: string, fileName?: string | null): "image" | "pdf" | "other" {
+  const combined = `${fileName ?? ""} ${url}`.toLowerCase();
+  const ext = getExtensionFromSource(combined);
+
+  const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"];
+
+  if (imageExts.includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+
+  if (
+    combined.includes(".jpg") ||
+    combined.includes(".jpeg") ||
+    combined.includes(".png") ||
+    combined.includes(".gif") ||
+    combined.includes(".webp") ||
+    combined.includes(".bmp") ||
+    combined.includes(".svg") ||
+    combined.includes(".avif")
+  ) {
+    return "image";
+  }
+
+  if (combined.includes(".pdf")) return "pdf";
+
+  return "other";
+}
+
+function normalizeUrlMaybe(u: string) {
+  return (u ?? "").trim();
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -177,6 +232,10 @@ export default function Home() {
     type: "error",
     message: "",
   });
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -300,6 +359,102 @@ export default function Home() {
     };
   }, [rows]);
 
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewItem(null);
+  }, []);
+
+  const openUrl = useCallback((u: string) => {
+    const url = normalizeUrlMaybe(u);
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const openPolicyPreview = useCallback(async (policyCode: string) => {
+    const code = policyCode.trim();
+
+    if (!code || code.toLowerCase() === "sin póliza" || code.toLowerCase() === "sin poliza") {
+      setToast({
+        open: true,
+        type: "error",
+        message: "Esta adquisición no tiene póliza asignada.",
+      });
+      return;
+    }
+
+    setLoadingPreview(true);
+
+    try {
+      const res = (await requestJson(`${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setToast({
+          open: true,
+          type: "error",
+          message: res.error || "No se pudieron consultar las pólizas.",
+        });
+        return;
+      }
+
+      const list = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+      const found =
+        list.find((x) => {
+          const currentCode = (x.policyCode ?? x.PolicyCode ?? "").trim().toLowerCase();
+          return currentCode === code.toLowerCase();
+        }) ?? null;
+
+      if (!found) {
+        setToast({
+          open: true,
+          type: "error",
+          message: `No se encontró la póliza ${code}.`,
+        });
+        return;
+      }
+
+      const previewUrl = normalizeUrlMaybe(found.previewUrl ?? found.PreviewUrl ?? "");
+      if (!previewUrl) {
+        setToast({
+          open: true,
+          type: "error",
+          message: "La póliza no tiene PreviewUrl disponible.",
+        });
+        return;
+      }
+
+      const fileName = `${code}`;
+      setPreviewItem({
+        url: previewUrl,
+        name: fileName,
+        type: getPreviewType(previewUrl, fileName),
+      });
+      setPreviewOpen(true);
+    } catch {
+      setToast({
+        open: true,
+        type: "error",
+        message: "Error inesperado al abrir la póliza.",
+      });
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closePreview();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewOpen, closePreview]);
+
   const filtered = useMemo(() => {
     const q = normalizeText(query);
     let list = rows;
@@ -355,214 +510,298 @@ export default function Home() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${previewOpen ? styles.pageLocked : ""}`}>
       <Toast open={toast.open} type={toast.type} message={toast.message} onClose={closeToast} />
 
-      <div className={styles.topbar}>
-        <div className={styles.topbarLeft}>
-          <h1 className={styles.title}>Adquisiciones</h1>
-          <p className={styles.subtitle}>Consulta y gestiona solicitudes registradas.</p>
+      <div className={`${styles.mainContent} ${previewOpen ? styles.mainContentBlurred : ""}`}>
+        <div className={styles.topbar}>
+          <div className={styles.topbarLeft}>
+            <h1 className={styles.title}>Adquisiciones</h1>
+            <p className={styles.subtitle}>Consulta y gestiona solicitudes registradas.</p>
+          </div>
+
+          <div className={styles.kpis}>
+            <div className={styles.kpiChip}>
+              <span className={styles.kpiLabel}>Total</span>
+              <span className={styles.kpiValue}>{kpiTotal}</span>
+            </div>
+            <div className={`${styles.kpiChip} ${styles.kpiOk}`}>
+              <span className={styles.kpiLabel}>Completo</span>
+              <span className={styles.kpiValue}>{kpiCompleto}</span>
+            </div>
+            <div className={`${styles.kpiChip} ${styles.kpiBad}`}>
+              <span className={styles.kpiLabel}>Incompleto</span>
+              <span className={styles.kpiValue}>{kpiIncompleto}</span>
+            </div>
+          </div>
         </div>
 
-        <div className={styles.kpis}>
-          <div className={styles.kpiChip}>
-            <span className={styles.kpiLabel}>Total</span>
-            <span className={styles.kpiValue}>{kpiTotal}</span>
+        <div className={styles.toolbar}>
+          <div className={styles.search}>
+            <FiSearch className={styles.searchIcon} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por folio, póliza, CFDI, clasificación, estado…"
+              aria-label="Buscar adquisición"
+            />
           </div>
-          <div className={`${styles.kpiChip} ${styles.kpiOk}`}>
-            <span className={styles.kpiLabel}>Completo</span>
-            <span className={styles.kpiValue}>{kpiCompleto}</span>
-          </div>
-          <div className={`${styles.kpiChip} ${styles.kpiBad}`}>
-            <span className={styles.kpiLabel}>Incompleto</span>
-            <span className={styles.kpiValue}>{kpiIncompleto}</span>
+
+          <div className={styles.controls}>
+            <label className={styles.control}>
+              <span>Estado</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              >
+                <option value="Todos">Todos</option>
+                <option value="Completo">Completo</option>
+                <option value="Incompleto">Incompleto</option>
+              </select>
+            </label>
+
+            <label className={styles.control}>
+              <span>Tamaño</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageNumber(1);
+                  setPageSize(Number(e.target.value));
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+
+            <button type="button" className={styles.primaryBtn} onClick={goRegister}>
+              Registrar adquisición
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className={styles.toolbar}>
-        <div className={styles.search}>
-          <FiSearch className={styles.searchIcon} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por folio, póliza, CFDI, clasificación, estado…"
-            aria-label="Buscar adquisición"
-          />
-        </div>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardTitle}>Registros</div>
+            <div className={styles.cardNote}>Ordenado por fecha más reciente</div>
+          </div>
 
-        <div className={styles.controls}>
-          <label className={styles.control}>
-            <span>Estado</span>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
-              <option value="Todos">Todos</option>
-              <option value="Completo">Completo</option>
-              <option value="Incompleto">Incompleto</option>
-            </select>
-          </label>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Póliza</th>
+                  <th>CFDI</th>
+                  <th>Clasificación</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th className={styles.thRight}>Acciones</th>
+                </tr>
+              </thead>
 
-          <label className={styles.control}>
-            <span>Tamaño</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageNumber(1);
-                setPageSize(Number(e.target.value));
-              }}
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className={styles.empty}>
+                      Cargando registros...
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className={styles.empty}>
+                      No se encontraron registros con esos criterios.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((r) => {
+                    const realEstado = calcStatus[r.idRequest];
+                    const shownEstado = realEstado ?? "Calculando…";
+
+                    const st = normalizeText(realEstado ?? "");
+                    const badgeClass =
+                      st === "completo"
+                        ? styles.badgeOk
+                        : st === "incompleto"
+                          ? styles.badgeBad
+                          : styles.badgeNeutral;
+
+                    const policyExists = hasPolicy(r.poliza);
+                    const cfdiExists = hasCfdi(r.cfdi);
+
+                    return (
+                      <tr key={r.idRequest}>
+                        <td className={styles.mono}>{r.folio}</td>
+
+                        <td>
+                          {policyExists ? (
+                            <button
+                              type="button"
+                              className={`${styles.policyBadge} ${styles.policyBadgeOk} ${styles.policyBadgeButton}`}
+                              title={`Ver póliza ${r.poliza}`}
+                              onClick={() => void openPolicyPreview(r.poliza)}
+                              disabled={loadingPreview}
+                            >
+                              {r.poliza}
+                            </button>
+                          ) : (
+                            <span
+                              className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
+                              title="Sin póliza asignada"
+                            >
+                              Sin póliza
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          {cfdiExists ? (
+                            <span
+                              className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
+                              title={r.cfdi}
+                            >
+                              {r.cfdi}
+                            </span>
+                          ) : (
+                            <span
+                              className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
+                              title="Sin CFDI asignado"
+                            >
+                              Sin CFDI
+                            </span>
+                          )}
+                        </td>
+
+                        <td className={styles.ellipsis} title={r.adquisicion}>
+                          {r.adquisicion}
+                        </td>
+
+                        <td className={styles.mono}>{r.fecha}</td>
+
+                        <td>
+                          <span className={`${styles.badge} ${badgeClass}`}>{shownEstado}</span>
+                        </td>
+
+                        <td className={styles.tdRight}>
+                          <button
+                            type="button"
+                            className={styles.linkBtn}
+                            onClick={() => goDetail(r.idRequest, r.adquisicion)}
+                            title={`Abrir expediente de solicitud ${r.idRequest}`}
+                          >
+                            Ver detalle
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={styles.pagination}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={loading || pageNumber === 1}
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </label>
+              Anterior
+            </button>
 
-          <button type="button" className={styles.primaryBtn} onClick={goRegister}>
-            Registrar adquisición
-          </button>
-        </div>
-      </div>
+            <div className={styles.pageInfo}>
+              Página <b>{pageNumber}</b>
+            </div>
 
-      <div className={styles.card}>
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitle}>Registros</div>
-          <div className={styles.cardNote}>Ordenado por fecha más reciente</div>
-        </div>
-
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Folio</th>
-                <th>Póliza</th>
-                <th>CFDI</th>
-                <th>Clasificación</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th className={styles.thRight}>Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className={styles.empty}>
-                    Cargando registros...
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={styles.empty}>
-                    No se encontraron registros con esos criterios.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => {
-                  const realEstado = calcStatus[r.idRequest];
-                  const shownEstado = realEstado ?? "Calculando…";
-
-                  const st = normalizeText(realEstado ?? "");
-                  const badgeClass =
-                    st === "completo"
-                      ? styles.badgeOk
-                      : st === "incompleto"
-                        ? styles.badgeBad
-                        : styles.badgeNeutral;
-
-                  const policyExists = hasPolicy(r.poliza);
-                  const cfdiExists = hasCfdi(r.cfdi);
-
-                  return (
-                    <tr key={r.idRequest}>
-                      <td className={styles.mono}>{r.folio}</td>
-
-                      <td>
-                        {policyExists ? (
-                          <span
-                            className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
-                            title={r.poliza}
-                          >
-                            {r.poliza}
-                          </span>
-                        ) : (
-                          <span
-                            className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
-                            title="Sin póliza asignada"
-                          >
-                            Sin póliza
-                          </span>
-                        )}
-                      </td>
-
-                      <td>
-                        {cfdiExists ? (
-                          <span
-                            className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
-                            title={r.cfdi}
-                          >
-                            {r.cfdi}
-                          </span>
-                        ) : (
-                          <span
-                            className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
-                            title="Sin CFDI asignado"
-                          >
-                            Sin CFDI
-                          </span>
-                        )}
-                      </td>
-
-                      <td className={styles.ellipsis} title={r.adquisicion}>
-                        {r.adquisicion}
-                      </td>
-
-                      <td className={styles.mono}>{r.fecha}</td>
-
-                      <td>
-                        <span className={`${styles.badge} ${badgeClass}`}>{shownEstado}</span>
-                      </td>
-
-                      <td className={styles.tdRight}>
-                        <button
-                          type="button"
-                          className={styles.linkBtn}
-                          onClick={() => goDetail(r.idRequest, r.adquisicion)}
-                          title={`Abrir expediente de solicitud ${r.idRequest}`}
-                        >
-                          Ver detalle
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className={styles.pagination}>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            disabled={loading || pageNumber === 1}
-            onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </button>
-
-          <div className={styles.pageInfo}>
-            Página <b>{pageNumber}</b>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={loading || !hasNext}
+              onClick={() => setPageNumber((p) => p + 1)}
+            >
+              Siguiente
+            </button>
           </div>
-
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            disabled={loading || !hasNext}
-            onClick={() => setPageNumber((p) => p + 1)}
-          >
-            Siguiente
-          </button>
         </div>
       </div>
+
+      {previewOpen && previewItem && (
+        <div
+          className={styles.previewOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Previsualización de póliza"
+          onClick={closePreview}
+        >
+          <div className={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.previewHeader}>
+              <div className={styles.previewHeaderInfo}>
+                <div className={styles.previewTitle}>Previsualización</div>
+                <div className={styles.previewName} title={previewItem.name}>
+                  {previewItem.name}
+                </div>
+              </div>
+
+              <div className={styles.previewActions}>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  onClick={() => openUrl(previewItem.url)}
+                >
+                  Abrir aparte
+                </button>
+
+                <button type="button" className={styles.ghostBtn} onClick={closePreview}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.previewBody}>
+              {previewItem.type === "pdf" && (
+                <div className={styles.previewPdfWrap}>
+                  <iframe
+                    src={`${previewItem.url}#view=FitH`}
+                    title={previewItem.name}
+                    className={styles.previewFrame}
+                  />
+                </div>
+              )}
+
+              {previewItem.type === "image" && (
+                <div className={styles.previewImageStage}>
+                  <img
+                    src={previewItem.url}
+                    alt={previewItem.name}
+                    className={styles.previewImage}
+                  />
+                </div>
+              )}
+
+              {previewItem.type === "other" && (
+                <div className={styles.previewFallback}>
+                  <div className={styles.previewFallbackTitle}>
+                    No se puede previsualizar este archivo aquí.
+                  </div>
+                  <div className={styles.previewFallbackText}>
+                    Puedes abrirlo en otra pestaña para verlo completo.
+                  </div>
+
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => openUrl(previewItem.url)}
+                  >
+                    Abrir archivo
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
