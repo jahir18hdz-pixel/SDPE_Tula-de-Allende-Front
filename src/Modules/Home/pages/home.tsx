@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
-import { FiSearch } from "react-icons/fi";
+import { FiSearch, FiTrash2 } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import { requestJson, authHeaders } from "../../../services/api";
@@ -77,7 +77,9 @@ function formatDate(iso?: string | null) {
 }
 
 function normalizeText(v: unknown) {
-  return String(v ?? "").trim().toLowerCase();
+  return String(v ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function getItemsFromUnknown<T>(value: unknown): T[] {
@@ -131,8 +133,12 @@ function normalizeChecklist(payload: unknown): ChecklistItem[] {
     .map((raw): ChecklistItem | null => {
       if (!isRecord(raw)) return null;
 
-      const documentTypeId = toNumber(raw["documentTypeId"] ?? raw["DocumentTypeId"]);
-      const documentName = toStringSafe(raw["documentName"] ?? raw["DocumentName"]).trim();
+      const documentTypeId = toNumber(
+        raw["documentTypeId"] ?? raw["DocumentTypeId"],
+      );
+      const documentName = toStringSafe(
+        raw["documentName"] ?? raw["DocumentName"],
+      ).trim();
 
       if (!documentTypeId || !documentName) return null;
 
@@ -159,7 +165,9 @@ function hasValidClassification(label: string) {
 }
 
 function computeCompletoFromChecklist(list: ChecklistItem[]) {
-  const missingRequired = list.some((x) => x.requiredByRule && !x.noApplies && !x.uploaded);
+  const missingRequired = list.some(
+    (x) => x.requiredByRule && !x.noApplies && !x.uploaded,
+  );
   return missingRequired ? "Incompleto" : "Completo";
 }
 
@@ -176,10 +184,13 @@ function hasCfdi(value: string) {
 function getExtensionFromSource(source: string) {
   const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
   const parts = clean.split(".");
-  return parts.length > 1 ? parts.pop() ?? "" : "";
+  return parts.length > 1 ? (parts.pop() ?? "") : "";
 }
 
-function getPreviewType(url: string, fileName?: string | null): "image" | "pdf" | "other" {
+function getPreviewType(
+  url: string,
+  fileName?: string | null,
+): "image" | "pdf" | "other" {
   const combined = `${fileName ?? ""} ${url}`.toLowerCase();
   const ext = getExtensionFromSource(combined);
 
@@ -224,10 +235,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [hasNext, setHasNext] = useState(false);
 
-  const [calcStatus, setCalcStatus] = useState<Record<number, "Completo" | "Incompleto">>({});
-  const statusCacheRef = useRef<Map<number, "Completo" | "Incompleto">>(new Map());
+  const [calcStatus, setCalcStatus] = useState<
+    Record<number, "Completo" | "Incompleto">
+  >({});
+  const statusCacheRef = useRef<Map<number, "Completo" | "Incompleto">>(
+    new Map(),
+  );
 
-  const [toast, setToast] = useState<{ open: boolean; type: ToastType; message: string }>({
+  const [toast, setToast] = useState<{
+    open: boolean;
+    type: ToastType;
+    message: string;
+  }>({
     open: false,
     type: "error",
     message: "",
@@ -236,6 +255,11 @@ export default function Home() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -275,7 +299,9 @@ export default function Home() {
           const cfdi = rawCfdi || "Sin CFDI";
 
           const adquisicion =
-            x.acquisitionClassification ?? x.AcquisitionClassification ?? "Sin clasificación";
+            x.acquisitionClassification ??
+            x.AcquisitionClassification ??
+            "Sin clasificación";
           const requestDate = x.requestDate ?? x.RequestDate ?? null;
           const estado = x.status ?? x.Status ?? "Sin estatus";
 
@@ -330,10 +356,13 @@ export default function Home() {
       await Promise.all(
         toFetch.map(async (requestId) => {
           try {
-            const res = (await requestJson(`${EXPEDIENT_API}/requests/${requestId}/checklist`, {
-              method: "GET",
-              headers: authHeaders(),
-            })) as RequestResult;
+            const res = (await requestJson(
+              `${EXPEDIENT_API}/requests/${requestId}/checklist`,
+              {
+                method: "GET",
+                headers: authHeaders(),
+              },
+            )) as RequestResult;
 
             if (!res.ok) return;
 
@@ -348,7 +377,7 @@ export default function Home() {
           } catch {
             // no bloquea la UI si falla
           }
-        })
+        }),
       );
     }
 
@@ -373,7 +402,11 @@ export default function Home() {
   const openPolicyPreview = useCallback(async (policyCode: string) => {
     const code = policyCode.trim();
 
-    if (!code || code.toLowerCase() === "sin póliza" || code.toLowerCase() === "sin poliza") {
+    if (
+      !code ||
+      code.toLowerCase() === "sin póliza" ||
+      code.toLowerCase() === "sin poliza"
+    ) {
       setToast({
         open: true,
         type: "error",
@@ -385,10 +418,13 @@ export default function Home() {
     setLoadingPreview(true);
 
     try {
-      const res = (await requestJson(`${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`, {
-        method: "GET",
-        headers: authHeaders(),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`,
+        {
+          method: "GET",
+          headers: authHeaders(),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
         setToast({
@@ -403,7 +439,9 @@ export default function Home() {
 
       const found =
         list.find((x) => {
-          const currentCode = (x.policyCode ?? x.PolicyCode ?? "").trim().toLowerCase();
+          const currentCode = (x.policyCode ?? x.PolicyCode ?? "")
+            .trim()
+            .toLowerCase();
           return currentCode === code.toLowerCase();
         }) ?? null;
 
@@ -416,7 +454,9 @@ export default function Home() {
         return;
       }
 
-      const previewUrl = normalizeUrlMaybe(found.previewUrl ?? found.PreviewUrl ?? "");
+      const previewUrl = normalizeUrlMaybe(
+        found.previewUrl ?? found.PreviewUrl ?? "",
+      );
       if (!previewUrl) {
         setToast({
           open: true,
@@ -444,32 +484,113 @@ export default function Home() {
     }
   }, []);
 
+  const openDeleteModal = useCallback((row: Row) => {
+    setDeleteTarget(row);
+    setDeletePassword("");
+    setDeleteModalOpen(true);
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    if (deleting) return;
+    setDeleteModalOpen(false);
+    setDeleteTarget(null);
+    setDeletePassword("");
+  }, [deleting]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+
+    const password = deletePassword.trim();
+    if (!password) {
+      setToast({
+        open: true,
+        type: "error",
+        message: "Ingresa la contraseña para confirmar la eliminación.",
+      });
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const res = (await requestJson(`${API_BASE}/${deleteTarget.idRequest}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          password,
+        }),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setToast({
+          open: true,
+          type: "error",
+          message: res.error || "No se pudo eliminar la adquisición.",
+        });
+        return;
+      }
+
+      setToast({
+        open: true,
+        type: "success",
+        message: `La adquisición ${deleteTarget.folio} se eliminó correctamente.`,
+      });
+
+      closeDeleteModal();
+
+      statusCacheRef.current.delete(deleteTarget.idRequest);
+      setCalcStatus((prev) => {
+        const copy = { ...prev };
+        delete copy[deleteTarget.idRequest];
+        return copy;
+      });
+
+      await fetchData();
+    } catch {
+      setToast({
+        open: true,
+        type: "error",
+        message: "Error inesperado al eliminar la adquisición.",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }, [deletePassword, deleteTarget, closeDeleteModal, fetchData]);
+
   useEffect(() => {
-    if (!previewOpen) return;
+    if (!previewOpen && !deleteModalOpen) return;
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closePreview();
+      if (e.key === "Escape") {
+        if (deleteModalOpen) {
+          closeDeleteModal();
+          return;
+        }
+
+        if (previewOpen) {
+          closePreview();
+        }
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [previewOpen, closePreview]);
+  }, [previewOpen, deleteModalOpen, closePreview, closeDeleteModal]);
 
   const filtered = useMemo(() => {
-    const q = normalizeText(query);
-    let list = rows;
+  const q = normalizeText(query);
+  let list = [...rows];
 
-    if (statusFilter !== "Todos") {
-      const wanted = normalizeText(statusFilter);
-      list = list.filter((r) => {
-        const real = calcStatus[r.idRequest] ?? (r.estado as "Completo" | "Incompleto" | string);
-        return normalizeText(real) === wanted;
-      });
-    }
+  if (statusFilter !== "Todos") {
+    const wanted = normalizeText(statusFilter);
+    list = list.filter((r) => {
+      const real = calcStatus[r.idRequest] ?? (r.estado as "Completo" | "Incompleto" | string);
+      return normalizeText(real) === wanted;
+    });
+  }
 
-    if (!q) return list;
-
-    return list.filter((r) => {
+  if (q) {
+    list = list.filter((r) => {
       const real = calcStatus[r.idRequest] ?? r.estado;
 
       return (
@@ -481,14 +602,34 @@ export default function Home() {
         normalizeText(real).includes(q)
       );
     });
-  }, [rows, query, statusFilter, calcStatus]);
+  }
+
+  list.sort((a, b) => {
+    const statusA = normalizeText(calcStatus[a.idRequest] ?? a.estado);
+    const statusB = normalizeText(calcStatus[b.idRequest] ?? b.estado);
+
+    const aIsComplete = statusA === "completo";
+    const bIsComplete = statusB === "completo";
+
+    if (aIsComplete !== bIsComplete) {
+      return aIsComplete ? 1 : -1;
+    }
+
+    const dateA = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
+    const dateB = b.requestDateRaw ? new Date(b.requestDateRaw).getTime() : 0;
+
+    return dateB - dateA;
+  });
+
+  return list;
+}, [rows, query, statusFilter, calcStatus]);
 
   const kpiTotal = filtered.length;
   const kpiCompleto = filtered.filter(
-    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "completo"
+    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "completo",
   ).length;
   const kpiIncompleto = filtered.filter(
-    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "incompleto"
+    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "incompleto",
   ).length;
 
   function goRegister() {
@@ -509,15 +650,28 @@ export default function Home() {
     navigate(`/adquisiciones/${idRequest}/expediente`);
   }
 
-  return (
-    <div className={`${styles.page} ${previewOpen ? styles.pageLocked : ""}`}>
-      <Toast open={toast.open} type={toast.type} message={toast.message} onClose={closeToast} />
+  const isAnyModalOpen = previewOpen || deleteModalOpen;
 
-      <div className={`${styles.mainContent} ${previewOpen ? styles.mainContentBlurred : ""}`}>
+  return (
+    <div
+      className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}
+    >
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
+
+      <div
+        className={`${styles.mainContent} ${isAnyModalOpen ? styles.mainContentBlurred : ""}`}
+      >
         <div className={styles.topbar}>
           <div className={styles.topbarLeft}>
             <h1 className={styles.title}>Adquisiciones</h1>
-            <p className={styles.subtitle}>Consulta y gestiona solicitudes registradas.</p>
+            <p className={styles.subtitle}>
+              Consulta y gestiona solicitudes registradas.
+            </p>
           </div>
 
           <div className={styles.kpis}>
@@ -552,7 +706,9 @@ export default function Home() {
               <span>Estado</span>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
               >
                 <option value="Todos">Todos</option>
                 <option value="Completo">Completo</option>
@@ -575,7 +731,11 @@ export default function Home() {
               </select>
             </label>
 
-            <button type="button" className={styles.primaryBtn} onClick={goRegister}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={goRegister}
+            >
               Registrar adquisición
             </button>
           </div>
@@ -584,7 +744,9 @@ export default function Home() {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardTitle}>Registros</div>
-            <div className={styles.cardNote}>Ordenado por fecha más reciente</div>
+            <div className={styles.cardNote}>
+              Ordenado por fecha más reciente
+            </div>
           </div>
 
           <div className={styles.tableWrap}>
@@ -679,19 +841,35 @@ export default function Home() {
 
                         <td className={styles.mono}>{r.fecha}</td>
 
-                        <td>
-                          <span className={`${styles.badge} ${badgeClass}`}>{shownEstado}</span>
+                        <td className={styles.statusCell}>
+                          <span className={`${styles.badge} ${badgeClass}`}>
+                            {shownEstado}
+                          </span>
                         </td>
 
                         <td className={styles.tdRight}>
-                          <button
-                            type="button"
-                            className={styles.linkBtn}
-                            onClick={() => goDetail(r.idRequest, r.adquisicion)}
-                            title={`Abrir expediente de solicitud ${r.idRequest}`}
-                          >
-                            Ver detalle
-                          </button>
+                          <div className={styles.actionsCell}>
+                            <button
+                              type="button"
+                              className={styles.linkBtn}
+                              onClick={() =>
+                                goDetail(r.idRequest, r.adquisicion)
+                              }
+                              title={`Abrir expediente de solicitud ${r.idRequest}`}
+                            >
+                              Ver detalle
+                            </button>
+
+                            <button
+                              type="button"
+                              className={styles.deleteIconBtn}
+                              onClick={() => openDeleteModal(r)}
+                              title={`Eliminar solicitud ${r.folio}`}
+                              aria-label={`Eliminar solicitud ${r.folio}`}
+                            >
+                              <FiTrash2 />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -735,7 +913,10 @@ export default function Home() {
           aria-label="Previsualización de póliza"
           onClick={closePreview}
         >
-          <div className={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.previewModal}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.previewHeader}>
               <div className={styles.previewHeaderInfo}>
                 <div className={styles.previewTitle}>Previsualización</div>
@@ -753,7 +934,11 @@ export default function Home() {
                   Abrir aparte
                 </button>
 
-                <button type="button" className={styles.ghostBtn} onClick={closePreview}>
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={closePreview}
+                >
                   Cerrar
                 </button>
               </div>
@@ -798,6 +983,173 @@ export default function Home() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModalOpen && deleteTarget && (
+        <div
+          className={styles.confirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminación"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.confirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.confirmHeader}>
+              <h3 className={styles.confirmTitle}>Confirmar eliminación</h3>
+              <p className={styles.confirmText}>
+                Vas a eliminar la adquisición <b>{deleteTarget.folio}</b>. Esta
+                acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className={styles.confirmBody}>
+              <label className={styles.confirmField}>
+                <span>Contraseña</span>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  autoFocus
+                />
+              </label>
+            </div>
+
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => void confirmDelete()}
+                disabled={deleting}
+              >
+                {deleting ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteModalOpen && deleteTarget && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminación"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12M10 11v6M14 11v6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>
+                  Confirmar eliminación
+                </div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Esta acción eliminará la adquisición seleccionada.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Folio</div>
+                <div
+                  className={styles.deleteFileName}
+                  title={deleteTarget.folio}
+                >
+                  {deleteTarget.folio}
+                </div>
+              </div>
+
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Clasificación</div>
+                <div
+                  className={styles.deleteFileName}
+                  title={deleteTarget.adquisicion}
+                >
+                  {deleteTarget.adquisicion}
+                </div>
+              </div>
+
+              <div className={styles.deleteFormField}>
+                <label className={styles.deleteFieldLabel}>Contraseña</label>
+                <input
+                  type="password"
+                  className={styles.deleteInput}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  disabled={deleting}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !deleting &&
+                      deletePassword.trim()
+                    ) {
+                      void confirmDelete();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Esta acción no se puede deshacer.
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => void confirmDelete()}
+                disabled={deleting || !deletePassword.trim()}
+              >
+                {deleting ? "Eliminando..." : "Eliminar adquisición"}
+              </button>
             </div>
           </div>
         </div>

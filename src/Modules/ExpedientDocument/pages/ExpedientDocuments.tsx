@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import styles from "../styles/ExpedientDocuments.module.css";
 
@@ -105,7 +111,7 @@ function unwrapList(payload: unknown): unknown[] {
       payload["data"] ??
       payload["Data"] ??
       payload["result"] ??
-      payload["Result"]
+      payload["Result"],
   );
 }
 
@@ -142,10 +148,13 @@ function toStringArray(v: unknown): string[] {
 function getExtensionFromSource(source: string) {
   const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
   const parts = clean.split(".");
-  return parts.length > 1 ? parts.pop() ?? "" : "";
+  return parts.length > 1 ? (parts.pop() ?? "") : "";
 }
 
-function getPreviewType(url: string, fileName?: string | null): "image" | "pdf" | "other" {
+function getPreviewType(
+  url: string,
+  fileName?: string | null,
+): "image" | "pdf" | "other" {
   const combined = `${fileName ?? ""} ${url}`.toLowerCase();
   const ext = getExtensionFromSource(combined);
 
@@ -183,14 +192,14 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
         raw["documentTypeId"] ??
           raw["DocumentTypeId"] ??
           raw["idDocumentType"] ??
-          raw["IdDocumentType"]
+          raw["IdDocumentType"],
       );
 
       const documentName = toStringSafe(
         raw["documentName"] ??
           raw["DocumentName"] ??
           raw["documentTypeName"] ??
-          raw["DocumentTypeName"]
+          raw["DocumentTypeName"],
       ).trim();
 
       if (!documentTypeId || !documentName) return null;
@@ -201,7 +210,7 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
           raw["isRequired"] ??
           raw["IsRequired"] ??
           raw["obligatorio"] ??
-          raw["Obligatorio"]
+          raw["Obligatorio"],
       );
 
       const noApplies = toBool(
@@ -210,7 +219,7 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
           raw["noAplica"] ??
           raw["NoAplica"] ??
           raw["doesNotApply"] ??
-          raw["DoesNotApply"]
+          raw["DoesNotApply"],
       );
 
       const uploaded = toBool(
@@ -219,7 +228,7 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
           raw["hasFile"] ??
           raw["HasFile"] ??
           raw["active"] ??
-          raw["Active"]
+          raw["Active"],
       );
 
       const observations =
@@ -228,13 +237,15 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
       const fileIdsRaw = asArray(raw["fileIds"] ?? raw["FileIds"]);
       const fileNames = toStringArray(raw["fileNames"] ?? raw["FileNames"]);
       const fileUrls = toStringArray(raw["fileUrls"] ?? raw["FileUrls"]);
-      const previewUrls = toStringArray(raw["previewUrls"] ?? raw["PreviewUrls"]);
+      const previewUrls = toStringArray(
+        raw["previewUrls"] ?? raw["PreviewUrls"],
+      );
 
       const maxLen = Math.max(
         fileIdsRaw.length,
         fileNames.length,
         fileUrls.length,
-        previewUrls.length
+        previewUrls.length,
       );
 
       const files: ChecklistFileItem[] = Array.from({ length: maxLen }, (_, i) => {
@@ -301,7 +312,10 @@ export default function ExpedientDocuments() {
   const params = useParams();
 
   const requestId = useMemo(() => {
-    const raw = (params.id ?? params.requestId ?? params.requestID ?? "") as string;
+    const raw = (params.id ??
+      params.requestId ??
+      params.requestID ??
+      "") as string;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [params]);
@@ -330,10 +344,17 @@ export default function ExpedientDocuments() {
   const [autoPlay, setAutoPlay] = useState(true);
   const [deletingPreview, setDeletingPreview] = useState(false);
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PreviewItem | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+
   const [managerPanelOpen, setManagerPanelOpen] = useState(false);
   const [savingManager, setSavingManager] = useState(false);
-  const [loadingAdministrativeUnits, setLoadingAdministrativeUnits] = useState(false);
-  const [administrativeUnits, setAdministrativeUnits] = useState<AdministrativeUnitOption[]>([]);
+  const [loadingAdministrativeUnits, setLoadingAdministrativeUnits] =
+    useState(false);
+  const [administrativeUnits, setAdministrativeUnits] = useState<
+    AdministrativeUnitOption[]
+  >([]);
   const [managerForm, setManagerForm] = useState<ManagerFormState>({
     idRequestManager: null,
     idAdministrativeUnit: null,
@@ -347,7 +368,9 @@ export default function ExpedientDocuments() {
   const [policyPanelOpen, setPolicyPanelOpen] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [loadingPolicies, setLoadingPolicies] = useState(false);
-  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>([]);
+  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>(
+    [],
+  );
   const [policyForm, setPolicyForm] = useState<PolicyFormState>({
     idPaymentPolicy: null,
   });
@@ -360,7 +383,9 @@ export default function ExpedientDocuments() {
 
   const [checklistPanelOpen, setChecklistPanelOpen] = useState(false);
   const [savingChecklist, setSavingChecklist] = useState(false);
-  const [checklistExceptionRows, setChecklistExceptionRows] = useState<ChecklistExceptionRow[]>([]);
+  const [checklistExceptionRows, setChecklistExceptionRows] = useState<
+    ChecklistExceptionRow[]
+  >([]);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -381,7 +406,7 @@ export default function ExpedientDocuments() {
       }
       window.open(url, "_blank", "noopener,noreferrer");
     },
-    [showToast]
+    [showToast],
   );
 
   const closePreview = useCallback(() => {
@@ -389,6 +414,9 @@ export default function ExpedientDocuments() {
     setPreviewItems([]);
     setPreviewIndex(0);
     setAutoPlay(true);
+    setDeleteModalOpen(false);
+    setDeleteTarget(null);
+    setDeletePassword("");
   }, []);
 
   const closeManagerPanel = useCallback(() => {
@@ -406,6 +434,30 @@ export default function ExpedientDocuments() {
   const closeChecklistPanel = useCallback(() => {
     setChecklistPanelOpen(false);
   }, []);
+
+  const openDeleteModal = useCallback(
+    (item: PreviewItem) => {
+      if (!item.id) {
+        showToast(
+          "error",
+          "No se puede eliminar este archivo porque no tiene identificador.",
+        );
+        return;
+      }
+
+      setDeleteTarget(item);
+      setDeletePassword("");
+      setDeleteModalOpen(true);
+    },
+    [showToast],
+  );
+
+  const closeDeleteModal = useCallback(() => {
+    if (deletingPreview) return;
+    setDeleteModalOpen(false);
+    setDeleteTarget(null);
+    setDeletePassword("");
+  }, [deletingPreview]);
 
   const loadRequestDetail = useCallback(async () => {
     if (!canUse) return;
@@ -433,7 +485,7 @@ export default function ExpedientDocuments() {
                 data["numeroSolicitud"] ??
                 data["NumeroSolicitud"] ??
                 data["folio"] ??
-                data["Folio"]
+                data["Folio"],
             )
           : ""
         ).trim() || "";
@@ -444,14 +496,16 @@ export default function ExpedientDocuments() {
               data["policyNumber"] ??
                 data["PolicyNumber"] ??
                 data["paymentPolicy"] ??
-                data["PaymentPolicy"]
+                data["PaymentPolicy"],
             )
           : ""
         ).trim() || "";
 
       const cfdiValue =
         (isRecord(data)
-          ? toStringSafe(data["cfdi"] ?? data["CFDI"] ?? data["cdfi"] ?? data["CDFI"])
+          ? toStringSafe(
+              data["cfdi"] ?? data["CFDI"] ?? data["cdfi"] ?? data["CDFI"],
+            )
           : ""
         ).trim() || "";
 
@@ -485,7 +539,9 @@ export default function ExpedientDocuments() {
       let found: UnknownRecord | null =
         (list.find((x) => {
           if (!isRecord(x)) return false;
-          const rn = toStringSafe(x["requestNumber"] ?? x["RequestNumber"]).trim();
+          const rn = toStringSafe(
+            x["requestNumber"] ?? x["RequestNumber"],
+          ).trim();
           return rn === String(requestId);
         }) as UnknownRecord) ?? null;
 
@@ -493,7 +549,9 @@ export default function ExpedientDocuments() {
         found =
           (list.find((x) => {
             if (!isRecord(x)) return false;
-            const rn = toStringSafe(x["requestNumber"] ?? x["RequestNumber"]).trim();
+            const rn = toStringSafe(
+              x["requestNumber"] ?? x["RequestNumber"],
+            ).trim();
             return rn === requestNumber;
           }) as UnknownRecord) ?? null;
       }
@@ -503,14 +561,23 @@ export default function ExpedientDocuments() {
         return;
       }
 
-      const idRequestManager = toNumber(found["idRequestManager"] ?? found["IdRequestManager"]);
-      const fullName = toStringSafe(found["fullName"] ?? found["FullName"]).trim();
+      const idRequestManager = toNumber(
+        found["idRequestManager"] ?? found["IdRequestManager"],
+      );
+      const fullName = toStringSafe(
+        found["fullName"] ?? found["FullName"],
+      ).trim();
       const administrativeUnit =
-        toStringSafe(found["administrativeUnit"] ?? found["AdministrativeUnit"]).trim() || null;
+        toStringSafe(
+          found["administrativeUnit"] ?? found["AdministrativeUnit"],
+        ).trim() || null;
       const reqNum =
-        toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() || null;
-      const email = toStringSafe(found["email"] ?? found["Email"]).trim() || null;
-      const phone = toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
+        toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() ||
+        null;
+      const email =
+        toStringSafe(found["email"] ?? found["Email"]).trim() || null;
+      const phone =
+        toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
 
       if (!idRequestManager || !fullName) {
         setManager(null);
@@ -537,10 +604,13 @@ export default function ExpedientDocuments() {
 
     setLoadingChecklist(true);
     try {
-      const res = (await requestJson(`${EXPEDIENT_API}/requests/${requestId}/checklist`, {
-        method: "GET",
-        headers: authHeaders(),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${EXPEDIENT_API}/requests/${requestId}/checklist`,
+        {
+          method: "GET",
+          headers: authHeaders(),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
         setChecklist([]);
@@ -555,13 +625,18 @@ export default function ExpedientDocuments() {
         const bRequiredApplies = b.requiredByRule && !b.noApplies;
 
         if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
-        if (aRequiredApplies !== bRequiredApplies) return aRequiredApplies ? -1 : 1;
+        if (aRequiredApplies !== bRequiredApplies)
+          return aRequiredApplies ? -1 : 1;
 
         if (aRequiredApplies && bRequiredApplies && a.uploaded !== b.uploaded) {
           return a.uploaded ? 1 : -1;
         }
 
-        if (!aRequiredApplies && !bRequiredApplies && a.uploaded !== b.uploaded) {
+        if (
+          !aRequiredApplies &&
+          !bRequiredApplies &&
+          a.uploaded !== b.uploaded
+        ) {
           return a.uploaded ? 1 : -1;
         }
 
@@ -593,19 +668,16 @@ export default function ExpedientDocuments() {
   }, [canUse, loadChecklist]);
 
   const stats = useMemo(() => {
-    const required = checklist.filter((x) => x.requiredByRule && !x.noApplies).length;
+    const required = checklist.filter(
+      (x) => x.requiredByRule && !x.noApplies,
+    ).length;
     const uploadedOk = checklist.filter((x) => x.uploaded).length;
     const requiredUploaded = checklist.filter(
-      (x) => x.requiredByRule && !x.noApplies && x.uploaded
+      (x) => x.requiredByRule && !x.noApplies && x.uploaded,
     ).length;
     const missingRequired = Math.max(0, required - requiredUploaded);
     return { required, uploadedOk, requiredUploaded, missingRequired };
   }, [checklist]);
-
-  const missingRequiredList = useMemo(
-    () => checklist.filter((x) => x.requiredByRule && !x.noApplies && !x.uploaded),
-    [checklist]
-  );
 
   const filteredChecklist = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -675,7 +747,7 @@ export default function ExpedientDocuments() {
 
       setPreviewOpen(true);
     },
-    [showToast]
+    [showToast],
   );
 
   const goPrevPreview = useCallback(() => {
@@ -693,21 +765,20 @@ export default function ExpedientDocuments() {
   }, [previewItems.length]);
 
   const onDeletePreviewDocumentByItem = useCallback(
-    async (item: PreviewItem) => {
+    async (item: PreviewItem, password: string) => {
       if (!item.id) {
-        showToast("error", "No se puede eliminar este archivo porque no tiene identificador.");
+        showToast(
+          "error",
+          "No se puede eliminar este archivo porque no tiene identificador.",
+        );
         return;
       }
 
-      const confirmed = window.confirm(
-        `¿Seguro que deseas eliminar el archivo "${item.name}"?`
-      );
-
-      if (!confirmed) return;
-
-      const password = window.prompt("Ingresa tu contraseña para confirmar la eliminación:");
-      if (!password || !password.trim()) {
-        showToast("error", "Debes capturar la contraseña para eliminar el archivo.");
+      if (!password.trim()) {
+        showToast(
+          "error",
+          "Debes capturar la contraseña para eliminar el archivo.",
+        );
         return;
       }
 
@@ -735,10 +806,15 @@ export default function ExpedientDocuments() {
           const removedIndex = previewItems.findIndex((x) => x.id === item.id);
           setPreviewItems(nextItems);
           setPreviewIndex((prev) => {
-            const safePrev = removedIndex >= 0 ? Math.min(prev, removedIndex) : prev;
+            const safePrev =
+              removedIndex >= 0 ? Math.min(prev, removedIndex) : prev;
             return Math.max(0, Math.min(safePrev, nextItems.length - 1));
           });
         }
+
+        setDeleteModalOpen(false);
+        setDeleteTarget(null);
+        setDeletePassword("");
 
         await loadChecklist();
       } catch {
@@ -747,38 +823,55 @@ export default function ExpedientDocuments() {
         setDeletingPreview(false);
       }
     },
-    [previewItems, closePreview, loadChecklist, showToast]
+    [previewItems, closePreview, loadChecklist, showToast],
   );
-
-  const onDeleteCurrentPreview = useCallback(async () => {
-    if (!currentPreview) return;
-    await onDeletePreviewDocumentByItem(currentPreview);
-  }, [currentPreview, onDeletePreviewDocumentByItem]);
 
   useEffect(() => {
     if (!previewOpen) return;
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closePreview();
-      if (e.key === "ArrowLeft" && canMovePreview) goPrevPreview();
-      if (e.key === "ArrowRight" && canMovePreview) goNextPreview();
+      if (e.key === "Escape") {
+        if (deleteModalOpen) {
+          closeDeleteModal();
+          return;
+        }
+        closePreview();
+      }
+      if (e.key === "ArrowLeft" && canMovePreview && !deleteModalOpen)
+        goPrevPreview();
+      if (e.key === "ArrowRight" && canMovePreview && !deleteModalOpen)
+        goNextPreview();
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [previewOpen, closePreview, canMovePreview, goPrevPreview, goNextPreview]);
+  }, [
+    previewOpen,
+    deleteModalOpen,
+    closeDeleteModal,
+    closePreview,
+    canMovePreview,
+    goPrevPreview,
+    goNextPreview,
+  ]);
 
   useEffect(() => {
-    if (!previewOpen || !autoPlay || !isImagePreview || previewItems.length <= 1) return;
+    if (
+      !previewOpen ||
+      !autoPlay ||
+      !isImagePreview ||
+      previewItems.length <= 1 ||
+      deleteModalOpen
+    ) {
+      return;
+    }
 
     const timer = window.setInterval(() => {
       setPreviewIndex((prev) => (prev + 1) % previewItems.length);
     }, 3000);
 
     return () => window.clearInterval(timer);
-  }, [previewOpen, autoPlay, isImagePreview, previewItems.length]);
-
-  const canUpload = canUse && uploads.length > 0 && !uploading;
+  }, [previewOpen, autoPlay, isImagePreview, previewItems.length, deleteModalOpen]);
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files);
@@ -807,7 +900,9 @@ export default function ExpedientDocuments() {
 
   function onBindFromChecklist(uploadIdx: number, docTypeId: number) {
     setUploads((prev) =>
-      prev.map((u, i) => (i === uploadIdx ? { ...u, documentTypeId: docTypeId } : u))
+      prev.map((u, i) =>
+        i === uploadIdx ? { ...u, documentTypeId: docTypeId } : u,
+      ),
     );
   }
 
@@ -842,7 +937,7 @@ export default function ExpedientDocuments() {
     if (invalidRow) {
       showToast(
         "error",
-        `Captura la justificación del documento "${invalidRow.documentName}".`
+        `Captura la justificación del documento "${invalidRow.documentName}".`,
       );
       return;
     }
@@ -859,14 +954,20 @@ export default function ExpedientDocuments() {
         })),
       };
 
-      const res = (await requestJson(`${REQUEST_DOCUMENT_EXCEPTION_API}/toggle`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(payload),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${REQUEST_DOCUMENT_EXCEPTION_API}/toggle`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
-        showToast("error", res.error || "No se pudo guardar la edición del checklist.");
+        showToast(
+          "error",
+          res.error || "No se pudo guardar la edición del checklist.",
+        );
         return;
       }
 
@@ -874,7 +975,10 @@ export default function ExpedientDocuments() {
       setChecklistPanelOpen(false);
       await loadChecklist();
     } catch {
-      showToast("error", "Error inesperado al guardar la edición del checklist.");
+      showToast(
+        "error",
+        "Error inesperado al guardar la edición del checklist.",
+      );
     } finally {
       setSavingChecklist(false);
     }
@@ -904,14 +1008,14 @@ export default function ExpedientDocuments() {
                 raw["idAdministrativeUnit"] ??
                   raw["IdAdministrativeUnit"] ??
                   raw["id"] ??
-                  raw["Id"]
+                  raw["Id"],
               );
 
               const description = toStringSafe(
                 raw["description"] ??
                   raw["Description"] ??
                   raw["descripcion"] ??
-                  raw["Descripcion"]
+                  raw["Descripcion"],
               ).trim();
 
               if (!idAdministrativeUnit || !description) return null;
@@ -936,7 +1040,7 @@ export default function ExpedientDocuments() {
         units.find(
           (u) =>
             u.description.trim().toLowerCase() ===
-            (manager.administrativeUnit ?? "").trim().toLowerCase()
+            (manager.administrativeUnit ?? "").trim().toLowerCase(),
         ) ?? null;
 
       setManagerForm({
@@ -971,10 +1075,13 @@ export default function ExpedientDocuments() {
     if (policies.length === 0) {
       setLoadingPolicies(true);
       try {
-        const res = (await requestJson(`${PAYMENT_POLICY_API}/available-policies`, {
-          method: "GET",
-          headers: authHeaders(),
-        })) as RequestResult;
+        const res = (await requestJson(
+          `${PAYMENT_POLICY_API}/available-policies`,
+          {
+            method: "GET",
+            headers: authHeaders(),
+          },
+        )) as RequestResult;
 
         if (res.ok) {
           const list = unwrapList(res.data);
@@ -987,11 +1094,14 @@ export default function ExpedientDocuments() {
                 raw["idPaymentPolicy"] ??
                   raw["IdPaymentPolicy"] ??
                   raw["id"] ??
-                  raw["Id"]
+                  raw["Id"],
               );
 
               const policyCode = toStringSafe(
-                raw["policyCode"] ?? raw["PolicyCode"] ?? raw["code"] ?? raw["Code"]
+                raw["policyCode"] ??
+                  raw["PolicyCode"] ??
+                  raw["code"] ??
+                  raw["Code"],
               ).trim();
 
               const description =
@@ -999,7 +1109,7 @@ export default function ExpedientDocuments() {
                   raw["description"] ??
                     raw["Description"] ??
                     raw["name"] ??
-                    raw["Name"]
+                    raw["Name"],
                 ).trim() || null;
 
               if (!idPaymentPolicy || !policyCode) return null;
@@ -1023,7 +1133,9 @@ export default function ExpedientDocuments() {
 
     const matchedPolicy =
       policies.find(
-        (p) => p.policyCode.trim().toLowerCase() === policyNumber.trim().toLowerCase()
+        (p) =>
+          p.policyCode.trim().toLowerCase() ===
+          policyNumber.trim().toLowerCase(),
       ) ?? null;
 
     setPolicyForm({
@@ -1100,7 +1212,9 @@ export default function ExpedientDocuments() {
 
       showToast(
         "success",
-        managerForm.idRequestManager ? "Responsable actualizado." : "Responsable asignado."
+        managerForm.idRequestManager
+          ? "Responsable actualizado."
+          : "Responsable asignado.",
       );
 
       setManagerPanelOpen(false);
@@ -1126,11 +1240,14 @@ export default function ExpedientDocuments() {
     setSavingPolicy(true);
 
     try {
-      const res = (await requestJson(`${REQUEST_DETAIL_API}/${requestId}/payment-policy`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(policyForm.idPaymentPolicy),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${REQUEST_DETAIL_API}/${requestId}/payment-policy`,
+        {
+          method: "PATCH",
+          headers: authHeaders(),
+          body: JSON.stringify(policyForm.idPaymentPolicy),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
         showToast("error", res.error || "No se pudo guardar la póliza.");
@@ -1161,11 +1278,14 @@ export default function ExpedientDocuments() {
     setSavingCfdi(true);
 
     try {
-      const res = (await requestJson(`${REQUEST_DETAIL_API}/${requestId}/CFDI`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(cfdiForm.cfdi.trim()),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${REQUEST_DETAIL_API}/${requestId}/CFDI`,
+        {
+          method: "PATCH",
+          headers: authHeaders(),
+          body: JSON.stringify(cfdiForm.cfdi.trim()),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
         showToast("error", res.error || "No se pudo guardar el CFDI.");
@@ -1195,7 +1315,10 @@ export default function ExpedientDocuments() {
 
     const unassigned = uploads.filter((u) => !u.documentTypeId).length;
     if (unassigned > 0) {
-      showToast("error", `Faltan ${unassigned} archivo(s) por asignar a un tipo de documento.`);
+      showToast(
+        "error",
+        `Faltan ${unassigned} archivo(s) por asignar a un tipo de documento.`,
+      );
       return;
     }
 
@@ -1232,7 +1355,10 @@ export default function ExpedientDocuments() {
 
       await loadChecklist();
     } catch (e: unknown) {
-      showToast("error", e instanceof Error ? e.message : "Error inesperado al subir archivos.");
+      showToast(
+        "error",
+        e instanceof Error ? e.message : "Error inesperado al subir archivos.",
+      );
     } finally {
       setUploading(false);
     }
@@ -1246,7 +1372,9 @@ export default function ExpedientDocuments() {
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        addFiles(e.dataTransfer.files);
+      }
     },
   };
 
@@ -1260,7 +1388,9 @@ export default function ExpedientDocuments() {
         durationMs={3200}
       />
 
-      <div className={`${styles.mainContent} ${previewOpen ? styles.mainContentBlurred : ""}`}>
+      <div
+        className={`${styles.mainContent} ${previewOpen ? styles.mainContentBlurred : ""}`}
+      >
         <div className={styles.topActionsBar}>
           <button
             type="button"
@@ -1269,7 +1399,13 @@ export default function ExpedientDocuments() {
             title="Regresar"
             aria-label="Regresar"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
               <path
                 d="M15 18l-6-6 6-6"
                 stroke="currentColor"
@@ -1292,10 +1428,30 @@ export default function ExpedientDocuments() {
               />
 
               {searchText.trim() !== "" && (
-                <button type="button" className={styles.ghostBtn} onClick={() => setSearchText("")}>
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={() => setSearchText("")}
+                >
                   Limpiar
                 </button>
               )}
+            </div>
+
+            <div className={styles.headerStatsInline}>
+              <div className={styles.statsBoxOk}>
+                <span className={styles.statsInlineLabel}>Cargados:</span>
+                <span className={styles.statsHeaderValue}>
+                  {stats.uploadedOk}
+                </span>
+              </div>
+
+              <div className={styles.statsBoxBad}>
+                <span className={styles.statsInlineLabel}>Faltan:</span>
+                <span className={styles.statsHeaderValue}>
+                  {stats.missingRequired}
+                </span>
+              </div>
             </div>
 
             <button
@@ -1318,13 +1474,17 @@ export default function ExpedientDocuments() {
                 <div className={styles.cardNoteInline}>
                   <div className={styles.inlineInfoGroup}>
                     <div className={styles.managerBox}>
-                      <span className={styles.managerInlineLabel}>Responsable:</span>
+                      <span className={styles.managerInlineLabel}>
+                        Responsable:
+                      </span>
 
                       <span
                         className={styles.managerHeaderName}
                         title={getManagerDisplayName(manager)}
                       >
-                        {loadingManager ? "Cargando..." : getManagerDisplayName(manager)}
+                        {loadingManager
+                          ? "Cargando..."
+                          : getManagerDisplayName(manager)}
                       </span>
 
                       <button
@@ -1353,14 +1513,19 @@ export default function ExpedientDocuments() {
                         onClick={() => void openPolicyPanel()}
                         disabled={!canUse || savingPolicy}
                       >
-                        {policyNumber?.trim() ? "Editar póliza" : "Agregar póliza"}
+                        {policyNumber?.trim()
+                          ? "Editar póliza"
+                          : "Agregar póliza"}
                       </button>
                     </div>
 
                     <div className={styles.cfdiBox}>
                       <span className={styles.cfdiInlineLabel}>CFDI:</span>
 
-                      <span className={styles.cfdiHeaderName} title={cfdi?.trim() || "Sin CFDI"}>
+                      <span
+                        className={styles.cfdiHeaderName}
+                        title={cfdi?.trim() || "Sin CFDI"}
+                      >
                         {cfdi?.trim() || "Sin CFDI"}
                       </span>
 
@@ -1373,17 +1538,17 @@ export default function ExpedientDocuments() {
                         {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      className={styles.headerEditChecklistBtn}
+                      onClick={openChecklistPanel}
+                      disabled={!canUse || savingChecklist}
+                    >
+                      Editar checklist
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className={styles.headerStatsMini}>
-                <span className={`${styles.miniStat} ${styles.miniOk}`}>
-                  Cargados: <b>{stats.uploadedOk}</b>
-                </span>
-                <span className={`${styles.miniStat} ${styles.miniBad}`}>
-                  Faltan: <b>{stats.missingRequired}</b>
-                </span>
               </div>
             </div>
 
@@ -1460,54 +1625,97 @@ export default function ExpedientDocuments() {
                               tabIndex={hasFiles ? 0 : -1}
                               onClick={() =>
                                 hasFiles
-                                  ? openPreviewFromFiles(c.documentName, c.files, 0)
-                                  : showToast("error", "Este documento aún no tiene archivo.")
+                                  ? openPreviewFromFiles(
+                                      c.documentName,
+                                      c.files,
+                                      0,
+                                    )
+                                  : showToast(
+                                      "error",
+                                      "Este documento aún no tiene archivo.",
+                                    )
                               }
                               onKeyDown={(e) => {
                                 if (!hasFiles) return;
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
-                                  openPreviewFromFiles(c.documentName, c.files, 0);
+                                  openPreviewFromFiles(
+                                    c.documentName,
+                                    c.files,
+                                    0,
+                                  );
                                 }
                               }}
                             >
-                              <div className={styles.docName}>{c.documentName}</div>
+                              <div className={styles.docName}>
+                                {c.documentName}
+                              </div>
 
                               <div className={styles.docMeta}>
-                                {isRequired && <span className={styles.metaTagWarn}>Obligatorio</span>}
-                                {c.noApplies && <span className={styles.metaTag}>No aplica</span>}
-                                {c.uploaded && <span className={styles.metaTagOk}>Cargado</span>}
+                                {isRequired && (
+                                  <span className={styles.metaTagWarn}>
+                                    Obligatorio
+                                  </span>
+                                )}
+                                {c.noApplies && (
+                                  <span className={styles.metaTag}>
+                                    No aplica
+                                  </span>
+                                )}
+                                {c.uploaded && (
+                                  <span className={styles.metaTagOk}>
+                                    Cargado
+                                  </span>
+                                )}
                                 {!c.uploaded && !c.noApplies && !isRequired && (
-                                  <span className={styles.metaTag}>Opcional</span>
+                                  <span className={styles.metaTag}>
+                                    Opcional
+                                  </span>
                                 )}
                                 {hasFiles && (
                                   <span className={styles.metaTag}>
-                                    {c.files.length} archivo{c.files.length === 1 ? "" : "s"}
+                                    {c.files.length} archivo
+                                    {c.files.length === 1 ? "" : "s"}
                                   </span>
                                 )}
                               </div>
 
                               {c.observations && (
-                                <div className={styles.cardNote}>Obs: {c.observations}</div>
+                                <div className={styles.cardNote}>
+                                  Obs: {c.observations}
+                                </div>
                               )}
                             </div>
                           </td>
 
                           <td>
-                            <span className={`${styles.statusPill} ${stateClass}`}>{stateText}</span>
+                            <span
+                              className={`${styles.statusPill} ${stateClass}`}
+                            >
+                              {stateText}
+                            </span>
                           </td>
 
                           <td className={styles.tdRight}>
                             {!hasFiles ? (
-                              <span className={styles.fileEmpty}>Sin archivo</span>
+                              <span className={styles.fileEmpty}>
+                                Sin archivo
+                              </span>
                             ) : (
                               <button
                                 type="button"
                                 className={styles.fileLink}
-                                onClick={() => openPreviewFromFiles(c.documentName, c.files, 0)}
+                                onClick={() =>
+                                  openPreviewFromFiles(
+                                    c.documentName,
+                                    c.files,
+                                    0,
+                                  )
+                                }
                                 title={
                                   c.files.length === 1
-                                    ? c.files[0]?.name ?? "Previsualizar archivo"
+                                    ? (c.files[0]?.name ??
+                                      "Previsualizar archivo")
                                     : `Previsualizar ${c.files.length} archivos`
                                 }
                               >
@@ -1522,32 +1730,15 @@ export default function ExpedientDocuments() {
                 </tbody>
               </table>
             </div>
-
-            {missingRequiredList.length > 0 && (
-              <div className={styles.footerHintRow}>
-                <div className={styles.footerHint}>
-                  <b>Faltan obligatorios:</b>{" "}
-                  {missingRequiredList.slice(0, 4).map((x) => x.documentName).join(", ")}
-                  {missingRequiredList.length > 4 ? "…" : ""}
-                </div>
-
-                <button
-                  type="button"
-                  className={styles.footerEditChecklistBtn}
-                  onClick={openChecklistPanel}
-                  disabled={!canUse || savingChecklist}
-                >
-                  Editar checklist
-                </button>
-              </div>
-            )}
           </section>
         </div>
       </div>
 
       <div
         className={`${styles.uploadOverlay} ${
-          showUploadPanel ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+          showUploadPanel
+            ? styles.uploadOverlayOpen
+            : styles.uploadOverlayClosed
         }`}
         aria-hidden={!showUploadPanel}
       >
@@ -1557,7 +1748,8 @@ export default function ExpedientDocuments() {
               <div className={styles.uploadHandle} />
               <div className={styles.uploadSheetTitle}>Carga de archivos</div>
               <div className={styles.uploadSheetNote}>
-                Selecciona varios archivos y asigna cada uno al documento correspondiente
+                Selecciona varios archivos y asigna cada uno al documento
+                correspondiente
               </div>
             </div>
 
@@ -1588,49 +1780,68 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.dropzoneLarge} {...dropHandlers}>
               <div className={styles.dropTitle}>Arrastra archivos aquí</div>
-              <div className={styles.dropSub}>o usa “Seleccionar archivos”.</div>
+              <div className={styles.dropSub}>
+                o usa “Seleccionar archivos”.
+              </div>
             </div>
 
             {uploads.length === 0 ? (
-              <div className={styles.emptyUploadState}>Aún no has agregado archivos.</div>
+              <div className={styles.emptyUploadState}>
+                Aún no has agregado archivos.
+              </div>
             ) : (
               <div className={styles.uploadListFullscreen}>
                 {uploads.map((u, idx) => (
-                  <div key={`${u.file.name}-${idx}`} className={styles.uploadRow}>
+                  <div
+                    key={`${u.file.name}-${idx}`}
+                    className={styles.uploadRow}
+                  >
                     <div className={styles.fileInfo}>
                       <div className={styles.fileName} title={u.file.name}>
                         {u.file.name}
                       </div>
-                      <div className={styles.fileMeta}>{bytesToHuman(u.file.size)}</div>
+                      <div className={styles.fileMeta}>
+                        {bytesToHuman(u.file.size)}
+                      </div>
                     </div>
 
                     <div className={styles.uploadControls}>
                       <select
                         className={styles.select}
                         value={u.documentTypeId ?? ""}
-                        onChange={(e) => onBindFromChecklist(idx, Number(e.target.value))}
+                        onChange={(e) =>
+                          onBindFromChecklist(idx, Number(e.target.value))
+                        }
                         disabled={uploading}
                       >
                         <option value="">Asignar tipo…</option>
                         {checklistOptions.map((o) => (
                           <option key={o.id} value={o.id}>
                             {o.name}
-                            {o.noApplies ? " (No aplica)" : o.required ? " (Obligatorio)" : ""}
+                            {o.noApplies
+                              ? " (No aplica)"
+                              : o.required
+                                ? " (Obligatorio)"
+                                : ""}
                             {o.uploaded ? " ✓" : ""}
                           </option>
                         ))}
                       </select>
 
                       <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>Observaciones</label>
+                        <label className={styles.fieldLabel}>
+                          Observaciones
+                        </label>
                         <input
                           className={styles.input}
                           value={u.observations}
                           onChange={(e) =>
                             setUploads((prev) =>
                               prev.map((x, i) =>
-                                i === idx ? { ...x, observations: e.target.value } : x
-                              )
+                                i === idx
+                                  ? { ...x, observations: e.target.value }
+                                  : x,
+                              ),
                             )
                           }
                           disabled={uploading}
@@ -1666,7 +1877,7 @@ export default function ExpedientDocuments() {
               type="button"
               className={styles.saveBtn}
               onClick={() => void onUploadMassive()}
-              disabled={!canUpload}
+              disabled={!canUse || uploads.length === 0 || uploading}
             >
               {uploading ? "Subiendo..." : "Subir todo"}
             </button>
@@ -1676,7 +1887,9 @@ export default function ExpedientDocuments() {
 
       <div
         className={`${styles.uploadOverlay} ${
-          managerPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+          managerPanelOpen
+            ? styles.uploadOverlayOpen
+            : styles.uploadOverlayClosed
         }`}
         aria-hidden={!managerPanelOpen}
       >
@@ -1685,10 +1898,13 @@ export default function ExpedientDocuments() {
             <div className={styles.uploadSheetTitleWrap}>
               <div className={styles.uploadHandle} />
               <div className={styles.uploadSheetTitle}>
-                {managerForm.idRequestManager ? "Editar responsable" : "Asignar responsable"}
+                {managerForm.idRequestManager
+                  ? "Editar responsable"
+                  : "Asignar responsable"}
               </div>
               <div className={styles.uploadSheetNote}>
-                Captura o actualiza la información del responsable de la solicitud
+                Captura o actualiza la información del responsable de la
+                solicitud
               </div>
             </div>
 
@@ -1707,7 +1923,9 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.managerFormWrap}>
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>Área administrativa</div>
+                <div className={styles.managerSectionTitle}>
+                  Área administrativa
+                </div>
 
                 <div className={styles.formField}>
                   <label className={styles.fieldLabel}>Área</label>
@@ -1717,7 +1935,9 @@ export default function ExpedientDocuments() {
                     onChange={(e) =>
                       setManagerForm((prev) => ({
                         ...prev,
-                        idAdministrativeUnit: e.target.value ? Number(e.target.value) : null,
+                        idAdministrativeUnit: e.target.value
+                          ? Number(e.target.value)
+                          : null,
                       }))
                     }
                     disabled={savingManager || loadingAdministrativeUnits}
@@ -1728,7 +1948,10 @@ export default function ExpedientDocuments() {
                         : "Seleccionar área administrativa…"}
                     </option>
                     {administrativeUnits.map((u) => (
-                      <option key={u.idAdministrativeUnit} value={u.idAdministrativeUnit}>
+                      <option
+                        key={u.idAdministrativeUnit}
+                        value={u.idAdministrativeUnit}
+                      >
                         {u.description}
                       </option>
                     ))}
@@ -1737,7 +1960,9 @@ export default function ExpedientDocuments() {
               </div>
 
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>Datos del responsable</div>
+                <div className={styles.managerSectionTitle}>
+                  Datos del responsable
+                </div>
 
                 <div className={styles.formGridTwo}>
                   <div className={styles.formField}>
@@ -1746,19 +1971,27 @@ export default function ExpedientDocuments() {
                       className={styles.input}
                       value={managerForm.firstName}
                       onChange={(e) =>
-                        setManagerForm((prev) => ({ ...prev, firstName: e.target.value }))
+                        setManagerForm((prev) => ({
+                          ...prev,
+                          firstName: e.target.value,
+                        }))
                       }
                       disabled={savingManager}
                     />
                   </div>
 
                   <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Apellido paterno</label>
+                    <label className={styles.fieldLabel}>
+                      Apellido paterno
+                    </label>
                     <input
                       className={styles.input}
                       value={managerForm.lastName}
                       onChange={(e) =>
-                        setManagerForm((prev) => ({ ...prev, lastName: e.target.value }))
+                        setManagerForm((prev) => ({
+                          ...prev,
+                          lastName: e.target.value,
+                        }))
                       }
                       disabled={savingManager}
                     />
@@ -1767,7 +2000,9 @@ export default function ExpedientDocuments() {
 
                 <div className={styles.formGridOne}>
                   <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Apellido materno</label>
+                    <label className={styles.fieldLabel}>
+                      Apellido materno
+                    </label>
                     <input
                       className={styles.input}
                       value={managerForm.secondLastName}
@@ -1788,13 +2023,18 @@ export default function ExpedientDocuments() {
 
                 <div className={styles.formGridTwo}>
                   <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Correo electrónico</label>
+                    <label className={styles.fieldLabel}>
+                      Correo electrónico
+                    </label>
                     <input
                       className={styles.input}
                       type="email"
                       value={managerForm.email}
                       onChange={(e) =>
-                        setManagerForm((prev) => ({ ...prev, email: e.target.value }))
+                        setManagerForm((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
                       }
                       disabled={savingManager}
                     />
@@ -1806,7 +2046,10 @@ export default function ExpedientDocuments() {
                       className={styles.input}
                       value={managerForm.phone}
                       onChange={(e) =>
-                        setManagerForm((prev) => ({ ...prev, phone: e.target.value }))
+                        setManagerForm((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
                       }
                       disabled={savingManager}
                     />
@@ -1840,7 +2083,9 @@ export default function ExpedientDocuments() {
 
       <div
         className={`${styles.uploadOverlay} ${
-          policyPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+          policyPanelOpen
+            ? styles.uploadOverlayOpen
+            : styles.uploadOverlayClosed
         }`}
         aria-hidden={!policyPanelOpen}
       >
@@ -1852,7 +2097,8 @@ export default function ExpedientDocuments() {
                 {policyNumber?.trim() ? "Editar póliza" : "Agregar póliza"}
               </div>
               <div className={styles.uploadSheetNote}>
-                Selecciona la póliza disponible que deseas asociar a esta solicitud
+                Selecciona la póliza disponible que deseas asociar a esta
+                solicitud
               </div>
             </div>
 
@@ -1871,7 +2117,9 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.policyFormWrap}>
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>Datos de la póliza</div>
+                <div className={styles.managerSectionTitle}>
+                  Datos de la póliza
+                </div>
 
                 <div className={styles.formField}>
                   <label className={styles.fieldLabel}>Póliza</label>
@@ -1880,13 +2128,17 @@ export default function ExpedientDocuments() {
                     value={policyForm.idPaymentPolicy ?? ""}
                     onChange={(e) =>
                       setPolicyForm({
-                        idPaymentPolicy: e.target.value ? Number(e.target.value) : null,
+                        idPaymentPolicy: e.target.value
+                          ? Number(e.target.value)
+                          : null,
                       })
                     }
                     disabled={savingPolicy || loadingPolicies}
                   >
                     <option value="">
-                      {loadingPolicies ? "Cargando pólizas..." : "Seleccionar póliza…"}
+                      {loadingPolicies
+                        ? "Cargando pólizas..."
+                        : "Seleccionar póliza…"}
                     </option>
 
                     {paymentPolicies.map((p) => (
@@ -1902,13 +2154,13 @@ export default function ExpedientDocuments() {
                   <div className={styles.policyPreviewCard}>
                     <div className={styles.policyPreviewCode}>
                       {paymentPolicies.find(
-                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy
+                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy,
                       )?.policyCode ?? "Póliza seleccionada"}
                     </div>
 
                     <div className={styles.policyPreviewDesc}>
                       {paymentPolicies.find(
-                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy
+                        (x) => x.idPaymentPolicy === policyForm.idPaymentPolicy,
                       )?.description || "Sin descripción adicional."}
                     </div>
                   </div>
@@ -1953,7 +2205,8 @@ export default function ExpedientDocuments() {
                 {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
               </div>
               <div className={styles.uploadSheetNote}>
-                Captura el folio o valor del CFDI para asociarlo a esta solicitud
+                Captura el folio o valor del CFDI para asociarlo a esta
+                solicitud
               </div>
             </div>
 
@@ -1991,7 +2244,9 @@ export default function ExpedientDocuments() {
 
                 {cfdiForm.cfdi.trim() && (
                   <div className={styles.cfdiPreviewCard}>
-                    <div className={styles.cfdiPreviewCode}>{cfdiForm.cfdi.trim()}</div>
+                    <div className={styles.cfdiPreviewCode}>
+                      {cfdiForm.cfdi.trim()}
+                    </div>
                     <div className={styles.cfdiPreviewDesc}>
                       CFDI que se asociará a esta solicitud.
                     </div>
@@ -2025,7 +2280,9 @@ export default function ExpedientDocuments() {
 
       <div
         className={`${styles.uploadOverlay} ${
-          checklistPanelOpen ? styles.uploadOverlayOpen : styles.uploadOverlayClosed
+          checklistPanelOpen
+            ? styles.uploadOverlayOpen
+            : styles.uploadOverlayClosed
         }`}
         aria-hidden={!checklistPanelOpen}
       >
@@ -2051,7 +2308,7 @@ export default function ExpedientDocuments() {
             </div>
           </div>
 
-                    <div className={styles.uploadSheetBody}>
+          <div className={styles.uploadSheetBody}>
             {checklistExceptionRows.length === 0 ? (
               <div className={styles.emptyUploadState}>
                 No hay documentos obligatorios para editar.
@@ -2059,8 +2316,12 @@ export default function ExpedientDocuments() {
             ) : (
               <div className={styles.checklistCompactWrap}>
                 <div className={styles.checklistCompactHeader}>
-                  <div className={styles.checklistCompactHeaderDoc}>Documento</div>
-                  <div className={styles.checklistCompactHeaderState}>Estado</div>
+                  <div className={styles.checklistCompactHeaderDoc}>
+                    Documento
+                  </div>
+                  <div className={styles.checklistCompactHeaderState}>
+                    Estado
+                  </div>
                 </div>
 
                 <div className={styles.checklistCompactList}>
@@ -2069,15 +2330,15 @@ export default function ExpedientDocuments() {
 
                     return (
                       <div
-  key={row.documentTypeId}
-  className={`${styles.checklistCompactCard} ${
-    row.uploaded
-      ? styles.checklistStateUploaded
-      : row.doesNotApply
-      ? styles.checklistStateNoApply
-      : styles.checklistStateRequired
-  }`}
->
+                        key={row.documentTypeId}
+                        className={`${styles.checklistCompactCard} ${
+                          row.uploaded
+                            ? styles.checklistStateUploaded
+                            : row.doesNotApply
+                              ? styles.checklistStateNoApply
+                              : styles.checklistStateRequired
+                        }`}
+                      >
                         <div className={styles.checklistCompactTop}>
                           <div className={styles.checklistCompactDocBlock}>
                             <div className={styles.checklistCompactDocName}>
@@ -2086,7 +2347,11 @@ export default function ExpedientDocuments() {
 
                             <div className={styles.checklistCompactBadges}>
                               {row.uploaded && (
-                                <span className={styles.checklistCompactBadgeOk}>Completo</span>
+                                <span
+                                  className={styles.checklistCompactBadgeOk}
+                                >
+                                  Completo
+                                </span>
                               )}
 
                               <span
@@ -2103,7 +2368,11 @@ export default function ExpedientDocuments() {
 
                           <div className={styles.checklistCompactStateBlock}>
                             <label className={styles.checklistCompactOption}>
-                              <span className={styles.checklistCompactOptionLabel}>No aplica</span>
+                              <span
+                                className={styles.checklistCompactOptionLabel}
+                              >
+                                No aplica
+                              </span>
                               <input
                                 type="radio"
                                 name={`checklist-state-${row.documentTypeId}`}
@@ -2116,10 +2385,11 @@ export default function ExpedientDocuments() {
                                             ...item,
                                             doesNotApply: true,
                                             justification:
-                                              item.justification.trim() || "No aplica",
+                                              item.justification.trim() ||
+                                              "No aplica",
                                           }
-                                        : item
-                                    )
+                                        : item,
+                                    ),
                                   )
                                 }
                                 disabled={savingChecklist}
@@ -2127,7 +2397,9 @@ export default function ExpedientDocuments() {
                             </label>
 
                             <label className={styles.checklistCompactOption}>
-                              <span className={styles.checklistCompactOptionLabel}>
+                              <span
+                                className={styles.checklistCompactOptionLabel}
+                              >
                                 Obligatorio
                               </span>
                               <input
@@ -2142,8 +2414,8 @@ export default function ExpedientDocuments() {
                                             ...item,
                                             doesNotApply: false,
                                           }
-                                        : item
-                                    )
+                                        : item,
+                                    ),
                                   )
                                 }
                                 disabled={savingChecklist}
@@ -2153,20 +2425,24 @@ export default function ExpedientDocuments() {
                         </div>
 
                         <div className={styles.checklistCompactBottom}>
-                          <label className={styles.fieldLabel}>Justificación</label>
+                          <label className={styles.fieldLabel}>
+                            Justificación
+                          </label>
                           <textarea
                             className={styles.checklistCompactTextarea}
-                            value={row.doesNotApply ? row.justification : "Aplica"}
+                            value={
+                              row.doesNotApply ? row.justification : "Aplica"
+                            }
                             onChange={(e) =>
                               setChecklistExceptionRows((prev) =>
                                 prev.map((item) =>
                                   item.documentTypeId === row.documentTypeId
                                     ? { ...item, justification: e.target.value }
-                                    : item
-                                )
+                                    : item,
+                                ),
                               )
                             }
-                            disabled={savingChecklist}
+                            disabled={savingChecklist || !row.doesNotApply}
                             rows={2}
                           />
                         </div>
@@ -2206,9 +2482,15 @@ export default function ExpedientDocuments() {
           role="dialog"
           aria-modal="true"
           aria-label="Previsualización de archivo"
-          onClick={closePreview}
+          onClick={() => {
+            if (deleteModalOpen) return;
+            closePreview();
+          }}
         >
-          <div className={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.previewModal}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.previewHeader}>
               <div className={styles.previewHeaderInfo}>
                 <div className={styles.previewTitle}>Previsualización</div>
@@ -2240,12 +2522,18 @@ export default function ExpedientDocuments() {
                   <button
                     type="button"
                     className={styles.iconDangerBtn}
-                    onClick={() => void onDeleteCurrentPreview()}
+                    onClick={() => openDeleteModal(currentPreview)}
                     disabled={deletingPreview}
                     title="Eliminar documento"
                     aria-label="Eliminar documento"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden="true"
+                    >
                       <path
                         d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12M10 11v6M14 11v6"
                         stroke="currentColor"
@@ -2254,10 +2542,15 @@ export default function ExpedientDocuments() {
                         strokeLinejoin="round"
                       />
                     </svg>
+                    <span>Eliminar</span>
                   </button>
                 )}
 
-                <button type="button" className={styles.ghostBtn} onClick={closePreview}>
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={closePreview}
+                >
                   Cerrar
                 </button>
               </div>
@@ -2314,7 +2607,9 @@ export default function ExpedientDocuments() {
                         <div
                           key={`${item.id ?? "thumb"}-${item.url}-${idx}`}
                           className={`${styles.previewThumbCard} ${
-                            idx === previewIndex ? styles.previewThumbCardActive : ""
+                            idx === previewIndex
+                              ? styles.previewThumbCardActive
+                              : ""
                           }`}
                         >
                           <button
@@ -2337,7 +2632,7 @@ export default function ExpedientDocuments() {
                             <button
                               type="button"
                               className={styles.previewThumbDelete}
-                              onClick={() => void onDeletePreviewDocumentByItem(item)}
+                              onClick={() => openDeleteModal(item)}
                               title={`Eliminar ${item.name}`}
                               aria-label={`Eliminar ${item.name}`}
                               disabled={deletingPreview}
@@ -2394,6 +2689,109 @@ export default function ExpedientDocuments() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModalOpen && deleteTarget && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminación"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12M10 11v6M14 11v6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>
+                  Confirmar eliminación
+                </div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Esta acción eliminará el documento seleccionado.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Documento</div>
+                <div className={styles.deleteFileName} title={deleteTarget.name}>
+                  {deleteTarget.name}
+                </div>
+              </div>
+
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>Contraseña</label>
+                <input
+                  type="password"
+                  className={styles.input}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  disabled={deletingPreview}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !deletingPreview) {
+                      void onDeletePreviewDocumentByItem(
+                        deleteTarget,
+                        deletePassword,
+                      );
+                    }
+                  }}
+                />
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Esta acción no se puede deshacer.
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeDeleteModal}
+                disabled={deletingPreview}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() =>
+                  void onDeletePreviewDocumentByItem(
+                    deleteTarget,
+                    deletePassword,
+                  )
+                }
+                disabled={deletingPreview || !deletePassword.trim()}
+              >
+                {deletingPreview ? "Eliminando..." : "Eliminar documento"}
+              </button>
             </div>
           </div>
         </div>
