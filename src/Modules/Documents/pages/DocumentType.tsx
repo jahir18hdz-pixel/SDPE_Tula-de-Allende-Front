@@ -271,7 +271,10 @@ export default function DocumentType() {
 
   async function onCreate() {
     const msg = validateCreate();
-    if (msg) return showToast("error", msg);
+    if (msg) {
+      showToast("error", msg);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -321,7 +324,10 @@ export default function DocumentType() {
     if (!selected) return;
 
     const msg = validateEdit();
-    if (msg) return showToast("error", msg);
+    if (msg) {
+      showToast("error", msg);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -361,7 +367,7 @@ export default function DocumentType() {
     return Math.max(1, Math.ceil(totalCount / pageSize));
   }, [totalCount, pageSize]);
 
-  const createDisabled = saving || loading;
+  const formDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -404,7 +410,7 @@ export default function DocumentType() {
               placeholder="Buscar por nombre o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              disabled={saving || loading}
+              disabled={formDisabled}
             />
 
             {search.trim() !== "" && (
@@ -413,7 +419,7 @@ export default function DocumentType() {
                 onClick={() => setSearch("")}
                 type="button"
                 aria-label="Limpiar búsqueda"
-                disabled={saving || loading}
+                disabled={formDisabled}
               >
                 <svg
                   width="14"
@@ -464,7 +470,7 @@ export default function DocumentType() {
               <select
                 className={styles.pageSize}
                 value={pageSize}
-                disabled={loading || saving}
+                disabled={formDisabled}
                 onChange={(e) => {
                   const ps = Number(e.target.value);
                   void loadPaged(1, ps);
@@ -481,7 +487,7 @@ export default function DocumentType() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page <= 1}
+                  disabled={formDisabled || page <= 1}
                   onClick={() =>
                     void loadPaged(Math.max(1, page - 1), pageSize)
                   }
@@ -498,8 +504,7 @@ export default function DocumentType() {
                   className={styles.pagerBtn}
                   type="button"
                   disabled={
-                    loading ||
-                    saving ||
+                    formDisabled ||
                     (totalPages != null
                       ? page >= totalPages
                       : rows.length < pageSize)
@@ -546,6 +551,7 @@ export default function DocumentType() {
                     const isSelected =
                       selectedId != null && id != null && id === selectedId;
                     const active = getActive(d) ?? false;
+                    const fullDescription = getDescription(d);
 
                     return (
                       <tr
@@ -554,8 +560,8 @@ export default function DocumentType() {
                         onClick={() => onRowClick(d)}
                       >
                         <td className={styles.mono}>{getName(d) ?? "—"}</td>
-                        <td title={getDescription(d) ?? ""}>
-                          {limitWords(getDescription(d), 10) ?? "—"}
+                        <td title={fullDescription ?? ""}>
+                          {limitWords(fullDescription, 10) ?? "—"}
                         </td>
                         <td>
                           <Switch
@@ -595,53 +601,51 @@ export default function DocumentType() {
               >
                 <div className={styles.detailBox}>
                   <div className={styles.detailCard}>
-                    <div className={styles.detailItemDescription}>
-                      <Field label="Nombre" required>
-                        <textarea
-                          className={styles.textarea}
-                          value={create.documentName}
-                          onChange={(e) =>
-                            setCreate((p) => ({
-                              ...p,
-                              documentName: e.target.value,
-                            }))
-                          }
-                          disabled={createDisabled}
-                          placeholder="Ej. Póliza"
-                          rows={2}
-                        />
-                      </Field>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Nombre</span>
+                      <textarea
+                        className={styles.floatingTextareaSingle}
+                        value={create.documentName}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            documentName: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe el nombre..."
+                        rows={2}
+                      />
                     </div>
 
-                    <div className={styles.detailItemDescription}>
-                      <Field label="Descripción" required>
-                        <textarea
-                          className={styles.textarea}
-                          value={create.description}
-                          onChange={(e) =>
-                            setCreate((p) => ({
-                              ...p,
-                              description: e.target.value,
-                            }))
-                          }
-                          onBlur={(e) =>
-                            setCreate((p) => ({
-                              ...p,
-                              description: breakTextEvery12Words(e.target.value),
-                            }))
-                          }
-                          disabled={createDisabled}
-                          placeholder="Descripción breve..."
-                          rows={4}
-                        />
-                      </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={create.description}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: breakTextEvery12Words(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe la descripción..."
+                        rows={4}
+                      />
                     </div>
 
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Activo</span>
                       <Switch
                         checked={create.active}
-                        disabled={createDisabled}
+                        disabled={formDisabled}
                         label={create.active ? "Activo" : "Inactivo"}
                         onChange={(next) =>
                           setCreate((p) => ({ ...p, active: next }))
@@ -663,7 +667,7 @@ export default function DocumentType() {
                     <button
                       type="submit"
                       className={styles.btnSave}
-                      disabled={createDisabled}
+                      disabled={formDisabled}
                     >
                       {saving ? "Guardando..." : "Guardar"}
                     </button>
@@ -684,53 +688,51 @@ export default function DocumentType() {
               >
                 <div className={styles.detailBox}>
                   <div className={styles.detailCard}>
-                    <div className={styles.detailItemDescription}>
-                      <Field label="Nombre" required>
-                        <textarea
-                          className={styles.textarea}
-                          value={edit.documentName}
-                          onChange={(e) =>
-                            setEdit((p) => ({
-                              ...p,
-                              documentName: e.target.value,
-                            }))
-                          }
-                          disabled={saving || loading}
-                          placeholder="Nombre..."
-                          rows={2}
-                        />
-                      </Field>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Nombre</span>
+                      <textarea
+                        className={styles.floatingTextareaSingle}
+                        value={edit.documentName}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            documentName: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe el nombre..."
+                        rows={2}
+                      />
                     </div>
 
-                    <div className={styles.detailItemDescription}>
-                      <Field label="Descripción" required>
-                        <textarea
-                          className={styles.textarea}
-                          value={edit.description}
-                          onChange={(e) =>
-                            setEdit((p) => ({
-                              ...p,
-                              description: e.target.value,
-                            }))
-                          }
-                          onBlur={(e) =>
-                            setEdit((p) => ({
-                              ...p,
-                              description: breakTextEvery12Words(e.target.value),
-                            }))
-                          }
-                          disabled={saving || loading}
-                          placeholder="Descripción..."
-                          rows={4}
-                        />
-                      </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={edit.description}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            description: breakTextEvery12Words(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe la descripción..."
+                        rows={4}
+                      />
                     </div>
 
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Activo</span>
                       <Switch
                         checked={edit.active}
-                        disabled={saving || loading}
+                        disabled={formDisabled}
                         label={edit.active ? "Activo" : "Inactivo"}
                         onChange={(next) =>
                           setEdit((p) => ({ ...p, active: next }))
@@ -752,7 +754,7 @@ export default function DocumentType() {
                     <button
                       type="submit"
                       className={styles.btnSave}
-                      disabled={saving || loading}
+                      disabled={formDisabled}
                     >
                       {saving ? "Guardando..." : "Guardar cambios"}
                     </button>
@@ -762,16 +764,16 @@ export default function DocumentType() {
             ) : (
               <div className={styles.detailBox}>
                 <div className={styles.detailCard}>
-                  <div className={styles.detailItemDescription}>
-                    <span className={styles.detailLabel}>Nombre</span>
-                    <div className={styles.detailNameBox}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Nombre</span>
+                    <div className={styles.floatingValue}>
                       {getName(selected) ?? "—"}
                     </div>
                   </div>
 
-                  <div className={styles.detailItemDescription}>
-                    <span className={styles.detailLabel}>Descripción</span>
-                    <div className={styles.detailDescriptionBox}>
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>Descripción</span>
+                    <div className={styles.floatingValueArea}>
                       {getDescription(selected) ?? "—"}
                     </div>
                   </div>
@@ -802,7 +804,7 @@ export default function DocumentType() {
                     className={styles.btnEdit}
                     type="button"
                     onClick={startEdit}
-                    disabled={saving || loading}
+                    disabled={formDisabled}
                   >
                     Editar
                   </button>
@@ -839,26 +841,6 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
         <span className={styles.switchKnob} />
       </button>
     </label>
-  );
-}
-
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
   );
 }
 

@@ -235,7 +235,8 @@
   color: #111827;
   font-weight: 900;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease,
+    background 120ms ease;
   font-family: inherit;
 }
 
@@ -457,81 +458,10 @@
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  padding: 12px 14px;
-  border: 1px solid rgba(230, 230, 234, 0.95);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.detailItemDescription {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid rgba(230, 230, 234, 0.95);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.detailValueInline {
-  max-width: 65%;
-  text-align: right;
-  font-weight: 600;
-  color: #111827;
-  word-break: break-word;
-}
-
-.detailNameBox {
-  width: 100%;
-  min-height: 58px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(246, 246, 247, 0.95),
-    rgba(255, 255, 255, 0.98)
-  );
-  border: 1px solid rgba(215, 215, 221, 0.95);
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  text-align: left;
-  box-sizing: border-box;
-  font-weight: 600;
-}
-
-.detailDescriptionBox {
-  width: 100%;
-  min-height: 110px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(246, 246, 247, 0.95),
-    rgba(255, 255, 255, 0.98)
-  );
-  border: 1px solid rgba(215, 215, 221, 0.95);
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.65;
-  white-space: pre-wrap;
-  word-break: break-word;
-  text-align: left;
-  box-sizing: border-box;
-}
-
-.detailRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.92);
-  align-items: center;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(230, 230, 234, 0.95);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .detailLabel {
@@ -546,138 +476,137 @@
   opacity: 0.95;
 }
 
-.detailValue {
-  max-width: 62%;
-  text-align: right;
-  opacity: 0.9;
-  font-weight: 500;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow: visible;
-  text-overflow: unset;
-}
-
 /* =========================
-   FORM + INPUTS
+   FLOATING FIELDS
 ========================= */
-.form {
+.floatingField,
+.floatingFieldArea {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
-}
-
-.grid > div:nth-child(1) {
-  grid-column: 1 / -1;
-}
-
-.labelRow {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  margin-bottom: 8px;
-}
-
-.label {
-  font-weight: 800;
-  font-size: 13px;
-  color: #000;
-}
-
-.required {
-  color: var(--gold);
-  font-weight: 900;
-}
-
-.input,
-.select {
   width: 100%;
-  height: 46px;
-  border-radius: 12px;
-  border: 1px solid var(--border2);
-  padding: 0 14px;
-  outline: none;
-  font-size: 15px;
-  background: #fff;
-  color: #000;
-  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.select {
-  appearance: none;
-}
-
-.input:hover,
-.select:hover {
-  border-color: #c9c9d0;
-}
-
-.input:focus,
-.select:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
-  transform: translateY(-1px);
-}
-
-.input:disabled,
-.select:disabled {
-  opacity: 0.75;
-  cursor: not-allowed;
-  background: #fafafa;
-}
-
-.textarea {
-  width: 100%;
-  min-height: 96px;
-  border-radius: 12px;
   border: 1px solid rgba(215, 215, 221, 0.95);
-  padding: 14px 16px;
-  outline: none;
-  font-size: 14px;
   background: linear-gradient(
     180deg,
     rgba(246, 246, 247, 0.95),
     rgba(255, 255, 255, 0.98)
   );
-  color: #111827;
-  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease,
-    background 120ms ease;
-  font-family: inherit;
   box-sizing: border-box;
-  resize: vertical;
-  line-height: 1.6;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+}
+
+.floatingField {
+  align-items: center;
+  min-height: 64px;
+  padding: 18px 16px 14px;
+  border-radius: 999px;
+}
+
+.floatingFieldArea {
+  flex-direction: column;
+  min-height: 128px;
+  padding: 20px 16px 14px;
+  border-radius: 24px;
+}
+
+.floatingLabel {
+  position: absolute;
+  top: -10px;
+  left: 18px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--guinda2);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  line-height: 1.2;
+}
+
+.floatingValue {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.floatingValueArea {
+  width: 100%;
+  min-height: 92px;
+  font-size: 14px;
+  color: #111827;
+  line-height: 1.65;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.textarea:hover {
-  border-color: #c9c9d0;
+.floatingTextareaSingle,
+.floatingTextareaArea {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  resize: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  font-family: inherit;
+  color: #111827;
+  border-radius: 0 !important;
+  min-height: auto;
+  font-size: 14px;
 }
 
-.textarea:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
-  transform: translateY(-1px);
-  background: #fffef8;
+.floatingTextareaSingle {
+  min-height: 24px;
+  line-height: 1.45;
+  overflow: hidden;
 }
 
-.textarea:disabled {
-  opacity: 0.75;
+.floatingTextareaArea {
+  min-height: 92px;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.floatingTextareaSingle:hover,
+.floatingTextareaArea:hover,
+.floatingTextareaSingle:focus,
+.floatingTextareaArea:focus,
+.floatingTextareaSingle:active,
+.floatingTextareaArea:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+.floatingTextareaSingle:disabled,
+.floatingTextareaArea:disabled {
+  background: transparent !important;
+  color: #111827;
+  opacity: 0.78;
   cursor: not-allowed;
-  background: #fafafa;
 }
 
-.hint {
-  margin-top: 8px;
-  font-size: 12px;
-  opacity: 0.7;
+.floatingTextareaSingle::placeholder,
+.floatingTextareaArea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+/* =========================
+   FORM
+========================= */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* =========================
@@ -703,8 +632,9 @@
   font-size: 14px;
   letter-spacing: 0.15px;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease,
-    background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease,
+    opacity 120ms ease, background 120ms ease, border-color 120ms ease,
+    color 120ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -807,7 +737,8 @@
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.12);
   position: relative;
   cursor: pointer;
-  transition: transform 120ms ease, background 160ms ease, border-color 160ms ease;
+  transition: transform 120ms ease, background 160ms ease,
+    border-color 160ms ease;
   padding: 0;
   flex: 0 0 auto;
 }
@@ -896,14 +827,6 @@
   .btnGhost {
     width: 100%;
   }
-
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
-  .grid > div:nth-child(1) {
-    grid-column: auto;
-  }
 }
 
 @media (max-width: 980px) {
@@ -948,18 +871,19 @@
     align-items: flex-start;
   }
 
-  .detailValueInline {
-    max-width: 100%;
-    text-align: left;
+  .floatingField {
+    min-height: 60px;
+    padding: 18px 14px 12px;
   }
 
-  .detailNameBox {
-    min-height: 52px;
-    padding: 12px 14px;
+  .floatingFieldArea {
+    min-height: 118px;
+    padding: 20px 14px 12px;
+    border-radius: 20px;
   }
 
-  .detailDescriptionBox {
-    min-height: 96px;
-    padding: 12px 14px;
+  .floatingLabel {
+    left: 14px;
+    font-size: 12px;
   }
 }
