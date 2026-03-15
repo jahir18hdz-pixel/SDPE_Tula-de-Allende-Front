@@ -261,9 +261,11 @@ export default function DocumentType() {
   function validateCreate(): string {
     const name = create.documentName.trim();
     const desc = create.description.trim();
+
     if (!name) return "El nombre del documento es obligatorio.";
     if (name.length < 2) return "Nombre demasiado corto.";
     if (!desc) return "La descripción es obligatoria.";
+
     return "";
   }
 
@@ -286,7 +288,10 @@ export default function DocumentType() {
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        showToast("error", result.error);
+        return;
+      }
 
       showToast("success", "Tipo de documento creado");
       setMode("view");
@@ -302,10 +307,13 @@ export default function DocumentType() {
   function validateEdit(): string {
     const id = Number(edit.idDocumentType);
     if (!Number.isFinite(id) || id <= 0) return "Id inválido.";
+
     const name = edit.documentName.trim();
     const desc = edit.description.trim();
+
     if (!name) return "El nombre del documento es obligatorio.";
     if (!desc) return "La descripción es obligatoria.";
+
     return "";
   }
 
@@ -332,7 +340,10 @@ export default function DocumentType() {
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        showToast("error", result.error);
+        return;
+      }
 
       showToast("success", "Tipo actualizado");
       setMode("view");
@@ -543,7 +554,9 @@ export default function DocumentType() {
                         onClick={() => onRowClick(d)}
                       >
                         <td className={styles.mono}>{getName(d) ?? "—"}</td>
-                        <td>{getDescription(d) ?? "—"}</td>
+                        <td title={getDescription(d) ?? ""}>
+                          {limitWords(getDescription(d), 10) ?? "—"}
+                        </td>
                         <td>
                           <Switch
                             checked={active}
@@ -582,45 +595,49 @@ export default function DocumentType() {
               >
                 <div className={styles.detailBox}>
                   <div className={styles.detailCard}>
-                    <Field label="Nombre" required>
-                      <textarea
-                        className={styles.textarea}
-                        value={create.documentName}
-                        onChange={(e) =>
-                          setCreate((p) => ({
-                            ...p,
-                            documentName: e.target.value,
-                          }))
-                        }
-                        disabled={createDisabled}
-                        placeholder="Ej. Póliza"
-                        rows={2}
-                      />
-                    </Field>
+                    <div className={styles.detailItemDescription}>
+                      <Field label="Nombre" required>
+                        <textarea
+                          className={styles.textarea}
+                          value={create.documentName}
+                          onChange={(e) =>
+                            setCreate((p) => ({
+                              ...p,
+                              documentName: e.target.value,
+                            }))
+                          }
+                          disabled={createDisabled}
+                          placeholder="Ej. Póliza"
+                          rows={2}
+                        />
+                      </Field>
+                    </div>
 
-                    <Field label="Descripción" required>
-                      <textarea
-                        className={styles.textarea}
-                        value={create.description}
-                        onChange={(e) =>
-                          setCreate((p) => ({
-                            ...p,
-                            description: e.target.value,
-                          }))
-                        }
-                        onBlur={(e) =>
-                          setCreate((p) => ({
-                            ...p,
-                            description: breakTextEvery12Words(e.target.value),
-                          }))
-                        }
-                        disabled={createDisabled}
-                        placeholder="Descripción breve..."
-                        rows={4}
-                      />
-                    </Field>
+                    <div className={styles.detailItemDescription}>
+                      <Field label="Descripción" required>
+                        <textarea
+                          className={styles.textarea}
+                          value={create.description}
+                          onChange={(e) =>
+                            setCreate((p) => ({
+                              ...p,
+                              description: e.target.value,
+                            }))
+                          }
+                          onBlur={(e) =>
+                            setCreate((p) => ({
+                              ...p,
+                              description: breakTextEvery12Words(e.target.value),
+                            }))
+                          }
+                          disabled={createDisabled}
+                          placeholder="Descripción breve..."
+                          rows={4}
+                        />
+                      </Field>
+                    </div>
 
-                    <div className={styles.detailRow}>
+                    <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Activo</span>
                       <Switch
                         checked={create.active}
@@ -632,25 +649,25 @@ export default function DocumentType() {
                       />
                     </div>
                   </div>
-                </div>
 
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
 
-                  <button
-                    type="submit"
-                    className={styles.btnSave}
-                    disabled={createDisabled}
-                  >
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={createDisabled}
+                    >
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
@@ -666,68 +683,80 @@ export default function DocumentType() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <Field label="Nombre" required>
-                    <textarea
-                      className={styles.textarea}
-                      value={edit.documentName}
-                      onChange={(e) =>
-                        setEdit((p) => ({ ...p, documentName: e.target.value }))
-                      }
-                      disabled={saving || loading}
-                      placeholder="Nombre..."
-                      rows={2}
-                    />
-                  </Field>
+                  <div className={styles.detailCard}>
+                    <div className={styles.detailItemDescription}>
+                      <Field label="Nombre" required>
+                        <textarea
+                          className={styles.textarea}
+                          value={edit.documentName}
+                          onChange={(e) =>
+                            setEdit((p) => ({
+                              ...p,
+                              documentName: e.target.value,
+                            }))
+                          }
+                          disabled={saving || loading}
+                          placeholder="Nombre..."
+                          rows={2}
+                        />
+                      </Field>
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <textarea
-                      className={styles.textarea}
-                      value={edit.description}
-                      onChange={(e) =>
-                        setEdit((p) => ({ ...p, description: e.target.value }))
-                      }
-                      onBlur={(e) =>
-                        setEdit((p) => ({
-                          ...p,
-                          description: breakTextEvery12Words(e.target.value),
-                        }))
-                      }
-                      disabled={saving || loading}
-                      placeholder="Descripción..."
-                      rows={4}
-                    />
-                  </Field>
+                    <div className={styles.detailItemDescription}>
+                      <Field label="Descripción" required>
+                        <textarea
+                          className={styles.textarea}
+                          value={edit.description}
+                          onChange={(e) =>
+                            setEdit((p) => ({
+                              ...p,
+                              description: e.target.value,
+                            }))
+                          }
+                          onBlur={(e) =>
+                            setEdit((p) => ({
+                              ...p,
+                              description: breakTextEvery12Words(e.target.value),
+                            }))
+                          }
+                          disabled={saving || loading}
+                          placeholder="Descripción..."
+                          rows={4}
+                        />
+                      </Field>
+                    </div>
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Activo</span>
-                    <Switch
-                      checked={edit.active}
-                      disabled={saving || loading}
-                      label={edit.active ? "Activo" : "Inactivo"}
-                      onChange={(next) =>
-                        setEdit((p) => ({ ...p, active: next }))
-                      }
-                    />
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={edit.active}
+                        disabled={saving || loading}
+                        label={edit.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setEdit((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
 
-                  <button
-                    type="submit"
-                    className={styles.btnSave}
-                    disabled={saving || loading}
-                  >
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={saving || loading}
+                    >
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : (
@@ -866,6 +895,7 @@ function getActive(d: DocumentTypeRow | null): boolean | null {
     if (t === "true" || t === "1" || t === "si" || t === "sí") return true;
     if (t === "false" || t === "0" || t === "no") return false;
   }
+
   return null;
 }
 
@@ -880,9 +910,19 @@ function breakTextEvery12Words(text: string): string {
   return lines.join("\n");
 }
 
+function limitWords(text: string | null, maxWords: number): string | null {
+  if (!text) return null;
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
+
   try {
     return JSON.stringify(e);
   } catch {

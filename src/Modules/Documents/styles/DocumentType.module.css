@@ -14,7 +14,7 @@
 }
 
 /* =========================
-   PAGE + HEADER (SIN SCROLL EN PANTALLA)
+   PAGE + HEADER
 ========================= */
 .page {
   color: #000;
@@ -150,7 +150,7 @@
 }
 
 /* =========================
-   LAYOUT (SIN SCROLL GLOBAL)
+   LAYOUT
 ========================= */
 .layout {
   display: grid;
@@ -284,14 +284,18 @@
 }
 
 /* =========================
-   TABLE (SIN SCROLL LATERAL ✅)
+   TABLE
 ========================= */
 .tableWrap {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  background: linear-gradient(180deg, rgba(182, 138, 42, 0.035), transparent 40%);
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.035),
+    transparent 40%
+  );
   border-top: 1px solid rgba(230, 230, 234, 0.7);
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
@@ -307,7 +311,12 @@
 
 .table thead th:nth-child(1),
 .table tbody td:nth-child(1) {
-  width: 34%;
+  width: 30%;
+}
+
+.table thead th:nth-child(2),
+.table tbody td:nth-child(2) {
+  width: auto;
 }
 
 .table thead th:nth-child(3),
@@ -353,6 +362,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.table tbody td:nth-child(2) {
+  color: #374151;
+  line-height: 1.5;
 }
 
 .table tbody td:nth-child(3) {
@@ -543,7 +558,7 @@
 }
 
 /* =========================
-   FORM + INPUTS + SELECT
+   FORM + INPUTS
 ========================= */
 .form {
   display: flex;
@@ -623,17 +638,22 @@
   width: 100%;
   min-height: 96px;
   border-radius: 12px;
-  border: 1px solid var(--border2);
-  padding: 12px 14px;
+  border: 1px solid rgba(215, 215, 221, 0.95);
+  padding: 14px 16px;
   outline: none;
-  font-size: 15px;
-  background: #fff;
-  color: #000;
-  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+  font-size: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.95),
+    rgba(255, 255, 255, 0.98)
+  );
+  color: #111827;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease,
+    background 120ms ease;
   font-family: inherit;
   box-sizing: border-box;
   resize: vertical;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
@@ -645,6 +665,7 @@
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
   transform: translateY(-1px);
+  background: #fffef8;
 }
 
 .textarea:disabled {
@@ -825,7 +846,7 @@
 }
 
 /* =========================
-   SCROLLBAR ESTILO (solo table + panel)
+   SCROLLBAR
 ========================= */
 .tableWrap,
 .panelBody {
