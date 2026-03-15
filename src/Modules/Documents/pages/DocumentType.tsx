@@ -99,7 +99,6 @@ export default function DocumentType() {
 
   const selectedId = useMemo(() => getId(selected), [selected]);
 
-  // ✅ REFS para que loadPaged NO dependa de selectedId/mode
   const selectedIdRef = useRef<number | null>(null);
   const modeRef = useRef<"view" | "create" | "edit">("view");
 
@@ -118,19 +117,23 @@ export default function DocumentType() {
     pageSize: number | null;
   } {
     if (Array.isArray(payload)) {
-      return { items: payload as DocumentTypeRow[], totalCount: null, page: null, pageSize: null };
+      return {
+        items: payload as DocumentTypeRow[],
+        totalCount: null,
+        page: null,
+        pageSize: null,
+      };
     }
 
     const p = (payload ?? {}) as PagedLike;
 
-    const items =
-      (p.items ??
-        p.Items ??
-        p.data ??
-        p.Data ??
-        p.documentTypes ??
-        p.DocumentTypes ??
-        []) as DocumentTypeRow[];
+    const items = (p.items ??
+      p.Items ??
+      p.data ??
+      p.Data ??
+      p.documentTypes ??
+      p.DocumentTypes ??
+      []) as DocumentTypeRow[];
 
     const totalCount =
       (p.totalCount ?? p.TotalCount ?? p.total ?? p.Total) != null
@@ -142,19 +145,21 @@ export default function DocumentType() {
         ? Number(p.pageNumber ?? p.PageNumber ?? p.page ?? p.Page)
         : null;
 
-    const pageSize = (p.pageSize ?? p.PageSize) != null ? Number(p.pageSize ?? p.PageSize) : null;
+    const pageSize =
+      (p.pageSize ?? p.PageSize) != null
+        ? Number(p.pageSize ?? p.PageSize)
+        : null;
 
     return { items, totalCount, page, pageSize };
   }
 
-  // ✅ loadPaged estable (solo depende de showToast)
   const loadPaged = useCallback(
     async (nextPage: number, nextPageSize: number) => {
       setLoading(true);
       try {
         const result = await requestJson(
           `${DOC_BASE}/paged?pageNumber=${nextPage}&pageSize=${nextPageSize}`,
-          { method: "GET", headers: authHeaders() }
+          { method: "GET", headers: authHeaders() },
         );
 
         if (!result.ok) {
@@ -171,13 +176,11 @@ export default function DocumentType() {
         setPage(norm.page ?? nextPage);
         setPageSize(norm.pageSize ?? nextPageSize);
 
-        // ✅ re-selección usando REF (no provoca rerender/recarga)
         const keepId = selectedIdRef.current;
         if (keepId != null) {
           const found = norm.items.find((d) => getId(d) === keepId) ?? null;
           setSelected(found);
 
-          // Si está editando y el registro sigue visible, repoblar form
           if (found && modeRef.current === "edit") {
             setEdit({
               idDocumentType: String(getId(found) ?? ""),
@@ -195,10 +198,9 @@ export default function DocumentType() {
         setLoading(false);
       }
     },
-    [showToast]
+    [showToast],
   );
 
-  // ✅ IMPORTANTE: solo 1 vez (como Users)
   useEffect(() => {
     void loadPaged(1, 10);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -365,13 +367,22 @@ export default function DocumentType() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Tipos de documento</h1>
             <p className={styles.sub}>
-              {showInactive ? "Viendo tipos inactivos." : "Viendo tipos activos."}
+              {showInactive
+                ? "Viendo tipos inactivos."
+                : "Viendo tipos activos."}
             </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -393,7 +404,14 @@ export default function DocumentType() {
                 aria-label="Limpiar búsqueda"
                 disabled={saving || loading}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -406,7 +424,9 @@ export default function DocumentType() {
               className={styles.btnGhost}
               type="button"
               onClick={toggleViewActiveInactive}
-              disabled={saving || loading || mode === "create" || mode === "edit"}
+              disabled={
+                saving || loading || mode === "create" || mode === "edit"
+              }
               title="Cambiar vista activos/inactivos"
             >
               {showInactive ? "Ver activos" : "Ver inactivos"}
@@ -451,7 +471,9 @@ export default function DocumentType() {
                   className={styles.pagerBtn}
                   type="button"
                   disabled={loading || saving || page <= 1}
-                  onClick={() => void loadPaged(Math.max(1, page - 1), pageSize)}
+                  onClick={() =>
+                    void loadPaged(Math.max(1, page - 1), pageSize)
+                  }
                 >
                   Anterior
                 </button>
@@ -464,7 +486,13 @@ export default function DocumentType() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || (totalPages != null ? page >= totalPages : rows.length < pageSize)}
+                  disabled={
+                    loading ||
+                    saving ||
+                    (totalPages != null
+                      ? page >= totalPages
+                      : rows.length < pageSize)
+                  }
                   onClick={() => void loadPaged(page + 1, pageSize)}
                 >
                   Siguiente
@@ -496,15 +524,16 @@ export default function DocumentType() {
                       {search.trim()
                         ? "No se encontraron registros con esos criterios."
                         : showInactive
-                        ? "No hay tipos inactivos."
-                        : "No hay tipos activos."}
+                          ? "No hay tipos inactivos."
+                          : "No hay tipos activos."}
                     </td>
                   </tr>
                 ) : (
                   displayedRows.map((d, idx) => {
                     const id = getId(d);
                     const key = id != null ? String(id) : `row-${idx}`;
-                    const isSelected = selectedId != null && id != null && id === selectedId;
+                    const isSelected =
+                      selectedId != null && id != null && id === selectedId;
                     const active = getActive(d) ?? false;
 
                     return (
@@ -516,7 +545,11 @@ export default function DocumentType() {
                         <td className={styles.mono}>{getName(d) ?? "—"}</td>
                         <td>{getDescription(d) ?? "—"}</td>
                         <td>
-                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
+                          <Switch
+                            checked={active}
+                            disabled
+                            label={active ? "Activo" : "Inactivo"}
+                          />
                         </td>
                       </tr>
                     );
@@ -530,7 +563,11 @@ export default function DocumentType() {
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo tipo" : mode === "edit" ? "Editar tipo" : "Detalle"}
+              {mode === "create"
+                ? "Nuevo tipo"
+                : mode === "edit"
+                  ? "Editar tipo"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -543,50 +580,83 @@ export default function DocumentType() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Nombre" required>
-                    <input
-                      className={styles.input}
-                      value={create.documentName}
-                      onChange={(e) => setCreate((p) => ({ ...p, documentName: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Ej. Póliza"
-                    />
-                  </Field>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <Field label="Nombre" required>
+                      <textarea
+                        className={styles.textarea}
+                        value={create.documentName}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            documentName: e.target.value,
+                          }))
+                        }
+                        disabled={createDisabled}
+                        placeholder="Ej. Póliza"
+                        rows={2}
+                      />
+                    </Field>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={create.description}
-                      onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Descripción breve..."
-                    />
-                  </Field>
-                </div>
+                    <Field label="Descripción" required>
+                      <textarea
+                        className={styles.textarea}
+                        value={create.description}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: breakTextEvery12Words(e.target.value),
+                          }))
+                        }
+                        disabled={createDisabled}
+                        placeholder="Descripción breve..."
+                        rows={4}
+                      />
+                    </Field>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={create.active}
-                    disabled={createDisabled}
-                    label={create.active ? "Activo" : "Inactivo"}
-                    onChange={(next) => setCreate((p) => ({ ...p, active: next }))}
-                  />
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={create.active}
+                        disabled={createDisabled}
+                        label={create.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setCreate((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
                     Cancelar
                   </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={createDisabled}
+                  >
                     {saving ? "Guardando..." : "Guardar"}
                   </button>
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un tipo de documento de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona un tipo de documento de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -596,24 +666,35 @@ export default function DocumentType() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  
                   <Field label="Nombre" required>
-                    <input
-                      className={styles.input}
+                    <textarea
+                      className={styles.textarea}
                       value={edit.documentName}
-                      onChange={(e) => setEdit((p) => ({ ...p, documentName: e.target.value }))}
+                      onChange={(e) =>
+                        setEdit((p) => ({ ...p, documentName: e.target.value }))
+                      }
                       disabled={saving || loading}
                       placeholder="Nombre..."
+                      rows={2}
                     />
                   </Field>
 
                   <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
+                    <textarea
+                      className={styles.textarea}
                       value={edit.description}
-                      onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
+                      onChange={(e) =>
+                        setEdit((p) => ({ ...p, description: e.target.value }))
+                      }
+                      onBlur={(e) =>
+                        setEdit((p) => ({
+                          ...p,
+                          description: breakTextEvery12Words(e.target.value),
+                        }))
+                      }
                       disabled={saving || loading}
                       placeholder="Descripción..."
+                      rows={4}
                     />
                   </Field>
 
@@ -623,48 +704,77 @@ export default function DocumentType() {
                       checked={edit.active}
                       disabled={saving || loading}
                       label={edit.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setEdit((p) => ({ ...p, active: next }))}
+                      onChange={(next) =>
+                        setEdit((p) => ({ ...p, active: next }))
+                      }
                     />
                   </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
                     Cancelar
                   </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={saving || loading}>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={saving || loading}
+                  >
                     {saving ? "Guardando..." : "Guardar cambios"}
                   </button>
                 </div>
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Nombre</span>
-                  <span className={styles.detailValue}>{getName(selected) ?? "—"}</span>
-                </div>
+                <div className={styles.detailCard}>
+                  <div className={styles.detailItemDescription}>
+                    <span className={styles.detailLabel}>Nombre</span>
+                    <div className={styles.detailNameBox}>
+                      {getName(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Descripción</span>
-                  <span className={styles.detailValue}>{getDescription(selected) ?? "—"}</span>
-                </div>
+                  <div className={styles.detailItemDescription}>
+                    <span className={styles.detailLabel}>Descripción</span>
+                    <div className={styles.detailDescriptionBox}>
+                      {getDescription(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={getActive(selected) ?? false}
+                      disabled
+                      label={
+                        (getActive(selected) ?? false) ? "Activo" : "Inactivo"
+                      }
+                    />
+                  </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={saving}
+                  >
                     Cerrar
                   </button>
 
-                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={saving || loading}
+                  >
                     Editar
                   </button>
                 </div>
@@ -733,7 +843,9 @@ function getId(d: DocumentTypeRow | null): number | null {
 
 function getName(d: DocumentTypeRow | null): string | null {
   if (!d) return null;
-  const s = String(d.documentName ?? d.DocumentName ?? d.name ?? d.Name ?? "").trim();
+  const s = String(
+    d.documentName ?? d.DocumentName ?? d.name ?? d.Name ?? "",
+  ).trim();
   return s ? s : null;
 }
 
@@ -755,6 +867,17 @@ function getActive(d: DocumentTypeRow | null): boolean | null {
     if (t === "false" || t === "0" || t === "no") return false;
   }
   return null;
+}
+
+function breakTextEvery12Words(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+
+  for (let i = 0; i < words.length; i += 12) {
+    lines.push(words.slice(i, i + 12).join(" "));
+  }
+
+  return lines.join("\n");
 }
 
 function toErrorMessage(e: unknown): string {
