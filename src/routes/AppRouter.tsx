@@ -8,7 +8,6 @@ import Roles from "../Modules/Roles/pages/Roles";
 import PermissionsByRole from "../Modules/Permissions/pages/Permissions";
 import Cog from "../Modules/Cog/pages/Cog";
 import FundingSource from "../Modules/FundingSource/pages/FundingSource";
-import ActionsPolicy from "../Modules/ActionsPolicy/pages/ActionsPolicy";
 import Community from "../Modules/Community/pages/Community";
 import Prog from "../Modules/Prog/pages/Prog";
 import Proyect from "../Modules/Proyect/pages/Proyec";
@@ -89,11 +88,7 @@ export default function AppRouter() {
               <Route path="/catalogos/fondo-financiamiento" element={<FundingSource />} />
             </Route>
 
-            {/* Acciones póliza */}
-            <Route element={<RequireModule modulePath="/catalogos/acciones-poliza" />}>
-              <Route path="/catalogos/acciones-poliza" element={<ActionsPolicy />} />
-            </Route>
-
+            
             {/* Pólizas de pago */}
             <Route element={<RequireModule modulePath="/catalogos/polizas" />}>
               <Route path="/catalogos/polizas" element={<PaymentPolicy />} />

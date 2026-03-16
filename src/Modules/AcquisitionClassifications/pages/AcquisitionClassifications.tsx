@@ -1,27 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "../styles/acquisitionClassifications.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
 type AcquisitionClassification = {
-  // DTO real (según tu código)
   idAcquisitionClassification?: number;
-  Code?: number;
-  Description?: string;
-  Active?: boolean;
-
-  // variantes por si llega camelCase u otras
   IdAcquisitionClassification?: number;
-  code?: number;
-  description?: string;
-  active?: boolean;
-
-  isActive?: boolean;
-  IsActive?: boolean;
-
   id?: number;
   Id?: number;
+
+  Code?: number;
+  code?: number;
+
+  Description?: string;
+  description?: string;
+  descripcion?: string;
+  Descripcion?: string;
+
+  Active?: boolean | number | string;
+  active?: boolean | number | string;
+  isActive?: boolean | number | string;
+  IsActive?: boolean | number | string;
 
   [key: string]: unknown;
 };
@@ -57,10 +57,8 @@ export default function AcquisitionClassifications() {
 
   const [showInactive, setShowInactive] = useState(false);
   const [saving, setSaving] = useState(false);
-
   const [search, setSearch] = useState("");
 
-  // paginación FRONT
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -77,8 +75,14 @@ export default function AcquisitionClassifications() {
     setToastOpen(true);
   }, []);
 
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
   const selectedId = useMemo(() => getId(selected), [selected]);
+  const selectedCode = useMemo(() => getCode(selected), [selected]);
+
+  const modeRef = useRef<"view" | "create" | "edit">("view");
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     void loadAll(null);
@@ -126,11 +130,13 @@ export default function AcquisitionClassifications() {
         isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
           ? String((parsed as UnknownRecord).message)
           : "";
+
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
         text ||
         `HTTP ${res.status}`;
+
       return { ok: false, error: msg, status: res.status };
     }
 
@@ -139,6 +145,7 @@ export default function AcquisitionClassifications() {
 
   function extractList(payload: unknown): AcquisitionClassification[] {
     if (Array.isArray(payload)) return payload as AcquisitionClassification[];
+
     if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
       return (payload as UnknownRecord).$values as AcquisitionClassification[];
     }
@@ -173,32 +180,41 @@ export default function AcquisitionClassifications() {
     if (!isRecord(payload)) return null;
 
     const obj = payload as UnknownRecord;
-
     const values = obj["$values"];
     if (Array.isArray(values)) return values;
 
-    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
+    const keys = [
+      "data",
+      "result",
+      "items",
+      "value",
+      "values",
+      "Items",
+      "Data",
+      "Result",
+    ];
+
     for (const k of keys) {
       const v = obj[k];
       if (Array.isArray(v)) return v;
       const nested = findArrayDeep(v, depth + 1);
       if (nested) return nested;
     }
+
     return null;
   }
 
   function codeExists(code: number): boolean {
-    return rows.some((u) => getCode(u) === code);
+    return rows.some((r) => getCode(r) === code);
   }
 
-  // ✅ nuevo: para validar duplicados en edición (excepto el registro actual)
   function codeExistsExcept(code: number, exceptId: number | null): boolean {
     return rows.some((r) => {
-      const rCode = getCode(r);
-      const rId = getId(r);
-      if (rCode !== code) return false;
+      const rowCode = getCode(r);
+      const rowId = getId(r);
+      if (rowCode !== code) return false;
       if (exceptId == null) return true;
-      return rId !== exceptId;
+      return rowId !== exceptId;
     });
   }
 
@@ -206,6 +222,7 @@ export default function AcquisitionClassifications() {
     setLoading(true);
     try {
       const token = readToken();
+
       if (!token) {
         showToast("error", "No hay token. Inicia sesión nuevamente.");
         setRows([]);
@@ -229,9 +246,8 @@ export default function AcquisitionClassifications() {
       if (keepSelectedCode != null) {
         const found = list.find((r) => getCode(r) === keepSelectedCode) ?? null;
         setSelected(found);
-        setMode("view");
 
-        if (found && mode === "edit") {
+        if (found && modeRef.current === "edit") {
           setFormEdit({
             code: String(getCode(found) ?? ""),
             description: String(getDescription(found) ?? ""),
@@ -247,11 +263,6 @@ export default function AcquisitionClassifications() {
     }
   }
 
-  /**
-   * ✅ FILTRO (igual tu vista)
-   * - Sin búsqueda: respeta showInactive (activos/inactivos)
-   * - Con búsqueda: busca en TODOS (activos + inactivos)
-   */
   const filteredRows = useMemo(() => {
     const q = asTrim(search).toLowerCase();
 
@@ -264,9 +275,9 @@ export default function AcquisitionClassifications() {
 
     if (!q) return base;
 
-    return base.filter((u) => {
-      const code = String(getCode(u) ?? "").toLowerCase();
-      const desc = String(getDescription(u) ?? "").toLowerCase();
+    return base.filter((r) => {
+      const code = String(getCode(r) ?? "").toLowerCase();
+      const desc = String(getDescription(r) ?? "").toLowerCase();
       return code.includes(q) || desc.includes(q);
     });
   }, [rows, search, showInactive]);
@@ -301,11 +312,13 @@ export default function AcquisitionClassifications() {
 
   function startEdit() {
     if (!selected) return;
+
     setFormEdit({
       code: String(getCode(selected) ?? ""),
       description: String(getDescription(selected) ?? ""),
       active: getActive(selected) ?? true,
     });
+
     setMode("edit");
   }
 
@@ -314,28 +327,38 @@ export default function AcquisitionClassifications() {
     setSelected(null);
     setMode("view");
     setPage(1);
+    setSearch("");
   }
 
   function validateForm(f: FormDto, isCreate: boolean): string {
     const codeNum = Number(f.code);
-    if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
+
+    if (!Number.isFinite(codeNum) || codeNum <= 0) {
+      return "La clave debe ser un número mayor a 0.";
+    }
 
     if (isCreate) {
       if (codeExists(codeNum)) return "No se pueden repetir las claves.";
     } else {
       const sid = getId(selected);
-      if (codeExistsExcept(codeNum, sid)) return "No se pueden repetir las claves.";
+      if (codeExistsExcept(codeNum, sid)) {
+        return "No se pueden repetir las claves.";
+      }
     }
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
     if (desc.length < 3) return "La descripción es muy corta.";
+
     return "";
   }
 
   async function onCreate() {
     const msg = validateForm(formCreate, true);
-    if (msg) return showToast("error", msg);
+    if (msg) {
+      showToast("error", msg);
+      return;
+    }
 
     const codeNum = Number(formCreate.code);
 
@@ -353,7 +376,10 @@ export default function AcquisitionClassifications() {
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        showToast("error", result.error);
+        return;
+      }
 
       showToast("success", "Clasificación creada correctamente");
       setMode("view");
@@ -367,17 +393,26 @@ export default function AcquisitionClassifications() {
   }
 
   async function onUpdate() {
-    if (!selected) return showToast("error", "Selecciona un registro para editar.");
+    if (!selected) {
+      showToast("error", "Selecciona una clasificación para editar.");
+      return;
+    }
 
     const msg = validateForm(formEdit, false);
-    if (msg) return showToast("error", msg);
+    if (msg) {
+      showToast("error", msg);
+      return;
+    }
 
-    if (selectedId == null) return showToast("error", "No se pudo resolver el idAcquisitionClassification.");
+    if (selectedId == null) {
+      showToast("error", "No se pudo resolver el idAcquisitionClassification.");
+      return;
+    }
 
     setSaving(true);
     try {
       const payload = {
-        Code: Number(formEdit.code), // ✅ ahora sí editable
+        Code: Number(formEdit.code),
         Description: asTrim(formEdit.description),
         Active: Boolean(formEdit.active),
       };
@@ -388,7 +423,10 @@ export default function AcquisitionClassifications() {
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        showToast("error", result.error);
+        return;
+      }
 
       const newCode = Number(formEdit.code);
 
@@ -404,12 +442,18 @@ export default function AcquisitionClassifications() {
   }
 
   async function onToggleActive() {
-    if (!selected) return showToast("error", "Selecciona un registro.");
-    const code = selectedCode;
-    if (code == null) return showToast("error", "No se pudo resolver el Code.");
+    if (!selected) {
+      showToast("error", "Selecciona una clasificación.");
+      return;
+    }
 
-    const current = getActive(selected) ?? false;
-    const next = !current;
+    const code = getCode(selected);
+    if (code == null) {
+      showToast("error", "No se pudo resolver el Code.");
+      return;
+    }
+
+    const next = !(getActive(selected) ?? false);
 
     setSaving(true);
     try {
@@ -419,11 +463,16 @@ export default function AcquisitionClassifications() {
         body: JSON.stringify(next),
       });
 
-      if (!result.ok) return showToast("error", result.error);
+      if (!result.ok) {
+        showToast("error", result.error);
+        return;
+      }
 
-      showToast("success", next ? "Se activó correctamente" : "Se desactivó correctamente");
-      await loadAll(code); // ✅ mantiene selección por code
-      setMode("view");
+      showToast(
+        "success",
+        `Estatus actualizado: ${next ? "Activo" : "Inactivo"}`
+      );
+      await loadAll(code);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -431,7 +480,7 @@ export default function AcquisitionClassifications() {
     }
   }
 
-  const createDisabled = saving || loading;
+  const formDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -451,14 +500,21 @@ export default function AcquisitionClassifications() {
               {asTrim(search)
                 ? "Buscando en activos e inactivos."
                 : showInactive
-                ? "Viendo registros inactivos."
-                : "Viendo registros activos."}
+                  ? "Viendo clasificaciones inactivas."
+                  : "Viendo clasificaciones activas."}
             </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -469,7 +525,7 @@ export default function AcquisitionClassifications() {
               placeholder="Buscar por clave o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              disabled={saving || loading}
+              disabled={formDisabled}
             />
 
             {asTrim(search) !== "" && (
@@ -478,9 +534,16 @@ export default function AcquisitionClassifications() {
                 onClick={() => setSearch("")}
                 type="button"
                 aria-label="Limpiar búsqueda"
-                disabled={saving || loading}
+                disabled={formDisabled}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -496,18 +559,22 @@ export default function AcquisitionClassifications() {
               disabled={saving || loading || mode === "create" || mode === "edit"}
               title="Cambiar vista activos/inactivos"
             >
-              {showInactive ? "Ver activos" : "Ver inactivos"}
+              {showInactive ? "Ver activas" : "Ver inactivas"}
             </button>
 
-            <button className={styles.btnPrimary} onClick={startCreate} disabled={saving || mode === "create"} type="button">
-              {mode === "create" ? "Creando..." : "+ Nueva"}
+            <button
+              className={styles.btnPrimary}
+              onClick={startCreate}
+              disabled={saving || mode === "create"}
+              type="button"
+            >
+              {mode === "create" ? "Creando..." : "+ Nueva clasificación"}
             </button>
           </div>
         </div>
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
@@ -516,7 +583,7 @@ export default function AcquisitionClassifications() {
               <select
                 className={styles.pageSize}
                 value={pageSize}
-                disabled={loading || saving}
+                disabled={formDisabled}
                 onChange={(e) => {
                   const ps = Number(e.target.value);
                   setPageSize(ps);
@@ -534,7 +601,7 @@ export default function AcquisitionClassifications() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page <= 1}
+                  disabled={formDisabled || page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
                   Anterior
@@ -547,7 +614,7 @@ export default function AcquisitionClassifications() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page >= totalPages}
+                  disabled={formDisabled || page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
                   Siguiente
@@ -577,18 +644,20 @@ export default function AcquisitionClassifications() {
                   <tr>
                     <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
-                        ? "No se encontraron registros (activos o inactivos) con esos criterios."
+                        ? "No se encontraron clasificaciones (activas o inactivas) con esos criterios."
                         : showInactive
-                        ? "No hay registros inactivos."
-                        : "No hay registros activos."}
+                          ? "No hay clasificaciones inactivas."
+                          : "No hay clasificaciones activas."}
                     </td>
                   </tr>
                 ) : (
                   displayedRows.map((r, idx) => {
                     const code = getCode(r);
                     const key = code != null ? String(code) : `row-${idx}`;
-                    const isSelected = selectedCode != null && code != null && code === selectedCode;
+                    const isSelected =
+                      selectedCode != null && code != null && code === selectedCode;
                     const active = getActive(r) ?? false;
+                    const fullDescription = getDescription(r);
 
                     return (
                       <tr
@@ -596,10 +665,18 @@ export default function AcquisitionClassifications() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(r)}
                       >
-                        <td className={styles.mono}>{code != null ? String(code) : "—"}</td>
-                        <td>{getDescription(r) ?? "—"}</td>
+                        <td className={styles.mono}>
+                          {code != null ? String(code) : "—"}
+                        </td>
+                        <td title={fullDescription ?? ""}>
+                          {limitWords(fullDescription, 10) ?? "—"}
+                        </td>
                         <td>
-                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
+                          <Switch
+                            checked={active}
+                            disabled
+                            label={active ? "Activo" : "Inactivo"}
+                          />
                         </td>
                       </tr>
                     );
@@ -610,11 +687,14 @@ export default function AcquisitionClassifications() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nueva clasificación" : mode === "edit" ? "Editar clasificación" : "Detalle"}
+              {mode === "create"
+                ? "Nueva clasificación"
+                : mode === "edit"
+                  ? "Editar clasificación"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -627,50 +707,82 @@ export default function AcquisitionClassifications() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Clave" required>
-                    <input
-                      className={styles.input}
-                      value={formCreate.code}
-                      onChange={(e) => setFormCreate((p) => ({ ...p, code: e.target.value }))}
-                      disabled={createDisabled}
-                      inputMode="numeric"
-                      placeholder="Ej: 10"
-                    />
-                  </Field>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Clave</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={formCreate.code}
+                        onChange={(e) =>
+                          setFormCreate((p) => ({ ...p, code: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        inputMode="numeric"
+                        placeholder="Ej: 1"
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={formCreate.description}
-                      onChange={(e) => setFormCreate((p) => ({ ...p, description: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Descripción"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={formCreate.description}
+                        onChange={(e) =>
+                          setFormCreate((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setFormCreate((p) => ({
+                            ...p,
+                            description: breakTextEvery12Words(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe la descripción..."
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Activo">
-                    <Switch
-                      checked={formCreate.active}
-                      disabled={createDisabled}
-                      label={formCreate.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setFormCreate((p) => ({ ...p, active: next }))}
-                    />
-                  </Field>
-                </div>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={formCreate.active}
+                        disabled={formDisabled}
+                        label={formCreate.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setFormCreate((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={formDisabled}
+                    >
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un registro de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona una clasificación de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -680,76 +792,120 @@ export default function AcquisitionClassifications() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  {/* ✅ Ya NO mostramos ID */}
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Clave</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={formEdit.code}
+                        onChange={(e) =>
+                          setFormEdit((p) => ({ ...p, code: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        inputMode="numeric"
+                        placeholder="Ej: 1"
+                      />
+                    </div>
 
-                  {/* ✅ Clave editable */}
-                  <Field label="Clave" required>
-                    <input
-                      className={styles.input}
-                      value={formEdit.code}
-                      onChange={(e) => setFormEdit((p) => ({ ...p, code: e.target.value }))}
-                      disabled={saving || loading}
-                      inputMode="numeric"
-                      placeholder="Ej: 10"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={formEdit.description}
+                        onChange={(e) =>
+                          setFormEdit((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setFormEdit((p) => ({
+                            ...p,
+                            description: breakTextEvery12Words(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Escribe la descripción..."
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={formEdit.description}
-                      onChange={(e) => setFormEdit((p) => ({ ...p, description: e.target.value }))}
-                      disabled={saving || loading}
-                      placeholder="Descripción"
-                    />
-                  </Field>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={formEdit.active}
+                        disabled={formDisabled}
+                        label={formEdit.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setFormEdit((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                  <div className={styles.detailRow}>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={formDisabled}
+                    >
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Clave</span>
+                    <div className={styles.floatingValue}>
+                      {String(selectedCode ?? "—")}
+                    </div>
+                  </div>
+
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>Descripción</span>
+                    <div className={styles.floatingValueArea}>
+                      {getDescription(selected) ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Activo</span>
                     <Switch
-                      checked={formEdit.active}
-                      disabled={saving || loading}
-                      label={formEdit.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setFormEdit((p) => ({ ...p, active: next }))}
+                      checked={getActive(selected) ?? false}
+                      disabled
+                      label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
                     />
                   </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
-
-                  <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Clave</span>
-                  <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
-                </div>
-
-                {/* ✅ Ya NO mostramos ID */}
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Descripción</span>
-                  <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch checked={getActive(selected) ?? false} disabled label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"} />
-                </div>
-
-                <div className={styles.actions}>
-                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={saving}
+                  >
                     Cerrar
                   </button>
 
-                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={formDisabled}
+                  >
                     Editar
                   </button>
 
@@ -757,10 +913,10 @@ export default function AcquisitionClassifications() {
                     className={styles.btnDanger}
                     type="button"
                     onClick={() => void onToggleActive()}
-                    disabled={saving || loading}
-                    title="Activa/Desactiva por Code (PATCH)"
+                    disabled={formDisabled}
+                    title="Activar / Desactivar"
                   >
-                    {(getActive(selected) ?? false) ? "Desactivar" : "Activar"}
+                    {getActive(selected) ? "Desactivar" : "Activar"}
                   </button>
                 </div>
               </div>
@@ -772,7 +928,6 @@ export default function AcquisitionClassifications() {
   );
 }
 
-/** Switch */
 type SwitchProps = {
   checked: boolean;
   onChange?: (next: boolean) => void;
@@ -798,28 +953,6 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
   );
 }
 
-/** Field */
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/** Helpers */
 function getId(u: AcquisitionClassification | null): number | null {
   if (!u) return null;
   const v = u.idAcquisitionClassification ?? u.IdAcquisitionClassification ?? u.id ?? u.Id;
@@ -836,7 +969,7 @@ function getCode(u: AcquisitionClassification | null): number | null {
 
 function getDescription(u: AcquisitionClassification | null): string | null {
   if (!u) return null;
-  const v = u.Description ?? u.description;
+  const v = u.Description ?? u.description ?? u.descripcion ?? u.Descripcion;
   const s = asTrim(v ?? "");
   return s ? s : null;
 }
@@ -878,6 +1011,7 @@ async function safeText(res: Response): Promise<string> {
 function tryParseJson(text: string): unknown {
   const t = asTrim(text);
   if (!t) return null;
+
   try {
     return JSON.parse(t) as unknown;
   } catch {
@@ -889,9 +1023,30 @@ function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
 }
 
+function breakTextEvery12Words(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+
+  for (let i = 0; i < words.length; i += 12) {
+    lines.push(words.slice(i, i + 12).join(" "));
+  }
+
+  return lines.join("\n");
+}
+
+function limitWords(text: string | null, maxWords: number): string | null {
+  if (!text) return null;
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
+
   try {
     return JSON.stringify(e);
   } catch {

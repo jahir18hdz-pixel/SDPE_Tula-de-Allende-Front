@@ -63,7 +63,6 @@ export default function Sidebar({
           { label: "Permisos", to: "/catalogos/permisos" },
           { label: "COG", to: "/catalogos/cog" },
           { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
-          { label: "Acciones de Póliza", to: "/catalogos/acciones-poliza" },
           { label: "Pólizas de Pago", to: "/catalogos/polizas" },
           { label: "Comunidades", to: "/catalogos/comunidades" },
           { label: "Beneficiarios", to: "/catalogos/beneficiarios" },

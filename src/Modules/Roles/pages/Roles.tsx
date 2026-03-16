@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import styles from "../styles/Roles.module.css";
 
 import Toast from "../../../Components/layout/Toast";
@@ -22,10 +28,10 @@ type Role = {
   descripcion?: string;
   Descripcion?: string;
 
-  active?: boolean;
-  Active?: boolean;
-  isActive?: boolean;
-  IsActive?: boolean;
+  active?: boolean | number | string;
+  Active?: boolean | number | string;
+  isActive?: boolean | number | string;
+  IsActive?: boolean | number | string;
 
   [key: string]: unknown;
 };
@@ -60,7 +66,6 @@ export default function Roles() {
 
   const [search, setSearch] = useState("");
 
-  // paginación FRONT
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -77,8 +82,12 @@ export default function Roles() {
     setToastOpen(true);
   }, []);
 
-  // ✅ ID solo interno (NO se muestra)
   const selectedId = useMemo(() => getId(selected), [selected]);
+  const modeRef = useRef<"view" | "create" | "edit">("view");
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     void loadAll();
@@ -109,7 +118,7 @@ export default function Roles() {
 
   async function requestJson(
     url: string,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<
     | { ok: true; data: unknown; status: number }
     | { ok: false; error: string; status: number }
@@ -122,15 +131,18 @@ export default function Roles() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
-          ? String((parsed as UnknownRecord).message)
-          : "";
+      const apiMsg = isRecord(parsed)
+        ? getStringProp(parsed, "message") ??
+          getStringProp(parsed, "title") ??
+          ""
+        : "";
+
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
         text ||
         `HTTP ${res.status}`;
+
       return { ok: false, error: msg, status: res.status };
     }
 
@@ -139,11 +151,32 @@ export default function Roles() {
 
   function extractList(payload: unknown): Role[] {
     if (Array.isArray(payload)) return payload as Role[];
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
-      return (payload as UnknownRecord).$values as Role[];
+
+    if (isRecord(payload) && Array.isArray(payload.$values)) {
+      return payload.$values as Role[];
     }
+
+    const obj = asObject(payload);
+    if (!obj) return [];
+
+    const possible =
+      obj.items ??
+      obj.Items ??
+      obj.data ??
+      obj.Data ??
+      obj.roles ??
+      obj.Roles ??
+      obj.values ??
+      obj.Values ??
+      obj.result ??
+      obj.Result;
+
+    if (Array.isArray(possible)) return possible as Role[];
+
     const arr = findArrayDeep(payload, 0);
     if (arr) return arr as Role[];
+
+    if (isRecord(payload)) return [payload as Role];
     return [];
   }
 
@@ -152,28 +185,46 @@ export default function Roles() {
     if (Array.isArray(payload)) return payload;
     if (!isRecord(payload)) return null;
 
-    const obj = payload as UnknownRecord;
+    const keys = [
+      "$values",
+      "data",
+      "Data",
+      "items",
+      "Items",
+      "result",
+      "Result",
+      "values",
+      "Values",
+      "roles",
+      "Roles",
+      "value",
+      "Value",
+    ];
 
-    const values = obj["$values"];
-    if (Array.isArray(values)) return values;
-
-    const keys = ["data", "result", "items", "value", "values"];
-    for (const k of keys) {
-      const v = obj[k];
-      if (Array.isArray(v)) return v;
-      const nested = findArrayDeep(v, depth + 1);
+    for (const key of keys) {
+      const value = payload[key];
+      if (Array.isArray(value)) return value;
+      const nested = findArrayDeep(value, depth + 1);
       if (nested) return nested;
     }
+
     return null;
   }
 
-  function nameExists(name: string): boolean {
-    const n = asTrim(name).toLowerCase();
-    if (!n) return false;
-    return rows.some((r) => (getName(r) ?? "").trim().toLowerCase() === n);
+  function nameExists(name: string, ignoreId?: number | null): boolean {
+    const normalized = asTrim(name).toLowerCase();
+    if (!normalized) return false;
+
+    return rows.some((r) => {
+      const currentId = getId(r);
+      const currentName = (getName(r) ?? "").trim().toLowerCase();
+
+      if (ignoreId != null && currentId === ignoreId) return false;
+      return currentName === normalized;
+    });
   }
 
-  async function loadAll(keepSelectedId?: number | null) {
+  async function loadAll() {
     setLoading(true);
     try {
       const token = readToken();
@@ -197,11 +248,11 @@ export default function Roles() {
       const list = extractList(result.data);
       setRows(list);
 
-      if (keepSelectedId != null) {
-        const found = list.find((r) => getId(r) === keepSelectedId) ?? null;
+      if (selectedId != null) {
+        const found = list.find((r) => getId(r) === selectedId) ?? null;
         setSelected(found);
-        setMode("view");
-        if (found && mode === "edit") {
+
+        if (found && modeRef.current === "edit") {
           setEdit({
             name: String(getName(found) ?? ""),
             description: String(getDescription(found) ?? ""),
@@ -217,11 +268,6 @@ export default function Roles() {
     }
   }
 
-  /**
-   * ✅ FILTRO CORREGIDO (sin ID)
-   * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
-   * - Con búsqueda: busca en TODOS (activos + inactivos)
-   */
   const filteredRows = useMemo(() => {
     const q = asTrim(search).toLowerCase();
 
@@ -234,7 +280,6 @@ export default function Roles() {
 
     if (!q) return base;
 
-    // ✅ búsqueda SOLO por nombre/descripción (sin ID)
     return base.filter((r) => {
       const name = String(getName(r) ?? "").toLowerCase();
       const desc = String(getDescription(r) ?? "").toLowerCase();
@@ -249,7 +294,7 @@ export default function Roles() {
     setPage((p) => Math.min(Math.max(1, p), totalPages));
   }, [totalPages]);
 
-  const pagedRows = useMemo(() => {
+  const displayedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, page, pageSize]);
@@ -272,6 +317,7 @@ export default function Roles() {
 
   function startEdit() {
     if (!selected) return;
+
     setEdit({
       name: String(getName(selected) ?? ""),
       description: String(getDescription(selected) ?? ""),
@@ -280,7 +326,6 @@ export default function Roles() {
     setMode("edit");
   }
 
-  // ✅ No borra el search
   function toggleViewActiveInactive() {
     setShowInactive((prev) => !prev);
     setSelected(null);
@@ -294,7 +339,14 @@ export default function Roles() {
 
     if (!name) return "El nombre del rol es obligatorio.";
     if (name.length < 3) return "El nombre del rol es muy corto.";
-    if (isCreate && nameExists(name)) return "No se pueden repetir los nombres de rol.";
+
+    if (isCreate && nameExists(name)) {
+      return "No se pueden repetir los nombres de rol.";
+    }
+
+    if (!isCreate && nameExists(name, selectedId)) {
+      return "No se pueden repetir los nombres de rol.";
+    }
 
     if (!desc) return "La descripción es obligatoria.";
     if (desc.length < 3) return "La descripción es muy corta.";
@@ -325,7 +377,7 @@ export default function Roles() {
       showToast("success", "Rol creado correctamente");
       setMode("view");
       setCreate(initialForm);
-      await loadAll(null);
+      await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -334,9 +386,9 @@ export default function Roles() {
   }
 
   async function onSaveEdit() {
-    // ✅ ID sigue siendo requerido para el PUT, pero NO se muestra en UI
-    if (!selected || selectedId == null) {
-      return showToast("error", "Selecciona un rol para editar.");
+    const id = selectedId;
+    if (id == null || id <= 0) {
+      return showToast("error", "No pude identificar el rol seleccionado.");
     }
 
     const msg = validateForm(edit, false);
@@ -344,14 +396,14 @@ export default function Roles() {
 
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = {
-        IdRol: selectedId,
+      const payload = {
+        IdRol: id,
         RolName: asTrim(edit.name),
         Description: asTrim(edit.description),
         active: Boolean(edit.active),
       };
 
-      const result = await requestJson(API_BASE, {
+      const result = await requestJson(`${API_BASE}/${id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -362,7 +414,7 @@ export default function Roles() {
       showToast("success", "Rol actualizado correctamente");
       setMode("view");
       setSelected(null);
-      await loadAll(null);
+      await loadAll();
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -370,7 +422,7 @@ export default function Roles() {
     }
   }
 
-  const createDisabled = saving || loading;
+  const formDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -390,14 +442,21 @@ export default function Roles() {
               {asTrim(search)
                 ? "Buscando en activos e inactivos."
                 : showInactive
-                ? "Viendo roles inactivos."
-                : "Viendo roles activos."}
+                  ? "Viendo roles inactivos."
+                  : "Viendo roles activos."}
             </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -408,7 +467,7 @@ export default function Roles() {
               placeholder="Buscar por nombre o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              disabled={saving || loading}
+              disabled={formDisabled}
             />
 
             {asTrim(search) !== "" && (
@@ -417,9 +476,16 @@ export default function Roles() {
                 onClick={() => setSearch("")}
                 type="button"
                 aria-label="Limpiar búsqueda"
-                disabled={saving || loading}
+                disabled={formDisabled}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -432,7 +498,9 @@ export default function Roles() {
               className={styles.btnGhost}
               type="button"
               onClick={toggleViewActiveInactive}
-              disabled={saving || loading || mode === "create" || mode === "edit"}
+              disabled={
+                saving || loading || mode === "create" || mode === "edit"
+              }
               title="Cambiar vista activos/inactivos"
             >
               {showInactive ? "Ver activos" : "Ver inactivos"}
@@ -451,7 +519,6 @@ export default function Roles() {
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
@@ -460,7 +527,7 @@ export default function Roles() {
               <select
                 className={styles.pageSize}
                 value={pageSize}
-                disabled={loading || saving}
+                disabled={formDisabled}
                 onChange={(e) => {
                   const ps = Number(e.target.value);
                   setPageSize(ps);
@@ -478,7 +545,7 @@ export default function Roles() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page <= 1}
+                  disabled={formDisabled || page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
                   Anterior
@@ -491,7 +558,7 @@ export default function Roles() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page >= totalPages}
+                  disabled={formDisabled || page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
                   Siguiente
@@ -504,8 +571,8 @@ export default function Roles() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {/* ✅ SIN ID */}
-                  <th>Nombre</th>
+                  <th style={{ width: 220 }}>Nombre</th>
+                  <th>Descripción</th>
                   <th style={{ width: 170 }}>Activo</th>
                 </tr>
               </thead>
@@ -513,26 +580,29 @@ export default function Roles() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
+                    <td colSpan={3} className={styles.empty}>
                       Cargando roles...
                     </td>
                   </tr>
-                ) : pagedRows.length === 0 ? (
+                ) : displayedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className={styles.empty}>
+                    <td colSpan={3} className={styles.empty}>
                       {asTrim(search)
                         ? "No se encontraron roles (activos o inactivos) con esos criterios."
                         : showInactive
-                        ? "No hay roles inactivos."
-                        : "No hay roles activos."}
+                          ? "No hay roles inactivos."
+                          : "No hay roles activos."}
                     </td>
                   </tr>
                 ) : (
-                  pagedRows.map((r, idx) => {
-                    const id = getId(r); // ✅ solo para key/selección
+                  displayedRows.map((r, idx) => {
+                    const id = getId(r);
                     const key = id != null ? String(id) : `row-${idx}`;
-                    const isSelected = selectedId != null && id != null && id === selectedId;
+                    const isSelected =
+                      selectedId != null && id != null && id === selectedId;
+
                     const active = getActive(r) ?? false;
+                    const fullDescription = getDescription(r);
 
                     return (
                       <tr
@@ -540,10 +610,16 @@ export default function Roles() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(r)}
                       >
-                        {/* ✅ SIN ID */}
-                        <td>{getName(r) ?? "—"}</td>
+                        <td title={getName(r) ?? ""}>{getName(r) ?? "—"}</td>
+                        <td title={fullDescription ?? ""}>
+                          {limitWords(fullDescription, 10) ?? "—"}
+                        </td>
                         <td>
-                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
+                          <Switch
+                            checked={active}
+                            disabled
+                            label={active ? "Activo" : "Inactivo"}
+                          />
                         </td>
                       </tr>
                     );
@@ -554,11 +630,14 @@ export default function Roles() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo rol" : mode === "edit" ? "Editar rol" : "Detalle"}
+              {mode === "create"
+                ? "Nuevo rol"
+                : mode === "edit"
+                  ? "Editar rol"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -571,49 +650,78 @@ export default function Roles() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Nombre" required>
-                    <input
-                      className={styles.input}
-                      value={create.name}
-                      onChange={(e) => setCreate((p) => ({ ...p, name: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Nombre del rol"
-                    />
-                  </Field>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Nombre</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={create.name}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            name: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Nombre del rol"
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={create.description}
-                      onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Descripción del rol"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={create.description}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Descripción del rol"
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Activo">
-                    <Switch
-                      checked={create.active}
-                      disabled={createDisabled}
-                      label={create.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setCreate((p) => ({ ...p, active: next }))}
-                    />
-                  </Field>
-                </div>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={create.active}
+                        disabled={formDisabled}
+                        label={create.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setCreate((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={formDisabled}
+                    >
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un rol de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona un rol de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -623,78 +731,118 @@ export default function Roles() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  {/* ✅ SIN ID */}
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Nombre</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={edit.name}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            name: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Nombre"
+                      />
+                    </div>
 
-                  <Field label="Nombre" required>
-                    <input
-                      className={styles.input}
-                      value={edit.name}
-                      onChange={(e) => setEdit((p) => ({ ...p, name: e.target.value }))}
-                      disabled={saving || loading}
-                      placeholder="Nombre"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={edit.description}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Descripción"
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={edit.description}
-                      onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
-                      disabled={saving || loading}
-                      placeholder="Descripción"
-                    />
-                  </Field>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={edit.active}
+                        disabled={formDisabled}
+                        label={edit.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setEdit((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                  <div className={styles.detailRow}>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={saving}
+                    >
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Nombre</span>
+                    <div className={styles.floatingValue}>
+                      {getName(selected) ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>Descripción</span>
+                    <div className={styles.floatingValueArea}>
+                      {getDescription(selected) ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Activo</span>
                     <Switch
-                      checked={edit.active}
-                      disabled={saving || loading}
-                      label={edit.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setEdit((p) => ({ ...p, active: next }))}
+                      checked={getActive(selected) ?? false}
+                      disabled
+                      label={
+                        (getActive(selected) ?? false) ? "Activo" : "Inactivo"
+                      }
                     />
                   </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
-
-                  <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className={styles.detailBox}>
-                {/* ✅ SIN ID */}
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Nombre</span>
-                  <span className={styles.detailValue}>{String(getName(selected) ?? "—")}</span>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Descripción</span>
-                  <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
-                </div>
-
-                <div className={styles.actions}>
-                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={saving}
+                  >
                     Cerrar
                   </button>
 
-                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={saving || loading}
+                  >
                     Editar
                   </button>
                 </div>
@@ -733,27 +881,6 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
   );
 }
 
-/** Field */
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 /** Helpers */
 function getId(r: Role | null): number | null {
   if (!r) return null;
@@ -764,7 +891,8 @@ function getId(r: Role | null): number | null {
 
 function getName(r: Role | null): string | null {
   if (!r) return null;
-  const v = r.rolName ?? r.RolName ?? r.roleName ?? r.RoleName ?? r.name ?? r.Name;
+  const v =
+    r.rolName ?? r.RolName ?? r.roleName ?? r.RoleName ?? r.name ?? r.Name;
   const s = asTrim(v ?? "");
   return s ? s : null;
 }
@@ -791,6 +919,11 @@ function getActive(r: Role | null): boolean | null {
   }
 
   return null;
+}
+
+function getStringProp(obj: UnknownRecord, key: string): string | undefined {
+  const v = obj[key];
+  return typeof v === "string" ? v : undefined;
 }
 
 function asString(v: unknown): string {
@@ -822,6 +955,19 @@ function tryParseJson(text: string): unknown {
 
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
+}
+
+function asObject(v: unknown): UnknownRecord | null {
+  return isRecord(v) ? (v as UnknownRecord) : null;
+}
+
+function limitWords(text: string | null, maxWords: number): string | null {
+  if (!text) return null;
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
 }
 
 function toErrorMessage(e: unknown): string {

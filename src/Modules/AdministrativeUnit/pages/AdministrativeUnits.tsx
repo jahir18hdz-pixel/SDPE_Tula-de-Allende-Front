@@ -1,17 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import styles from "../styles/administrativeUnits.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
 type AdministrativeUnit = {
-  // DTO real
   IdAdministrativeUnit?: number;
   Code?: number;
   Description?: string;
   Active?: boolean;
 
-  // variantes por si llega camelCase
   idAdministrativeUnit?: number;
   code?: number;
   description?: string;
@@ -61,10 +65,8 @@ export default function AdministrativeUnits() {
   const [showInactive, setShowInactive] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // buscador
   const [search, setSearch] = useState("");
 
-  // paginación FRONT
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -82,7 +84,11 @@ export default function AdministrativeUnits() {
   }, []);
 
   const selectedId = useMemo(() => getId(selected), [selected]);
-  const selectedCode = useMemo(() => getCode(selected), [selected]);
+  const modeRef = useRef<"view" | "create" | "edit">("view");
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     void loadAll();
@@ -113,7 +119,7 @@ export default function AdministrativeUnits() {
 
   async function requestJson(
     url: string,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<
     | { ok: true; data: unknown; status: number }
     | { ok: false; error: string; status: number }
@@ -126,15 +132,18 @@ export default function AdministrativeUnits() {
     const parsed = tryParseJson(text);
 
     if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
-          ? String((parsed as UnknownRecord).message)
-          : "";
+      const apiMsg = isRecord(parsed)
+        ? getStringProp(parsed, "message") ??
+          getStringProp(parsed, "title") ??
+          ""
+        : "";
+
       const msg =
         apiMsg ||
         (typeof parsed === "string" ? parsed : "") ||
         text ||
         `HTTP ${res.status}`;
+
       return { ok: false, error: msg, status: res.status };
     }
 
@@ -143,26 +152,26 @@ export default function AdministrativeUnits() {
 
   function extractList(payload: unknown): AdministrativeUnit[] {
     if (Array.isArray(payload)) return payload as AdministrativeUnit[];
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
-      return (payload as UnknownRecord).$values as AdministrativeUnit[];
+    if (isRecord(payload) && Array.isArray(payload.$values)) {
+      return payload.$values as AdministrativeUnit[];
     }
 
-    const obj = isRecord(payload) ? (payload as UnknownRecord) : null;
-    if (obj) {
-      const possible =
-        obj.items ??
-        obj.Items ??
-        obj.data ??
-        obj.Data ??
-        obj.result ??
-        obj.Result ??
-        obj.value ??
-        obj.Value ??
-        obj.values ??
-        obj.Values;
+    const obj = asObject(payload);
+    if (!obj) return [];
 
-      if (Array.isArray(possible)) return possible as AdministrativeUnit[];
-    }
+    const possible =
+      obj.items ??
+      obj.Items ??
+      obj.data ??
+      obj.Data ??
+      obj.result ??
+      obj.Result ??
+      obj.value ??
+      obj.Value ??
+      obj.values ??
+      obj.Values;
+
+    if (Array.isArray(possible)) return possible as AdministrativeUnit[];
 
     const arr = findArrayDeep(payload, 0);
     if (arr) return arr as AdministrativeUnit[];
@@ -176,18 +185,27 @@ export default function AdministrativeUnits() {
     if (Array.isArray(payload)) return payload;
     if (!isRecord(payload)) return null;
 
-    const obj = payload as UnknownRecord;
+    const keys = [
+      "$values",
+      "data",
+      "Data",
+      "items",
+      "Items",
+      "result",
+      "Result",
+      "value",
+      "Value",
+      "values",
+      "Values",
+    ];
 
-    const values = obj["$values"];
-    if (Array.isArray(values)) return values;
-
-    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
-    for (const k of keys) {
-      const v = obj[k];
-      if (Array.isArray(v)) return v;
-      const nested = findArrayDeep(v, depth + 1);
+    for (const key of keys) {
+      const value = payload[key];
+      if (Array.isArray(value)) return value;
+      const nested = findArrayDeep(value, depth + 1);
       if (nested) return nested;
     }
+
     return null;
   }
 
@@ -197,10 +215,10 @@ export default function AdministrativeUnits() {
 
   function codeExistsExcept(code: number, excludeId: number | null): boolean {
     return rows.some((u) => {
-      const c = getCode(u);
-      if (c !== code) return false;
+      const currentCode = getCode(u);
+      if (currentCode !== code) return false;
+
       const id = getId(u);
-      // si no se puede resolver id, lo consideramos conflicto por seguridad
       if (excludeId == null || id == null) return true;
       return id !== excludeId;
     });
@@ -216,7 +234,10 @@ export default function AdministrativeUnits() {
         return;
       }
 
-      const result = await requestJson(API_BASE, { method: "GET", headers: authHeaders() });
+      const result = await requestJson(API_BASE, {
+        method: "GET",
+        headers: authHeaders(),
+      });
 
       if (!result.ok) {
         showToast("error", result.error);
@@ -226,6 +247,19 @@ export default function AdministrativeUnits() {
 
       const list = extractList(result.data);
       setRows(list);
+
+      if (selectedId != null) {
+        const found = list.find((r) => getId(r) === selectedId) ?? null;
+        setSelected(found);
+
+        if (found && modeRef.current === "edit") {
+          setFormEdit({
+            code: String(getCode(found) ?? ""),
+            description: String(getDescription(found) ?? ""),
+            active: getActive(found) ?? true,
+          });
+        }
+      }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
       setRows([]);
@@ -234,11 +268,6 @@ export default function AdministrativeUnits() {
     }
   }
 
-  /**
-   * ✅ FILTRO
-   * - Sin búsqueda: respeta showInactive (vista activos/inactivos)
-   * - Con búsqueda: busca en TODOS (activos + inactivos)
-   */
   const filteredRows = useMemo(() => {
     const q = asTrim(search).toLowerCase();
 
@@ -303,21 +332,29 @@ export default function AdministrativeUnits() {
     setPage(1);
   }
 
+  function normalizeCodeInput(raw: string): string {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    const n = Number(digits);
+    return Number.isFinite(n) ? String(n) : "";
+  }
+
   function validateForm(f: FormDto, isCreate: boolean): string {
     const codeNum = Number(f.code);
-    if (!Number.isFinite(codeNum) || codeNum <= 0) return "La clave debe ser un número mayor a 0.";
+    if (!Number.isFinite(codeNum) || codeNum <= 0) {
+      return "La clave debe ser un número mayor a 0.";
+    }
 
     if (isCreate) {
       if (codeExists(codeNum)) return "Ese código ya existe.";
     } else {
-      // ✅ en editar: si el usuario cambia la clave, validar duplicados (excluyendo el mismo id)
-      const currentId = selectedId;
-      if (codeExistsExcept(codeNum, currentId)) return "Ese código ya existe.";
+      if (codeExistsExcept(codeNum, selectedId)) return "Ese código ya existe.";
     }
 
     const desc = asTrim(f.description);
     if (!desc) return "La descripción es obligatoria.";
     if (desc.length < 3) return "La descripción es muy corta.";
+
     return "";
   }
 
@@ -355,23 +392,24 @@ export default function AdministrativeUnits() {
   }
 
   async function onUpdate() {
-    if (!selected) return showToast("error", "Selecciona una unidad para editar.");
+    const id = selectedId;
+    if (id == null || id <= 0) {
+      return showToast("error", "No se pudo resolver el IdAdministrativeUnit.");
+    }
 
     const msg = validateForm(formEdit, false);
     if (msg) return showToast("error", msg);
 
-    if (selectedId == null) return showToast("error", "No se pudo resolver el IdAdministrativeUnit.");
-
     setSaving(true);
     try {
       const payload = {
-        IdAdministrativeUnit: selectedId, // requerido por tu DTO
-        Code: Number(formEdit.code),      // ✅ ahora editable
+        IdAdministrativeUnit: id,
+        Code: Number(formEdit.code),
         Description: asTrim(formEdit.description),
         Active: Boolean(formEdit.active),
       };
 
-      const result = await requestJson(`${API_BASE}/${selectedId}`, {
+      const result = await requestJson(`${API_BASE}/${id}`, {
         method: "PUT",
         headers: authHeaders(),
         body: JSON.stringify(payload),
@@ -390,7 +428,7 @@ export default function AdministrativeUnits() {
     }
   }
 
-  const createDisabled = saving || loading;
+  const formDisabled = saving || loading;
 
   return (
     <div className={styles.page}>
@@ -410,14 +448,21 @@ export default function AdministrativeUnits() {
               {asTrim(search)
                 ? "Buscando en activos e inactivos."
                 : showInactive
-                ? "Viendo unidades inactivas."
-                : "Viendo unidades activas."}
+                  ? "Viendo unidades inactivas."
+                  : "Viendo unidades activas."}
             </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -428,7 +473,7 @@ export default function AdministrativeUnits() {
               placeholder="Buscar por clave o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              disabled={saving || loading}
+              disabled={formDisabled}
             />
 
             {asTrim(search) !== "" && (
@@ -437,9 +482,16 @@ export default function AdministrativeUnits() {
                 onClick={() => setSearch("")}
                 type="button"
                 aria-label="Limpiar búsqueda"
-                disabled={saving || loading}
+                disabled={formDisabled}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -452,7 +504,9 @@ export default function AdministrativeUnits() {
               className={styles.btnGhost}
               type="button"
               onClick={toggleViewActiveInactive}
-              disabled={saving || loading || mode === "create" || mode === "edit"}
+              disabled={
+                saving || loading || mode === "create" || mode === "edit"
+              }
               title="Cambiar vista activos/inactivos"
             >
               {showInactive ? "Ver activos" : "Ver inactivos"}
@@ -471,7 +525,6 @@ export default function AdministrativeUnits() {
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
@@ -480,7 +533,7 @@ export default function AdministrativeUnits() {
               <select
                 className={styles.pageSize}
                 value={pageSize}
-                disabled={loading || saving}
+                disabled={formDisabled}
                 onChange={(e) => {
                   const ps = Number(e.target.value);
                   setPageSize(ps);
@@ -498,7 +551,7 @@ export default function AdministrativeUnits() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page <= 1}
+                  disabled={formDisabled || page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
                   Anterior
@@ -511,7 +564,7 @@ export default function AdministrativeUnits() {
                 <button
                   className={styles.pagerBtn}
                   type="button"
-                  disabled={loading || saving || page >= totalPages}
+                  disabled={formDisabled || page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
                   Siguiente
@@ -524,7 +577,7 @@ export default function AdministrativeUnits() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ width: 120 }}>Clave</th>
+                  <th style={{ width: 140 }}>Clave</th>
                   <th>Descripción</th>
                   <th style={{ width: 170 }}>Activo</th>
                 </tr>
@@ -543,19 +596,19 @@ export default function AdministrativeUnits() {
                       {asTrim(search)
                         ? "No se encontraron unidades (activos o inactivos) con esos criterios."
                         : showInactive
-                        ? "No hay unidades inactivas."
-                        : "No hay unidades activas."}
+                          ? "No hay unidades inactivas."
+                          : "No hay unidades activas."}
                     </td>
                   </tr>
                 ) : (
                   displayedRows.map((r, idx) => {
-                    const code = getCode(r);
-                    const key = code != null ? String(code) : `row-${idx}`;
-
+                    const id = getId(r);
+                    const key = id != null ? String(id) : `row-${idx}`;
                     const isSelected =
-                      selectedId != null && getId(r) != null && getId(r) === selectedId;
+                      selectedId != null && id != null && id === selectedId;
 
                     const active = getActive(r) ?? false;
+                    const fullDescription = getDescription(r);
 
                     return (
                       <tr
@@ -563,10 +616,18 @@ export default function AdministrativeUnits() {
                         className={isSelected ? styles.rowSelected : styles.row}
                         onClick={() => onRowClick(r)}
                       >
-                        <td className={styles.mono}>{code != null ? String(code) : "—"}</td>
-                        <td>{getDescription(r) ?? "—"}</td>
+                        <td className={styles.mono}>
+                          {getCode(r) != null ? String(getCode(r)) : "—"}
+                        </td>
+                        <td title={fullDescription ?? ""}>
+                          {limitWords(fullDescription, 10) ?? "—"}
+                        </td>
                         <td>
-                          <Switch checked={active} disabled label={active ? "Activo" : "Inactivo"} />
+                          <Switch
+                            checked={active}
+                            disabled
+                            label={active ? "Activo" : "Inactivo"}
+                          />
                         </td>
                       </tr>
                     );
@@ -577,11 +638,14 @@ export default function AdministrativeUnits() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nueva unidad" : mode === "edit" ? "Editar unidad" : "Detalle"}
+              {mode === "create"
+                ? "Nueva unidad"
+                : mode === "edit"
+                  ? "Editar unidad"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -594,50 +658,79 @@ export default function AdministrativeUnits() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Clave" required>
-                    <input
-                      className={styles.input}
-                      value={formCreate.code}
-                      onChange={(e) => setFormCreate((p) => ({ ...p, code: e.target.value }))}
-                      disabled={createDisabled}
-                      inputMode="numeric"
-                      placeholder="Ej: 101"
-                    />
-                  </Field>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Clave</span>
+                      <input
+                        className={styles.floatingInput}
+                        inputMode="numeric"
+                        value={formCreate.code}
+                        onChange={(e) =>
+                          setFormCreate((p) => ({
+                            ...p,
+                            code: normalizeCodeInput(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Ej: 101"
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={formCreate.description}
-                      onChange={(e) => setFormCreate((p) => ({ ...p, description: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Descripción de la unidad"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={formCreate.description}
+                        onChange={(e) =>
+                          setFormCreate((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Descripción de la unidad"
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Activo">
-                    <Switch
-                      checked={formCreate.active}
-                      disabled={createDisabled}
-                      label={formCreate.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setFormCreate((p) => ({ ...p, active: next }))}
-                    />
-                  </Field>
-                </div>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={formCreate.active}
+                        disabled={formDisabled}
+                        label={formCreate.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setFormCreate((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={formDisabled}
+                    >
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona una unidad de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona una unidad de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -647,79 +740,119 @@ export default function AdministrativeUnits() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  {/* ✅ NO SE MUESTRA ID */}
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Clave</span>
+                      <input
+                        className={styles.floatingInput}
+                        inputMode="numeric"
+                        value={formEdit.code}
+                        onChange={(e) =>
+                          setFormEdit((p) => ({
+                            ...p,
+                            code: normalizeCodeInput(e.target.value),
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Ej: 101"
+                      />
+                    </div>
 
-                  <Field label="Clave" required>
-                    <input
-                      className={styles.input}
-                      value={formEdit.code}
-                      onChange={(e) => setFormEdit((p) => ({ ...p, code: e.target.value }))}
-                      disabled={saving || loading}
-                      inputMode="numeric"
-                      placeholder="Ej: 101"
-                    />
-                  </Field>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={formEdit.description}
+                        onChange={(e) =>
+                          setFormEdit((p) => ({
+                            ...p,
+                            description: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="Descripción"
+                        rows={4}
+                      />
+                    </div>
 
-                  <Field label="Descripción" required>
-                    <input
-                      className={styles.input}
-                      value={formEdit.description}
-                      onChange={(e) => setFormEdit((p) => ({ ...p, description: e.target.value }))}
-                      disabled={saving || loading}
-                      placeholder="Descripción"
-                    />
-                  </Field>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={formEdit.active}
+                        disabled={formDisabled}
+                        label={formEdit.active ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setFormEdit((p) => ({ ...p, active: next }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                  <div className={styles.detailRow}>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={saving}
+                    >
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.detailBox}>
+                <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Clave</span>
+                    <div className={styles.floatingValue}>
+                      {getCode(selected) ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>Descripción</span>
+                    <div className={styles.floatingValueArea}>
+                      {getDescription(selected) ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Activo</span>
                     <Switch
-                      checked={formEdit.active}
-                      disabled={saving || loading}
-                      label={formEdit.active ? "Activo" : "Inactivo"}
-                      onChange={(next) => setFormEdit((p) => ({ ...p, active: next }))}
+                      checked={getActive(selected) ?? false}
+                      disabled
+                      label={
+                        (getActive(selected) ?? false) ? "Activo" : "Inactivo"
+                      }
                     />
                   </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => setMode("view")} disabled={saving}>
-                    Cancelar
-                  </button>
-
-                  <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Clave</span>
-                  <span className={styles.mono}>{String(selectedCode ?? "—")}</span>
-                </div>
-
-                {/* ✅ NO SE MUESTRA ID */}
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Descripción</span>
-                  <span className={styles.detailValue}>{String(getDescription(selected) ?? "—")}</span>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getActive(selected) ?? false}
-                    disabled
-                    label={(getActive(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
-                </div>
-
-                <div className={styles.actions}>
-                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={saving}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={saving}
+                  >
                     Cerrar
                   </button>
 
-                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={saving || loading}>
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={saving || loading}
+                  >
                     Editar
                   </button>
                 </div>
@@ -755,27 +888,6 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
         <span className={styles.switchKnob} />
       </button>
     </label>
-  );
-}
-
-/** Field */
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
   );
 }
 
@@ -818,6 +930,11 @@ function getActive(u: AdministrativeUnit | null): boolean | null {
   return null;
 }
 
+function getStringProp(obj: UnknownRecord, key: string): string | undefined {
+  const v = obj[key];
+  return typeof v === "string" ? v : undefined;
+}
+
 function asString(v: unknown): string {
   if (v == null) return "";
   return typeof v === "string" ? v : String(v);
@@ -847,6 +964,19 @@ function tryParseJson(text: string): unknown {
 
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
+}
+
+function asObject(v: unknown): UnknownRecord | null {
+  return isRecord(v) ? (v as UnknownRecord) : null;
+}
+
+function limitWords(text: string | null, maxWords: number): string | null {
+  if (!text) return null;
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
 }
 
 function toErrorMessage(e: unknown): string {
