@@ -1,4 +1,3 @@
-// src/Modules/Beneficiary/pages/Beneficiary.tsx
 import React, {
   useCallback,
   useEffect,

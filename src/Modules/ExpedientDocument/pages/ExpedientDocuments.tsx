@@ -248,19 +248,22 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
         previewUrls.length,
       );
 
-      const files: ChecklistFileItem[] = Array.from({ length: maxLen }, (_, i) => {
-        const id = toNumber(fileIdsRaw[i]);
-        const url = normalizeUrlMaybe(fileUrls[i] ?? "");
-        const previewUrl = normalizeUrlMaybe(previewUrls[i] ?? "");
-        const name = (fileNames[i] ?? "").trim() || `Archivo ${i + 1}`;
+      const files: ChecklistFileItem[] = Array.from(
+        { length: maxLen },
+        (_, i) => {
+          const id = toNumber(fileIdsRaw[i]);
+          const url = normalizeUrlMaybe(fileUrls[i] ?? "");
+          const previewUrl = normalizeUrlMaybe(previewUrls[i] ?? "");
+          const name = (fileNames[i] ?? "").trim() || `Archivo ${i + 1}`;
 
-        return {
-          id,
-          name,
-          url,
-          previewUrl: previewUrl || null,
-        };
-      }).filter((x) => x.url || x.previewUrl);
+          return {
+            id,
+            name,
+            url,
+            previewUrl: previewUrl || null,
+          };
+        },
+      ).filter((x) => x.url || x.previewUrl);
 
       return {
         documentTypeId,
@@ -871,7 +874,13 @@ export default function ExpedientDocuments() {
     }, 3000);
 
     return () => window.clearInterval(timer);
-  }, [previewOpen, autoPlay, isImagePreview, previewItems.length, deleteModalOpen]);
+  }, [
+    previewOpen,
+    autoPlay,
+    isImagePreview,
+    previewItems.length,
+    deleteModalOpen,
+  ]);
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files);
@@ -898,7 +907,7 @@ export default function ExpedientDocuments() {
     setUploads((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function onBindFromChecklist(uploadIdx: number, docTypeId: number) {
+  function onBindFromChecklist(uploadIdx: number, docTypeId: number | null) {
     setUploads((prev) =>
       prev.map((u, i) =>
         i === uploadIdx ? { ...u, documentTypeId: docTypeId } : u,
@@ -1806,34 +1815,44 @@ export default function ExpedientDocuments() {
                     </div>
 
                     <div className={styles.uploadControls}>
-                      <select
-                        className={styles.select}
-                        value={u.documentTypeId ?? ""}
-                        onChange={(e) =>
-                          onBindFromChecklist(idx, Number(e.target.value))
-                        }
-                        disabled={uploading}
-                      >
-                        <option value="">Asignar tipo…</option>
-                        {checklistOptions.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name}
-                            {o.noApplies
-                              ? " (No aplica)"
-                              : o.required
-                                ? " (Obligatorio)"
-                                : ""}
-                            {o.uploaded ? " ✓" : ""}
-                          </option>
-                        ))}
-                      </select>
+                      <div className={styles.editorFloatingSelectField}>
+                        <span className={styles.editorFloatingLabel}>
+                          Tipo de documento
+                        </span>
 
-                      <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>
+                        <select
+                          className={styles.editorFloatingSelect}
+                          value={u.documentTypeId ?? ""}
+                          onChange={(e) =>
+                            onBindFromChecklist(
+                              idx,
+                              e.target.value ? Number(e.target.value) : null,
+                            )
+                          }
+                          disabled={uploading}
+                        >
+                          <option value="">Asignar tipo…</option>
+
+                          {checklistOptions.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.required && !o.uploaded
+                                ? `🔴 ${o.name} (Obligatorio)`
+                                : o.uploaded
+                                  ? `🟢 ${o.name} ✓`
+                                  : o.noApplies
+                                    ? `⚪ ${o.name} (No aplica)`
+                                    : `🟡 ${o.name}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={styles.editorFloatingField}>
+                        <span className={styles.editorFloatingLabel}>
                           Observaciones
-                        </label>
+                        </span>
                         <input
-                          className={styles.input}
+                          className={styles.editorFloatingInput}
                           value={u.observations}
                           onChange={(e) =>
                             setUploads((prev) =>
@@ -1845,6 +1864,7 @@ export default function ExpedientDocuments() {
                             )
                           }
                           disabled={uploading}
+                          placeholder="Escribe una observación"
                         />
                       </div>
 
@@ -1884,7 +1904,6 @@ export default function ExpedientDocuments() {
           </div>
         </div>
       </div>
-
       <div
         className={`${styles.uploadOverlay} ${
           managerPanelOpen
@@ -1923,14 +1942,14 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.managerFormWrap}>
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>
+                <div className={styles.editorSectionTitle}>
                   Área administrativa
                 </div>
 
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Área</label>
+                <div className={styles.editorFloatingSelectField}>
+                  <span className={styles.editorFloatingLabel}>Área</span>
                   <select
-                    className={styles.select}
+                    className={styles.editorFloatingSelect}
                     value={managerForm.idAdministrativeUnit ?? ""}
                     onChange={(e) =>
                       setManagerForm((prev) => ({
@@ -1960,15 +1979,17 @@ export default function ExpedientDocuments() {
               </div>
 
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>
+                <div className={styles.editorSectionTitle}>
                   Datos del responsable
                 </div>
 
                 <div className={styles.formGridTwo}>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Nombre(s)</label>
+                  <div className={styles.editorFloatingField}>
+                    <span className={styles.editorFloatingLabel}>
+                      Nombre(s)
+                    </span>
                     <input
-                      className={styles.input}
+                      className={styles.editorFloatingInput}
                       value={managerForm.firstName}
                       onChange={(e) =>
                         setManagerForm((prev) => ({
@@ -1977,15 +1998,16 @@ export default function ExpedientDocuments() {
                         }))
                       }
                       disabled={savingManager}
+                      placeholder="Captura el nombre"
                     />
                   </div>
 
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>
+                  <div className={styles.editorFloatingField}>
+                    <span className={styles.editorFloatingLabel}>
                       Apellido paterno
-                    </label>
+                    </span>
                     <input
-                      className={styles.input}
+                      className={styles.editorFloatingInput}
                       value={managerForm.lastName}
                       onChange={(e) =>
                         setManagerForm((prev) => ({
@@ -1994,17 +2016,18 @@ export default function ExpedientDocuments() {
                         }))
                       }
                       disabled={savingManager}
+                      placeholder="Captura el apellido paterno"
                     />
                   </div>
                 </div>
 
                 <div className={styles.formGridOne}>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>
+                  <div className={styles.editorFloatingField}>
+                    <span className={styles.editorFloatingLabel}>
                       Apellido materno
-                    </label>
+                    </span>
                     <input
-                      className={styles.input}
+                      className={styles.editorFloatingInput}
                       value={managerForm.secondLastName}
                       onChange={(e) =>
                         setManagerForm((prev) => ({
@@ -2013,21 +2036,22 @@ export default function ExpedientDocuments() {
                         }))
                       }
                       disabled={savingManager}
+                      placeholder="Captura el apellido materno"
                     />
                   </div>
                 </div>
               </div>
 
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>Contacto</div>
+                <div className={styles.editorSectionTitle}>Contacto</div>
 
                 <div className={styles.formGridTwo}>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>
+                  <div className={styles.editorFloatingField}>
+                    <span className={styles.editorFloatingLabel}>
                       Correo electrónico
-                    </label>
+                    </span>
                     <input
-                      className={styles.input}
+                      className={styles.editorFloatingInput}
                       type="email"
                       value={managerForm.email}
                       onChange={(e) =>
@@ -2037,13 +2061,14 @@ export default function ExpedientDocuments() {
                         }))
                       }
                       disabled={savingManager}
+                      placeholder="usuario@correo.com"
                     />
                   </div>
 
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Teléfono</label>
+                  <div className={styles.editorFloatingField}>
+                    <span className={styles.editorFloatingLabel}>Teléfono</span>
                     <input
-                      className={styles.input}
+                      className={styles.editorFloatingInput}
                       value={managerForm.phone}
                       onChange={(e) =>
                         setManagerForm((prev) => ({
@@ -2052,6 +2077,7 @@ export default function ExpedientDocuments() {
                         }))
                       }
                       disabled={savingManager}
+                      placeholder="Captura el teléfono"
                     />
                   </div>
                 </div>
@@ -2117,14 +2143,14 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.policyFormWrap}>
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>
+                <div className={styles.editorSectionTitle}>
                   Datos de la póliza
                 </div>
 
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Póliza</label>
+                <div className={styles.editorFloatingSelectField}>
+                  <span className={styles.editorFloatingLabel}>Póliza</span>
                   <select
-                    className={styles.select}
+                    className={styles.editorFloatingSelect}
                     value={policyForm.idPaymentPolicy ?? ""}
                     onChange={(e) =>
                       setPolicyForm({
@@ -2225,12 +2251,12 @@ export default function ExpedientDocuments() {
           <div className={styles.uploadSheetBody}>
             <div className={styles.policyFormWrap}>
               <div className={styles.managerSectionCard}>
-                <div className={styles.managerSectionTitle}>Datos del CFDI</div>
+                <div className={styles.editorSectionTitle}>Datos del CFDI</div>
 
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>CFDI</label>
+                <div className={styles.editorFloatingField}>
+                  <span className={styles.editorFloatingLabel}>CFDI</span>
                   <input
-                    className={styles.input}
+                    className={styles.editorFloatingInput}
                     value={cfdiForm.cfdi}
                     onChange={(e) =>
                       setCfdiForm({
@@ -2738,7 +2764,10 @@ export default function ExpedientDocuments() {
             <div className={styles.deleteConfirmBody}>
               <div className={styles.deleteFileCard}>
                 <div className={styles.deleteFileLabel}>Documento</div>
-                <div className={styles.deleteFileName} title={deleteTarget.name}>
+                <div
+                  className={styles.deleteFileName}
+                  title={deleteTarget.name}
+                >
                   {deleteTarget.name}
                 </div>
               </div>

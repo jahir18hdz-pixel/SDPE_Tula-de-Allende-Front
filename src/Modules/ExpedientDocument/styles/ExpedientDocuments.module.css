@@ -893,32 +893,38 @@
 ========================= */
 .uploadRow {
   border: 1px solid rgba(230, 230, 234, 0.92);
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 14px;
-  padding: 12px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 248, 250, 0.98)
+  );
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+  display: grid;
+  gap: 12px;
 }
 
 .fileInfo {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 2px;
+  min-width: 0;
 }
 
 .fileName {
   font-weight: 900;
+  color: #111827;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 72%;
-
   position: relative;
   padding-bottom: 6px;
 }
-
 .fileName::after {
   content: "";
   position: absolute;
@@ -948,11 +954,10 @@
 .uploadControls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
+  gap: 12px;
+  align-items: center;
   min-width: 0;
 }
-
 /* =========================
    OVERLAY SOLO EN VISTA
 ========================= */
@@ -2739,6 +2744,16 @@
     min-height: 42px;
     font-size: 14px;
   }
+  .editorFloatingField,
+.editorFloatingSelectField {
+  min-height: 60px;
+  padding: 18px 14px 12px;
+}
+
+.editorFloatingLabel {
+  left: 14px;
+  font-size: 12px;
+}
 }
 
 @media (max-width: 640px) {
@@ -2847,4 +2862,145 @@
   .deleteConfirmFooter > button {
     width: 100%;
   }
+}
+/* =========================
+   FLOATING FIELDS LIKE BENEFICIARY
+========================= */
+.editorSectionTitle {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(182, 138, 42, 0.28);
+  background: rgba(182, 138, 42, 0.08);
+  font-weight: 900;
+  letter-spacing: 0.25px;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #111827;
+}
+
+.editorFloatingField,
+.editorFloatingSelectField {
+  position: relative;
+  display: flex;
+  width: 100%;
+  border: 1px solid rgba(215, 215, 221, 0.95);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.95),
+    rgba(255, 255, 255, 0.98)
+  );
+  box-sizing: border-box;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.editorFloatingField {
+  align-items: center;
+  min-height: 64px;
+  padding: 18px 16px 14px;
+  border-radius: 999px;
+}
+
+.editorFloatingSelectField {
+  align-items: center;
+  min-height: 64px;
+  padding: 18px 16px 14px;
+  border-radius: 999px;
+}
+
+.editorFloatingField:focus-within,
+.editorFloatingSelectField:focus-within {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 3px rgba(182, 138, 42, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.05);
+  background: #fffef8;
+  transform: translateY(-1px);
+}
+
+.editorFloatingLabel {
+  position: absolute;
+  top: -10px;
+  left: 18px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--guinda2);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  line-height: 1.2;
+}
+
+.editorFloatingInput,
+.editorFloatingSelect {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  resize: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  font-family: inherit;
+  color: #111827;
+  border-radius: 0 !important;
+  min-height: auto;
+  font-size: 14px;
+}
+
+.editorFloatingInput {
+  height: auto;
+  min-height: 24px;
+  line-height: 1.45;
+}
+
+.editorFloatingSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-height: 24px;
+  line-height: 1.45;
+  cursor: pointer;
+  padding-right: 28px !important;
+  background-image: linear-gradient(45deg, transparent 50%, #65001f 50%),
+    linear-gradient(135deg, #65001f 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 3px),
+    calc(100% - 10px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.editorFloatingInput:hover,
+.editorFloatingInput:focus,
+.editorFloatingInput:active,
+.editorFloatingSelect:hover,
+.editorFloatingSelect:focus,
+.editorFloatingSelect:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  transform: none !important;
+}
+
+.editorFloatingInput:disabled,
+.editorFloatingSelect:disabled {
+  background: transparent !important;
+  color: #111827;
+  opacity: 0.78;
+  cursor: not-allowed;
+}
+
+.editorFloatingInput::placeholder {
+  color: #6b7280;
+  opacity: 1;
 }

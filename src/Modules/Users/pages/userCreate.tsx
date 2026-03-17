@@ -15,9 +15,13 @@ type UserRow = {
 
   role?: string;
   Role?: string;
+  idRole?: number;
+  IdRole?: number;
 
   administrativeUnit?: string;
   AdministrativeUnit?: string;
+  idAdministrativeUnit?: number;
+  IdAdministrativeUnit?: number;
 
   asset?: boolean | number | string;
   Asset?: boolean | number | string;
@@ -48,6 +52,13 @@ type CreateForm = {
   password2: string;
   idAdministrativeUnit: string;
   idRole: string;
+};
+
+type EditForm = {
+  email: string;
+  idAdministrativeUnit: string;
+  idRole: string;
+  asset: boolean;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -84,6 +95,13 @@ const initialCreate: CreateForm = {
   idRole: "",
 };
 
+const initialEdit: EditForm = {
+  email: "",
+  idAdministrativeUnit: "",
+  idRole: "",
+  asset: true,
+};
+
 export default function Users() {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,14 +118,11 @@ export default function Users() {
   const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const [showInactive, setShowInactive] = useState(false);
-
   const [saving, setSaving] = useState(false);
-
   const [search, setSearch] = useState("");
 
   const [create, setCreate] = useState<CreateForm>(initialCreate);
-
-  const [editStatus, setEditStatus] = useState<boolean>(true);
+  const [edit, setEdit] = useState<EditForm>(initialEdit);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -127,13 +142,18 @@ export default function Users() {
   }, []);
 
   useEffect(() => {
-    if (mode === "create") void loadCombos();
+    if (mode === "create" || mode === "edit") {
+      void loadCombos();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   async function firstWorkingEndpoint(endpoints: string[]) {
     for (const path of endpoints) {
-      const r = await requestJson(path, { method: "GET", headers: authHeaders() });
+      const r = await requestJson(path, {
+        method: "GET",
+        headers: authHeaders(),
+      });
       if (r.ok) return { path, data: r.data as unknown };
     }
     return { path: endpoints[0] ?? "", data: [] as unknown };
@@ -146,13 +166,24 @@ export default function Users() {
     pageSize: number | null;
   } {
     if (Array.isArray(payload)) {
-      return { items: payload as UserRow[], totalCount: null, page: null, pageSize: null };
+      return {
+        items: payload as UserRow[],
+        totalCount: null,
+        page: null,
+        pageSize: null,
+      };
     }
 
     const p = (payload ?? {}) as PagedLike;
 
     const items =
-      (p.items ?? p.Items ?? p.data ?? p.Data ?? p.users ?? p.Users ?? []) as UserRow[];
+      (p.items ??
+        p.Items ??
+        p.data ??
+        p.Data ??
+        p.users ??
+        p.Users ??
+        []) as UserRow[];
 
     const totalCount =
       (p.totalCount ?? p.TotalCount ?? p.total ?? p.Total) != null
@@ -160,7 +191,10 @@ export default function Users() {
         : null;
 
     const page = (p.page ?? p.Page) != null ? Number(p.page ?? p.Page) : null;
-    const pageSize = (p.pageSize ?? p.PageSize) != null ? Number(p.pageSize ?? p.PageSize) : null;
+    const pageSize =
+      (p.pageSize ?? p.PageSize) != null
+        ? Number(p.pageSize ?? p.PageSize)
+        : null;
 
     return { items, totalCount, page, pageSize };
   }
@@ -189,7 +223,6 @@ export default function Users() {
       if (selectedId != null) {
         const found = norm.items.find((u) => getId(u) === selectedId) ?? null;
         setSelected(found);
-        if (found && mode === "edit") setEditStatus(getAsset(found) ?? true);
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -219,8 +252,12 @@ export default function Users() {
           "No se pudieron cargar Roles. Revisa ROLE_ENDPOINTS (y CORS/HTTPS)."
         );
       }
+
       if (auNorm.length === 0) {
-        showToast("error", "No se pudieron cargar Unidades. Revisa AU_ENDPOINTS.");
+        showToast(
+          "error",
+          "No se pudieron cargar Unidades. Revisa AU_ENDPOINTS."
+        );
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -232,7 +269,14 @@ export default function Users() {
   }
 
   function normalizeRoles(payload: unknown): RoleOption[] {
-    const arr = pickArray(payload, ["items", "Items", "data", "Data", "roles", "Roles"]);
+    const arr = pickArray(payload, [
+      "items",
+      "Items",
+      "data",
+      "Data",
+      "roles",
+      "Roles",
+    ]);
 
     return arr
       .map((row): RoleOption | null => {
@@ -248,7 +292,13 @@ export default function Users() {
           `Rol ${id}`
         );
 
-        const active = readBool(obj, ["active", "Active", "isActive", "IsActive"]);
+        const active = readBool(obj, [
+          "active",
+          "Active",
+          "isActive",
+          "IsActive",
+        ]);
+
         return { id, name, active };
       })
       .filter((x): x is RoleOption => x !== null);
@@ -293,25 +343,44 @@ export default function Users() {
           `Unidad ${id}`
         );
 
-        const active = readBool(obj, ["active", "Active", "isActive", "IsActive"]);
+        const active = readBool(obj, [
+          "active",
+          "Active",
+          "isActive",
+          "IsActive",
+        ]);
+
         return { id, name, active };
       })
       .filter((x): x is AuOption => x !== null);
   }
 
   const displayedRows = useMemo(() => {
-    const only = rows.filter((u) => (getAsset(u) ?? false) === !showInactive);
-
     const q = search.trim().toLowerCase();
-    if (!q) return only;
 
-    return only.filter((u) => {
+    const base = q
+      ? rows
+      : rows.filter((u) => {
+          const active = getAsset(u) ?? false;
+          return showInactive ? !active : active;
+        });
+
+    if (!q) return base;
+
+    return base.filter((u) => {
       const email = (getEmail(u) ?? "").toLowerCase();
       const role = (getRole(u) ?? "").toLowerCase();
       const au = (getAdministrativeUnit(u) ?? "").toLowerCase();
       return email.includes(q) || role.includes(q) || au.includes(q);
     });
   }, [rows, search, showInactive]);
+
+  const totalPages = useMemo(() => {
+    if (totalCount == null) return null;
+    return Math.max(1, Math.ceil(totalCount / pageSize));
+  }, [totalCount, pageSize]);
+
+  const formDisabled = saving || loading || loadingCombos;
 
   function onRowClick(row: UserRow) {
     setSelected(row);
@@ -327,11 +396,23 @@ export default function Users() {
   function clearSelection() {
     setSelected(null);
     setMode("view");
+    setEdit(initialEdit);
   }
 
-  function startEdit() {
+  async function startEdit() {
     if (!selected) return;
-    setEditStatus(getAsset(selected) ?? true);
+
+    if (roles.length === 0 || adminUnits.length === 0) {
+      await loadCombos();
+    }
+
+    setEdit({
+      email: getEmail(selected) ?? "",
+      idRole: String(getRoleId(selected) ?? ""),
+      idAdministrativeUnit: String(getAdministrativeUnitId(selected) ?? ""),
+      asset: getAsset(selected) ?? true,
+    });
+
     setMode("edit");
   }
 
@@ -348,14 +429,37 @@ export default function Users() {
     if (!/^\S+@\S+\.\S+$/.test(email)) return "Correo inválido.";
     if (!create.password) return "La contraseña es obligatoria.";
     if (create.password.length < 8) return "Mínimo 8 caracteres.";
-    if (create.password !== create.password2) return "Las contraseñas no coinciden.";
-    if (!create.idAdministrativeUnit.trim()) return "Unidad administrativa es obligatoria.";
+    if (create.password !== create.password2)
+      return "Las contraseñas no coinciden.";
+    if (!create.idAdministrativeUnit.trim())
+      return "Unidad administrativa es obligatoria.";
     if (!create.idRole.trim()) return "Rol es obligatorio.";
 
     const au = Number(create.idAdministrativeUnit);
     const r = Number(create.idRole);
-    if (!Number.isFinite(au) || au <= 0) return "Unidad administrativa inválida.";
+
+    if (!Number.isFinite(au) || au <= 0)
+      return "Unidad administrativa inválida.";
     if (!Number.isFinite(r) || r <= 0) return "Rol inválido.";
+
+    return "";
+  }
+
+  function validateEdit(): string {
+    const email = edit.email.trim().toLowerCase();
+    if (!email) return "El correo es obligatorio.";
+    if (!/^\S+@\S+\.\S+$/.test(email)) return "Correo inválido.";
+
+    if (!edit.idRole.trim()) return "Rol obligatorio.";
+    if (!edit.idAdministrativeUnit.trim())
+      return "Unidad administrativa obligatoria.";
+
+    const roleId = Number(edit.idRole);
+    const auId = Number(edit.idAdministrativeUnit);
+
+    if (!Number.isFinite(roleId) || roleId <= 0) return "Rol inválido.";
+    if (!Number.isFinite(auId) || auId <= 0)
+      return "Unidad administrativa inválida.";
 
     return "";
   }
@@ -397,8 +501,35 @@ export default function Users() {
     }
   }
 
-  async function updateStatus(user: UserRow, next: boolean) {
-    const id = getId(user);
+  async function updateUserDataOnly(): Promise<void> {
+    const id = getId(selected);
+    if (id == null) throw new Error("No pude identificar el usuario.");
+
+    const payload = {
+      IdUser: id,
+      Email: edit.email.trim().toLowerCase(),
+      IdRole: Number(edit.idRole),
+      IdAdministrativeUnit: Number(edit.idAdministrativeUnit),
+
+      idUser: id,
+      email: edit.email.trim().toLowerCase(),
+      idRole: Number(edit.idRole),
+      idAdministrativeUnit: Number(edit.idAdministrativeUnit),
+    };
+
+    const result = await requestJson(`${USERS_BASE}/update`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+  }
+
+  async function updateUserStatusOnly(next: boolean): Promise<void> {
+    const id = getId(selected);
     if (id == null) throw new Error("No pude identificar el usuario.");
 
     const payload = {
@@ -416,18 +547,62 @@ export default function Users() {
       body: JSON.stringify(payload),
     });
 
-    if (!result.ok) throw new Error(result.error);
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+  }
+
+  function didUserDataChange(): boolean {
+    if (!selected) return false;
+
+    const originalEmail = (getEmail(selected) ?? "").trim().toLowerCase();
+    const nextEmail = edit.email.trim().toLowerCase();
+
+    const originalRoleId = getRoleId(selected);
+    const originalAuId = getAdministrativeUnitId(selected);
+
+    const nextRoleId = Number(edit.idRole);
+    const nextAuId = Number(edit.idAdministrativeUnit);
+
+    return (
+      originalEmail !== nextEmail ||
+      originalRoleId !== nextRoleId ||
+      originalAuId !== nextAuId
+    );
   }
 
   async function onSaveEdit() {
     if (!selected) return;
 
+    const msg = validateEdit();
+    if (msg) {
+      showToast("error", msg);
+      return;
+    }
+
+    const originalStatus = getAsset(selected) ?? true;
+    const statusChanged = edit.asset !== originalStatus;
+    const dataChanged = didUserDataChange();
+
+    if (!dataChanged && !statusChanged) {
+      showToast("error", "No hay cambios para guardar.");
+      return;
+    }
+
     setSaving(true);
     try {
-      await updateStatus(selected, editStatus);
-      showToast("success", "Estado actualizado correctamente");
+      if (dataChanged) {
+        await updateUserDataOnly();
+      }
+
+      if (statusChanged) {
+        await updateUserStatusOnly(edit.asset);
+      }
+
+      showToast("success", "Usuario actualizado correctamente");
       setMode("view");
       setSelected(null);
+      setEdit(initialEdit);
       await loadPaged(page, pageSize);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -435,13 +610,6 @@ export default function Users() {
       setSaving(false);
     }
   }
-
-  const totalPages = useMemo(() => {
-    if (totalCount == null) return null;
-    return Math.max(1, Math.ceil(totalCount / pageSize));
-  }, [totalCount, pageSize]);
-
-  const createDisabled = saving || loading || loadingCombos;
 
   return (
     <div className={styles.page}>
@@ -458,13 +626,24 @@ export default function Users() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Usuarios</h1>
             <p className={styles.sub}>
-              {showInactive ? "Viendo usuarios inactivos." : "Viendo usuarios activos."}
+              {search.trim()
+                ? "Buscando en usuarios activos e inactivos."
+                : showInactive
+                  ? "Viendo usuarios inactivos."
+                  : "Viendo usuarios activos."}
             </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -486,7 +665,14 @@ export default function Users() {
                 aria-label="Limpiar búsqueda"
                 disabled={saving || loading}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -518,7 +704,6 @@ export default function Users() {
       </div>
 
       <div className={styles.layout}>
-        {/* LISTADO */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Listado</p>
@@ -595,15 +780,16 @@ export default function Users() {
                       {search.trim()
                         ? "No se encontraron usuarios con esos criterios."
                         : showInactive
-                        ? "No hay usuarios inactivos."
-                        : "No hay usuarios activos."}
+                          ? "No hay usuarios inactivos."
+                          : "No hay usuarios activos."}
                     </td>
                   </tr>
                 ) : (
                   displayedRows.map((u, idx) => {
                     const id = getId(u);
                     const key = id != null ? String(id) : `row-${idx}`;
-                    const isSelected = selectedId != null && id != null && id === selectedId;
+                    const isSelected =
+                      selectedId != null && id != null && id === selectedId;
                     const asset = getAsset(u) ?? false;
 
                     return (
@@ -616,7 +802,11 @@ export default function Users() {
                         <td>{getRole(u) ?? "—"}</td>
                         <td>{getAdministrativeUnit(u) ?? "—"}</td>
                         <td>
-                          <Switch checked={asset} disabled label={asset ? "Activo" : "Inactivo"} />
+                          <Switch
+                            checked={asset}
+                            disabled
+                            label={asset ? "Activo" : "Inactivo"}
+                          />
                         </td>
                       </tr>
                     );
@@ -627,11 +817,14 @@ export default function Users() {
           </div>
         </section>
 
-        {/* PANEL */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nuevo usuario" : mode === "edit" ? "Editar usuario" : "Detalle"}
+              {mode === "create"
+                ? "Nuevo usuario"
+                : mode === "edit"
+                  ? "Editar usuario"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -644,104 +837,121 @@ export default function Users() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Correo" required>
-                    <input
-                      className={styles.input}
-                      value={create.email}
-                      onChange={(e) => setCreate((p) => ({ ...p, email: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="correo@dominio.com"
-                    />
-                  </Field>
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Correo</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={create.email}
+                        onChange={(e) =>
+                          setCreate((p) => ({ ...p, email: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="correo@dominio.com"
+                      />
+                    </div>
 
-                  <Field label="Rol" required>
-                    <select
-                      className={styles.select}
-                      value={create.idRole}
-                      onChange={(e) => setCreate((p) => ({ ...p, idRole: e.target.value }))}
-                      disabled={createDisabled}
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Rol</span>
+                      <select
+                        className={styles.floatingSelect}
+                        value={create.idRole}
+                        onChange={(e) =>
+                          setCreate((p) => ({ ...p, idRole: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                      >
+                        <option value="">Selecciona un rol...</option>
+                        {roles.map((r) => (
+                          <option key={r.id} value={String(r.id)}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>
+                        Unidad administrativa
+                      </span>
+                      <select
+                        className={styles.floatingSelect}
+                        value={create.idAdministrativeUnit}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            idAdministrativeUnit: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                      >
+                        <option value="">Selecciona una unidad...</option>
+                        {adminUnits.map((u) => (
+                          <option key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Contraseña</span>
+                      <input
+                        type="password"
+                        className={styles.floatingInput}
+                        value={create.password}
+                        onChange={(e) =>
+                          setCreate((p) => ({ ...p, password: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="********"
+                      />
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>
+                        Confirmar contraseña
+                      </span>
+                      <input
+                        type="password"
+                        className={styles.floatingInput}
+                        value={create.password2}
+                        onChange={(e) =>
+                          setCreate((p) => ({ ...p, password2: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="********"
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
                     >
-                      <option value="">Selecciona un rol...</option>
-                      {roles.map((r) => (
-                        <option key={r.id} value={String(r.id)}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                      Cancelar
+                    </button>
 
-                    {loadingCombos ? <div className={styles.hint}>Cargando roles…</div> : null}
-                  </Field>
+                   
 
-                  <Field label="Unidad administrativa" required>
-                    <select
-                      className={styles.select}
-                      value={create.idAdministrativeUnit}
-                      onChange={(e) =>
-                        setCreate((p) => ({ ...p, idAdministrativeUnit: e.target.value }))
-                      }
-                      disabled={createDisabled}
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={formDisabled}
                     >
-                      <option value="">Selecciona una unidad...</option>
-                      {adminUnits.map((u) => (
-                        <option key={u.id} value={String(u.id)}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    {loadingCombos ? <div className={styles.hint}>Cargando unidades…</div> : null}
-                  </Field>
-
-                  <Field label="Contraseña" required>
-                    <input
-                      type="password"
-                      className={styles.input}
-                      value={create.password}
-                      onChange={(e) => setCreate((p) => ({ ...p, password: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="********"
-                    />
-                  </Field>
-
-                  <Field label="Confirmar contraseña" required>
-                    <input
-                      type="password"
-                      className={styles.input}
-                      value={create.password2}
-                      onChange={(e) => setCreate((p) => ({ ...p, password2: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="********"
-                    />
-                  </Field>
-                </div>
-
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.btnEdit}
-                    onClick={() => void loadCombos()}
-                    disabled={saving || loadingCombos}
-                  >
-                    Recargar listas
-                  </button>
-
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona un usuario de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona un usuario de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -751,75 +961,131 @@ export default function Users() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Correo</span>
-                    <span className={styles.detailValue}>{getEmail(selected) ?? "—"}</span>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Correo</span>
+                      <input
+                        className={styles.floatingInput}
+                        value={edit.email}
+                        onChange={(e) =>
+                          setEdit((p) => ({ ...p, email: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                        placeholder="correo@dominio.com"
+                      />
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Rol</span>
+                      <select
+                        className={styles.floatingSelect}
+                        value={edit.idRole}
+                        onChange={(e) =>
+                          setEdit((p) => ({ ...p, idRole: e.target.value }))
+                        }
+                        disabled={formDisabled}
+                      >
+                        <option value="">Selecciona un rol...</option>
+                        {roles.map((r) => (
+                          <option key={r.id} value={String(r.id)}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>
+                        Unidad administrativa
+                      </span>
+                      <select
+                        className={styles.floatingSelect}
+                        value={edit.idAdministrativeUnit}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            idAdministrativeUnit: e.target.value,
+                          }))
+                        }
+                        disabled={formDisabled}
+                      >
+                        <option value="">Selecciona una unidad...</option>
+                        {adminUnits.map((u) => (
+                          <option key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Activo</span>
+                      <Switch
+                        checked={edit.asset}
+                        disabled={formDisabled}
+                        label={edit.asset ? "Activo" : "Inactivo"}
+                        onChange={(next) =>
+                          setEdit((p) => ({ ...p, asset: next }))
+                        }
+                      />
+                    </div>
                   </div>
 
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Rol</span>
-                    <span className={styles.detailValue}>{getRole(selected) ?? "—"}</span>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </button>
+
+
+                    <button
+                      type="submit"
+                      className={styles.btnSave}
+                      disabled={saving}
+                    >
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
                   </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Unidad Adm.</span>
-                    <span className={styles.detailValue}>
-                      {getAdministrativeUnit(selected) ?? "—"}
-                    </span>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Activo</span>
-                    <Switch
-                      checked={editStatus}
-                      disabled={saving || loading}
-                      label={editStatus ? "Activo" : "Inactivo"}
-                      onChange={(next) => setEditStatus(next)}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </button>
-
-                  <button type="submit" className={styles.btnSave} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
                 </div>
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Correo</span>
-                  <span className={styles.detailValue}>{getEmail(selected) ?? "—"}</span>
-                </div>
+                <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Correo</span>
+                    <div className={styles.floatingValue}>
+                      {getEmail(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Rol</span>
-                  <span className={styles.detailValue}>{getRole(selected) ?? "—"}</span>
-                </div>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Rol</span>
+                    <div className={styles.floatingValue}>
+                      {getRole(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Unidad Adm.</span>
-                  <span className={styles.detailValue}>
-                    {getAdministrativeUnit(selected) ?? "—"}
-                  </span>
-                </div>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>
+                      Unidad administrativa
+                    </span>
+                    <div className={styles.floatingValue}>
+                      {getAdministrativeUnit(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Activo</span>
-                  <Switch
-                    checked={getAsset(selected) ?? false}
-                    disabled
-                    label={(getAsset(selected) ?? false) ? "Activo" : "Inactivo"}
-                  />
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Activo</span>
+                    <Switch
+                      checked={getAsset(selected) ?? false}
+                      disabled
+                      label={(getAsset(selected) ?? false) ? "Activo" : "Inactivo"}
+                    />
+                  </div>
                 </div>
 
                 <div className={styles.actions}>
@@ -835,7 +1101,7 @@ export default function Users() {
                   <button
                     className={styles.btnEdit}
                     type="button"
-                    onClick={startEdit}
+                    onClick={() => void startEdit()}
                     disabled={saving || loading}
                   >
                     Editar
@@ -896,10 +1162,24 @@ function getRole(u: UserRow | null): string | null {
   return s ? s : null;
 }
 
+function getRoleId(u: UserRow | null): number | null {
+  if (!u) return null;
+  const v = u.idRole ?? u.IdRole;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function getAdministrativeUnit(u: UserRow | null): string | null {
   if (!u) return null;
   const s = String(u.administrativeUnit ?? u.AdministrativeUnit ?? "").trim();
   return s ? s : null;
+}
+
+function getAdministrativeUnitId(u: UserRow | null): number | null {
+  if (!u) return null;
+  const v = u.idAdministrativeUnit ?? u.IdAdministrativeUnit;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function getAsset(u: UserRow | null): boolean | null {
@@ -916,27 +1196,6 @@ function getAsset(u: UserRow | null): boolean | null {
   return null;
 }
 
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/** Parsing helpers (igual que tenías) */
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
 }
@@ -955,6 +1214,7 @@ function pickArray(payload: unknown, keys: string[]): unknown[] {
     const maybe = obj[k];
     if (Array.isArray(maybe)) return maybe;
   }
+
   return [];
 }
 

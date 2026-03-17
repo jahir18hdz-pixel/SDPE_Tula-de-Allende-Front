@@ -815,408 +815,414 @@ export default function AcquisitionRequest() {
                 void onCreate();
               }}
             >
-              <div className={styles.sectionTitle}>Información general</div>
+              <div className={styles.detailCard}>
+                <div className={styles.sectionTitle}>Información general</div>
 
-              <div className={styles.grid2}>
-                <Field label="Número de solicitud" required>
-                  <input
-                    className={styles.input}
-                    value={create.requestNumber}
-                    onChange={(e) => setCreate((p) => ({ ...p, requestNumber: e.target.value }))}
-                    disabled={createDisabled}
-                    placeholder="Ej. ADQ-2026-001"
-                  />
-                </Field>
-
-                <Field label="Fecha de solicitud" required>
-                  <div className={styles.dateWrap}>
+                <div className={styles.doubleRow}>
+                  <FloatingField label="Número de solicitud" required>
                     <input
-                      ref={requestDateRef}
-                      className={`${styles.input} ${styles.dateInput}`}
-                      type="date"
-                      value={create.requestDate}
-                      onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                      className={styles.floatingInput}
+                      value={create.requestNumber}
+                      onChange={(e) => setCreate((p) => ({ ...p, requestNumber: e.target.value }))}
                       disabled={createDisabled}
+                      placeholder="Ej. ADQ-2026-001"
                     />
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      onClick={() => openDatePicker(requestDateRef)}
-                      disabled={createDisabled}
-                      aria-label="Abrir calendario (fecha de solicitud)"
-                      title="Calendario"
-                    >
-                      <CalendarIcon />
-                    </button>
-                  </div>
-                </Field>
-              </div>
+                  </FloatingField>
 
-              <Field label="Justificación" required>
-                <textarea
-                  className={styles.textarea}
-                  value={create.justification}
-                  onChange={(e) => setCreate((p) => ({ ...p, justification: e.target.value }))}
-                  disabled={createDisabled}
-                  placeholder="Describe por qué se requiere esta adquisición..."
-                  rows={4}
-                />
+                  <FloatingField label="Fecha de solicitud" required>
+                    <div className={styles.dateWrap}>
+                      <input
+                        ref={requestDateRef}
+                        className={`${styles.floatingInput} ${styles.dateInput}`}
+                        type="date"
+                        value={create.requestDate}
+                        onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                        disabled={createDisabled}
+                      />
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => openDatePicker(requestDateRef)}
+                        disabled={createDisabled}
+                        aria-label="Abrir calendario (fecha de solicitud)"
+                        title="Calendario"
+                      >
+                        <CalendarIcon />
+                      </button>
+                    </div>
+                  </FloatingField>
+                </div>
+
+                <FloatingFieldArea label="Justificación" required>
+                  <textarea
+                    className={styles.floatingTextareaArea}
+                    value={create.justification}
+                    onChange={(e) => setCreate((p) => ({ ...p, justification: e.target.value }))}
+                    disabled={createDisabled}
+                    placeholder="Describe por qué se requiere esta adquisición..."
+                    rows={4}
+                  />
+                </FloatingFieldArea>
+
                 <div className={styles.hint}>Tip: incluye objetivo, urgencia y beneficiarios.</div>
-              </Field>
 
-              <div className={styles.grid2}>
-                <Field label="Fecha de autorización">
-                  <div className={styles.dateWrap}>
+                <div className={styles.doubleRow}>
+                  <FloatingField label="Fecha de autorización">
+                    <div className={styles.dateWrap}>
+                      <input
+                        ref={authDateRef}
+                        className={`${styles.floatingInput} ${styles.dateInput}`}
+                        type="date"
+                        value={create.authorizationDate}
+                        onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+                        disabled={createDisabled}
+                      />
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => openDatePicker(authDateRef)}
+                        disabled={createDisabled}
+                        aria-label="Abrir calendario (fecha de autorización)"
+                        title="Calendario"
+                      >
+                        <CalendarIcon />
+                      </button>
+                    </div>
+                  </FloatingField>
+
+                  <FloatingField label="CFDI">
                     <input
-                      ref={authDateRef}
-                      className={`${styles.input} ${styles.dateInput}`}
-                      type="date"
-                      value={create.authorizationDate}
-                      onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+                      className={styles.floatingInput}
+                      value={create.cfdi}
+                      onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
                       disabled={createDisabled}
+                      placeholder="Ej. UUID, folio o referencia CFDI"
                     />
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      onClick={() => openDatePicker(authDateRef)}
-                      disabled={createDisabled}
-                      aria-label="Abrir calendario (fecha de autorización)"
-                      title="Calendario"
-                    >
-                      <CalendarIcon />
-                    </button>
-                  </div>
-                </Field>
+                  </FloatingField>
+                </div>
 
-                <Field label="CFDI">
+                <FloatingField label="Observaciones">
                   <input
-                    className={styles.input}
-                    value={create.cfdi}
-                    onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
+                    className={styles.floatingInput}
+                    value={create.observations}
+                    onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
                     disabled={createDisabled}
-                    placeholder="Ej. UUID, folio o referencia CFDI"
+                    placeholder="Notas adicionales (opcional)"
                   />
-                </Field>
-              </div>
+                </FloatingField>
 
-              <Field label="Observaciones">
-                <input
-                  className={styles.input}
-                  value={create.observations}
-                  onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
-                  disabled={createDisabled}
-                  placeholder="Notas adicionales (opcional)"
-                />
-              </Field>
+                <div className={styles.sectionTitle}>Relaciones</div>
 
-              <div className={styles.sectionTitle}>Relaciones</div>
+                <div className={styles.grid3}>
+                  <FloatingField label="Unidad administrativa">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idAdministrativeUnit ?? ""}
+                      onChange={(e) =>
+                        setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {administrativeUnits.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-              <div className={styles.grid3}>
-                <Field label="Unidad administrativa">
-                  <select
-                    className={styles.select}
-                    value={create.idAdministrativeUnit ?? ""}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
-                    }
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {administrativeUnits.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Proyecto">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idProject ?? ""}
+                      onChange={(e) => setCreate((p) => ({ ...p, idProject: toNullableNumber(e.target.value) }))}
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {projects.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Proyecto">
-                  <select
-                    className={styles.select}
-                    value={create.idProject ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idProject: toNullableNumber(e.target.value) }))}
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {projects.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Tipo de adquisición">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idAcquisitionType ?? ""}
+                      onChange={(e) =>
+                        setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {acquisitionTypes.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Tipo de adquisición">
-                  <select
-                    className={styles.select}
-                    value={create.idAcquisitionType ?? ""}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))
-                    }
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {acquisitionTypes.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Proveedor">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idSupplier ?? ""}
+                      onChange={(e) => setCreate((p) => ({ ...p, idSupplier: toNullableNumber(e.target.value) }))}
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {suppliers.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Proveedor">
-                  <select
-                    className={styles.select}
-                    value={create.idSupplier ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idSupplier: toNullableNumber(e.target.value) }))}
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {suppliers.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Fuente de financiamiento">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idFundingSource ?? ""}
+                      onChange={(e) =>
+                        setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {fundingSources.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Fuente de financiamiento">
-                  <select
-                    className={styles.select}
-                    value={create.idFundingSource ?? ""}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))
-                    }
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {fundingSources.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Clasificación de adquisición" required>
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idAcquisitionClassification ?? ""}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          idAcquisitionClassification: toNullableNumber(e.target.value),
+                        }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {acqClassifications.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Clasificación de adquisición" required>
-                  <select
-                    className={styles.select}
-                    value={create.idAcquisitionClassification ?? ""}
-                    onChange={(e) =>
-                      setCreate((p) => ({
-                        ...p,
-                        idAcquisitionClassification: toNullableNumber(e.target.value),
-                      }))
-                    }
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {acqClassifications.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Programa">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idProgram ?? ""}
+                      onChange={(e) => setCreate((p) => ({ ...p, idProgram: toNullableNumber(e.target.value) }))}
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {programs.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Programa">
-                  <select
-                    className={styles.select}
-                    value={create.idProgram ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idProgram: toNullableNumber(e.target.value) }))}
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {programs.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Comunidad">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idCommunity ?? ""}
+                      onChange={(e) => setCreate((p) => ({ ...p, idCommunity: toNullableNumber(e.target.value) }))}
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {communities.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
 
-                <Field label="Comunidad">
-                  <select
-                    className={styles.select}
-                    value={create.idCommunity ?? ""}
-                    onChange={(e) => setCreate((p) => ({ ...p, idCommunity: toNullableNumber(e.target.value) }))}
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {communities.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <FloatingField label="Beneficiario">
+                    <select
+                      className={styles.floatingSelect}
+                      value={create.idBeneficiary ?? ""}
+                      onChange={(e) =>
+                        setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))
+                      }
+                      disabled={createDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {beneficiaries.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
+                </div>
 
-                <Field label="Beneficiario">
-                  <select
-                    className={styles.select}
-                    value={create.idBeneficiary ?? ""}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))
-                    }
-                    disabled={createDisabled}
-                  >
-                    <option value="">Selecciona...</option>
-                    {beneficiaries.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-
-              <div className={styles.actions}>
-                <button type="submit" className={styles.btnSave} disabled={createDisabled}>
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
+                <div className={styles.actions}>
+                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                    {saving ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
               </div>
             </form>
           )}
 
           {step === "postCreate" && (
             <div className={styles.form}>
-              <div className={styles.sectionTitle}>Responsable</div>
+              <div className={styles.detailCard}>
+                <div className={styles.sectionTitle}>Responsable</div>
 
-              <div className={styles.grid3}>
-                <Field label="Unidad administrativa" required>
-                  <select
-                    className={styles.select}
-                    value={manager.idAdministrativeUnit ?? ""}
-                    onChange={(e) =>
-                      setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
-                    }
+                <div className={styles.grid3}>
+                  <FloatingField label="Unidad administrativa" required>
+                    <select
+                      className={styles.floatingSelect}
+                      value={manager.idAdministrativeUnit ?? ""}
+                      onChange={(e) =>
+                        setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                      }
+                      disabled={postDisabled}
+                    >
+                      <option value="">Selecciona...</option>
+                      {administrativeUnits.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
+
+                  <FloatingField label="Nombre(s)" required>
+                    <input
+                      className={styles.floatingInput}
+                      value={manager.firstName}
+                      onChange={(e) => setManager((p) => ({ ...p, firstName: e.target.value }))}
+                      disabled={postDisabled}
+                      placeholder="Ej. Juan"
+                    />
+                  </FloatingField>
+
+                  <FloatingField label="Apellido paterno" required>
+                    <input
+                      className={styles.floatingInput}
+                      value={manager.lastName}
+                      onChange={(e) => setManager((p) => ({ ...p, lastName: e.target.value }))}
+                      disabled={postDisabled}
+                      placeholder="Ej. Pérez"
+                    />
+                  </FloatingField>
+
+                  <FloatingField label="Apellido materno">
+                    <input
+                      className={styles.floatingInput}
+                      value={manager.secondLastName}
+                      onChange={(e) => setManager((p) => ({ ...p, secondLastName: e.target.value }))}
+                      disabled={postDisabled}
+                      placeholder="Ej. López"
+                    />
+                  </FloatingField>
+
+                  <FloatingField label="Email">
+                    <input
+                      className={styles.floatingInput}
+                      value={manager.email}
+                      onChange={(e) => setManager((p) => ({ ...p, email: e.target.value }))}
+                      disabled={postDisabled}
+                      placeholder="correo@dominio.com"
+                    />
+                  </FloatingField>
+
+                  <FloatingField label="Teléfono">
+                    <input
+                      className={styles.floatingInput}
+                      value={manager.phone}
+                      onChange={(e) => setManager((p) => ({ ...p, phone: e.target.value }))}
+                      disabled={postDisabled}
+                      placeholder="Ej. 7711234567"
+                    />
+                  </FloatingField>
+                </div>
+
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => void onSaveManager()}
                     disabled={postDisabled}
                   >
-                    <option value="">Selecciona...</option>
-                    {administrativeUnits.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    {savingManager ? "Guardando..." : managerSaved ? "Responsable guardado" : "Guardar responsable"}
+                  </button>
+                </div>
 
-                <Field label="Nombre(s)" required>
-                  <input
-                    className={styles.input}
-                    value={manager.firstName}
-                    onChange={(e) => setManager((p) => ({ ...p, firstName: e.target.value }))}
-                    disabled={postDisabled}
-                    placeholder="Ej. Juan"
-                  />
-                </Field>
+                <div className={styles.sectionTitle}>Documentos por clasificación</div>
 
-                <Field label="Apellido paterno" required>
-                  <input
-                    className={styles.input}
-                    value={manager.lastName}
-                    onChange={(e) => setManager((p) => ({ ...p, lastName: e.target.value }))}
-                    disabled={postDisabled}
-                    placeholder="Ej. Pérez"
-                  />
-                </Field>
-
-                <Field label="Apellido materno">
-                  <input
-                    className={styles.input}
-                    value={manager.secondLastName}
-                    onChange={(e) => setManager((p) => ({ ...p, secondLastName: e.target.value }))}
-                    disabled={postDisabled}
-                    placeholder="Ej. López"
-                  />
-                </Field>
-
-                <Field label="Email">
-                  <input
-                    className={styles.input}
-                    value={manager.email}
-                    onChange={(e) => setManager((p) => ({ ...p, email: e.target.value }))}
-                    disabled={postDisabled}
-                    placeholder="correo@dominio.com"
-                  />
-                </Field>
-
-                <Field label="Teléfono">
-                  <input
-                    className={styles.input}
-                    value={manager.phone}
-                    onChange={(e) => setManager((p) => ({ ...p, phone: e.target.value }))}
-                    disabled={postDisabled}
-                    placeholder="Ej. 7711234567"
-                  />
-                </Field>
-              </div>
-
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.btnGhost}
-                  onClick={() => void onSaveManager()}
-                  disabled={postDisabled}
-                >
-                  {savingManager ? "Guardando..." : managerSaved ? "Responsable guardado" : "Guardar responsable"}
-                </button>
-              </div>
-
-              <div className={styles.sectionTitle}>Documentos por clasificación</div>
-              {!managerSaved && (
-                <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>
-              )}
-
-              <div className={styles.docsWrap}>
-                {docsLoading && <div className={styles.docsHint}>Cargando documentos...</div>}
-
-                {!docsLoading && docs.length === 0 && (
-                  <div className={styles.docsHint}>No hay documentos para esta clasificación.</div>
+                {!managerSaved && (
+                  <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>
                 )}
 
-                {docs.map((d) => (
-                  <div key={d.idDocumentType} className={styles.docRow}>
-                    <div className={styles.docLeft}>
-                      <label className={styles.docName}>
-                        <input
-                          type="checkbox"
-                          checked={d.applies}
-                          onChange={(e) =>
-                            setDocs((prev) =>
-                              prev.map((x) =>
-                                x.idDocumentType === d.idDocumentType
-                                  ? { ...x, applies: e.target.checked }
-                                  : x
-                              )
-                            )
-                          }
-                          disabled={postDisabled || !managerSaved}
-                        />
-                        <span>{d.name}</span>
-                      </label>
+                <div className={styles.docsWrap}>
+                  {docsLoading && <div className={styles.docsHint}>Cargando documentos...</div>}
 
-                      <div className={styles.docMini}>
-                        {d.applies
-                          ? d.requiredByRule
-                            ? "Aplica / Obligatorio por clasificación"
-                            : "Aplica / Opcional por clasificación"
-                          : "No aplica para esta solicitud"}
+                  {!docsLoading && docs.length === 0 && (
+                    <div className={styles.docsHint}>No hay documentos para esta clasificación.</div>
+                  )}
+
+                  {docs.map((d) => (
+                    <div key={d.idDocumentType} className={styles.docRow}>
+                      <div className={styles.docLeft}>
+                        <label className={styles.docName}>
+                          <input
+                            type="checkbox"
+                            checked={d.applies}
+                            onChange={(e) =>
+                              setDocs((prev) =>
+                                prev.map((x) =>
+                                  x.idDocumentType === d.idDocumentType
+                                    ? { ...x, applies: e.target.checked }
+                                    : x
+                                )
+                              )
+                            }
+                            disabled={postDisabled || !managerSaved}
+                          />
+                          <span>{d.name}</span>
+                        </label>
+
+                        <div className={styles.docMini}>
+                          {d.applies
+                            ? d.requiredByRule
+                              ? "Aplica / Obligatorio por clasificación"
+                              : "Aplica / Opcional por clasificación"
+                            : "No aplica para esta solicitud"}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.btnSave}
-                  onClick={() => void onSaveDocsChecklist()}
-                  disabled={postDisabled || !managerSaved}
-                >
-                  {docsSaving ? "Guardando..." : "Guardar checklist"}
-                </button>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnSave}
+                    onClick={() => void onSaveDocsChecklist()}
+                    disabled={postDisabled || !managerSaved}
+                  >
+                    {docsSaving ? "Guardando..." : "Guardar checklist"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1226,7 +1232,7 @@ export default function AcquisitionRequest() {
   );
 }
 
-function Field({
+function FloatingField({
   label,
   required = false,
   children,
@@ -1236,11 +1242,29 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
+    <div className={styles.floatingField}>
+      <span className={styles.floatingLabel}>
+        {label} {required && <span className={styles.required}>*</span>}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function FloatingFieldArea({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={styles.floatingFieldArea}>
+      <span className={styles.floatingLabel}>
+        {label} {required && <span className={styles.required}>*</span>}
+      </span>
       {children}
     </div>
   );
@@ -1249,33 +1273,10 @@ function Field({
 function CalendarIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M8 2v3M16 2v3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M3 9h18"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <rect
-        x="3"
-        y="4"
-        width="18"
-        height="17"
-        rx="3"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path
-        d="M8 13h3M8 17h3M14 13h2.5M14 17h2.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <path d="M8 2v3M16 2v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3 9h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 13h3M8 17h3M14 13h2.5M14 17h2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
