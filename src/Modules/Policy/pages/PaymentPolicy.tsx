@@ -70,6 +70,7 @@ export default function PaymentPolicy() {
     file: null,
   });
   const [deleteForm, setDeleteForm] = useState<DeleteForm>({ password: "" });
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -189,6 +190,18 @@ export default function PaymentPolicy() {
     setMode("edit");
   }
 
+  function openDeleteModal() {
+    if (!selected) return;
+    setDeleteForm({ password: "" });
+    setDeleteModalOpen(true);
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return;
+    setDeleteModalOpen(false);
+    setDeleteForm({ password: "" });
+  }
+
   function validateCreate(): string {
     const code = create.policyCode.trim();
     if (!code) return "El código de póliza es obligatorio.";
@@ -306,6 +319,7 @@ export default function PaymentPolicy() {
 
       showToast("success", "Póliza eliminada correctamente");
       setDeleteForm({ password: "" });
+      setDeleteModalOpen(false);
       setSelected(null);
       setMode("view");
 
@@ -542,62 +556,71 @@ export default function PaymentPolicy() {
                   void onCreate();
                 }}
               >
-                <div className={styles.grid}>
-                  <Field label="Código de póliza" required>
-                    <input
-                      className={styles.input}
-                      value={create.policyCode}
-                      onChange={(e) => setCreate((p) => ({ ...p, policyCode: e.target.value }))}
-                      disabled={busy}
-                      placeholder="Ej. POL-2026-001"
-                    />
-                  </Field>
-
-                  <Field label="Descripción">
-                    <input
-                      className={styles.input}
-                      value={create.description}
-                      onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
-                      disabled={busy}
-                      placeholder="Descripción breve..."
-                    />
-                  </Field>
-
-                  <Field label="Archivo PDF" required>
-                    <label className={styles.fileBox}>
-                      <input
-                        className={styles.fileInput}
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        disabled={busy}
-                        onChange={(e) =>
-                          setCreate((p) => ({
-                            ...p,
-                            file: e.target.files?.[0] ?? null,
-                          }))
-                        }
-                      />
-                      <span className={styles.fileButton}>Seleccionar archivo</span>
-                      <span className={styles.fileName}>
-                        {create.file ? create.file.name : "Ningún archivo seleccionado"}
+                <div className={styles.detailBox}>
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>
+                        Código de póliza <span className={styles.required}>*</span>
                       </span>
-                    </label>
-                  </Field>
-                </div>
+                      <input
+                        className={styles.floatingInput}
+                        value={create.policyCode}
+                        onChange={(e) => setCreate((p) => ({ ...p, policyCode: e.target.value }))}
+                        disabled={busy}
+                        placeholder="Ej. POL-2026-001"
+                      />
+                    </div>
 
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={busy}
-                  >
-                    Cancelar
-                  </button>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={create.description}
+                        onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
+                        disabled={busy}
+                        placeholder="Descripción breve..."
+                        rows={4}
+                      />
+                    </div>
 
-                  <button type="submit" className={styles.btnSave} disabled={busy}>
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Archivo PDF *</span>
+
+                      <label className={styles.fileBox}>
+                        <input
+                          className={styles.fileInput}
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          disabled={busy}
+                          onChange={(e) =>
+                            setCreate((p) => ({
+                              ...p,
+                              file: e.target.files?.[0] ?? null,
+                            }))
+                          }
+                        />
+                        <span className={styles.fileButton}>Seleccionar archivo</span>
+                        <span className={styles.fileName}>
+                          {create.file ? create.file.name : "Ningún archivo seleccionado"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={busy}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button type="submit" className={styles.btnSave} disabled={busy}>
+                      {saving ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : !selected ? (
@@ -611,115 +634,112 @@ export default function PaymentPolicy() {
                 }}
               >
                 <div className={styles.detailBox}>
-                  <Field label="Código de póliza" required>
-                    <input
-                      className={styles.input}
-                      value={edit.policyCode}
-                      onChange={(e) => setEdit((p) => ({ ...p, policyCode: e.target.value }))}
-                      disabled={busy}
-                      placeholder="Código..."
-                    />
-                  </Field>
-
-                  <Field label="Descripción">
-                    <input
-                      className={styles.input}
-                      value={edit.description}
-                      onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
-                      disabled={busy}
-                      placeholder="Descripción..."
-                    />
-                  </Field>
-
-                  <Field label="Reemplazar PDF">
-                    <label className={styles.fileBox}>
-                      <input
-                        className={styles.fileInput}
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        disabled={busy}
-                        onChange={(e) =>
-                          setEdit((p) => ({
-                            ...p,
-                            file: e.target.files?.[0] ?? null,
-                          }))
-                        }
-                      />
-                      <span className={styles.fileButton}>Seleccionar archivo</span>
-                      <span className={styles.fileName}>
-                        {edit.file ? edit.file.name : "Sin cambios en el archivo"}
+                  <div className={styles.detailCard}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>
+                        Código de póliza <span className={styles.required}>*</span>
                       </span>
-                    </label>
-                  </Field>
-                </div>
+                      <input
+                        className={styles.floatingInput}
+                        value={edit.policyCode}
+                        onChange={(e) => setEdit((p) => ({ ...p, policyCode: e.target.value }))}
+                        disabled={busy}
+                        placeholder="Código..."
+                      />
+                    </div>
 
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => setMode("view")}
-                    disabled={busy}
-                  >
-                    Cancelar
-                  </button>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>Descripción</span>
+                      <textarea
+                        className={styles.floatingTextareaArea}
+                        value={edit.description}
+                        onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
+                        disabled={busy}
+                        placeholder="Descripción..."
+                        rows={4}
+                      />
+                    </div>
 
-                  <button type="submit" className={styles.btnSave} disabled={busy}>
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Reemplazar PDF</span>
+
+                      <label className={styles.fileBox}>
+                        <input
+                          className={styles.fileInput}
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          disabled={busy}
+                          onChange={(e) =>
+                            setEdit((p) => ({
+                              ...p,
+                              file: e.target.files?.[0] ?? null,
+                            }))
+                          }
+                        />
+                        <span className={styles.fileButton}>Seleccionar archivo</span>
+                        <span className={styles.fileName}>
+                          {edit.file ? edit.file.name : "Sin cambios en el archivo"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      onClick={() => setMode("view")}
+                      disabled={busy}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button type="submit" className={styles.btnSave} disabled={busy}>
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : (
               <div className={styles.detailBox}>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Código</span>
-                  <span className={styles.detailValue}>{getPolicyCode(selected) ?? "—"}</span>
-                </div>
+                <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Código</span>
+                    <div className={styles.floatingValue}>{getPolicyCode(selected) ?? "—"}</div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Descripción</span>
-                  <span className={styles.detailValue}>{getDescription(selected) ?? "—"}</span>
-                </div>
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>Descripción</span>
+                    <div className={styles.floatingValueArea}>
+                      {getDescription(selected) ?? "—"}
+                    </div>
+                  </div>
 
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Archivo</span>
-                  <button
-                    type="button"
-                    className={styles.btnMini}
-                    onClick={() => void onDownload(selected)}
-                    disabled={busy}
-                  >
-                    Descargar PDF
-                  </button>
-                </div>
-
-                <div className={styles.deleteCard}>
-                  <p className={styles.deleteTitle}>Eliminar póliza</p>
-                  <p className={styles.deleteText}>
-                    Para eliminar esta póliza, escribe tu contraseña.
-                  </p>
-
-                  <input
-                    type="password"
-                    className={styles.input}
-                    placeholder="Contraseña"
-                    value={deleteForm.password}
-                    onChange={(e) => setDeleteForm({ password: e.target.value })}
-                    disabled={busy}
-                  />
-
-                  <button
-                    type="button"
-                    className={styles.btnDanger}
-                    onClick={() => void onDelete()}
-                    disabled={busy}
-                  >
-                    {deleting ? "Eliminando..." : "Eliminar"}
-                  </button>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Archivo</span>
+                    <button
+                      type="button"
+                      className={styles.btnMini}
+                      onClick={() => void onDownload(selected)}
+                      disabled={busy}
+                    >
+                      Descargar PDF
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.actions}>
                   <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={busy}>
                     Cerrar
+                  </button>
+
+                  <button
+                    className={styles.btnDanger}
+                    type="button"
+                    onClick={openDeleteModal}
+                    disabled={busy}
+                  >
+                    Eliminar
                   </button>
 
                   <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={busy}>
@@ -731,26 +751,112 @@ export default function PaymentPolicy() {
           </div>
         </aside>
       </div>
-    </div>
-  );
-}
 
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className={styles.labelRow}>
-        <label className={styles.label}>{label}</label>
-        {required && <span className={styles.required}>*</span>}
-      </div>
-      {children}
+      {deleteModalOpen && selected && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminación"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12M10 11v6M14 11v6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>Confirmar eliminación</div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Esta acción eliminará la póliza seleccionada.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Código</div>
+                <div
+                  className={styles.deleteFileName}
+                  title={getPolicyCode(selected) ?? ""}
+                >
+                  {getPolicyCode(selected) ?? "—"}
+                </div>
+              </div>
+
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Descripción</div>
+                <div
+                  className={styles.deleteFileName}
+                  title={getDescription(selected) ?? ""}
+                >
+                  {getDescription(selected) ?? "—"}
+                </div>
+              </div>
+
+              <div className={styles.deleteFormField}>
+                <label className={styles.deleteFieldLabel}>Contraseña</label>
+                <input
+                  type="password"
+                  className={styles.deleteInput}
+                  value={deleteForm.password}
+                  onChange={(e) => setDeleteForm({ password: e.target.value })}
+                  placeholder="Ingresa tu contraseña"
+                  disabled={deleting}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !deleting && deleteForm.password.trim()) {
+                      void onDelete();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Esta acción no se puede deshacer.
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => void onDelete()}
+                disabled={deleting || !deleteForm.password.trim()}
+              >
+                {deleting ? "Eliminando..." : "Eliminar póliza"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

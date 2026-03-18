@@ -10,6 +10,8 @@ import styles from "../styles/Suplier.module.css";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 
+type SupplierType = "fisica" | "moral";
+
 type Supplier = {
   IdSupplier?: number;
   Rfc?: string;
@@ -62,6 +64,7 @@ type Supplier = {
 };
 
 type FormDto = {
+  supplierType: SupplierType;
   rfc: string;
   businessName: string;
 
@@ -95,6 +98,7 @@ const BASE_API = "https://localhost:7197";
 const API_BASE = `${BASE_API}/api/Supplier`;
 
 const initialForm: FormDto = {
+  supplierType: "moral",
   rfc: "",
   businessName: "",
 
@@ -129,19 +133,31 @@ function onlyLettersSpaces(v: string): string {
   return v.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s.\-']/g, "");
 }
 
-function capitalizeWords(v: string): string {
-  const clean = v.replace(/\s+/g, " ").trim().toLowerCase();
-  if (!clean) return "";
-  return clean
-    .split(" ")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
-    .join(" ");
+function onlyAlphaNumeric(v: string): string {
+  return v.replace(/[^A-Za-z0-9]/g, "");
 }
 
-function normalizeHumanText(v: string): string {
+function capitalizeWordsLoose(v: string): string {
+  return v.replace(/\b([a-záéíóúüñ])/g, (m) => m.toUpperCase());
+}
+
+function normalizeHumanTextInput(v: string): string {
   const cleaned = onlyLettersSpaces(v);
-  const collapsed = collapseSpaces(cleaned);
-  return capitalizeWords(collapsed);
+  const singleSpaces = cleaned.replace(/\s{2,}/g, " ");
+  return capitalizeWordsLoose(singleSpaces);
+}
+
+function normalizeGeneralTextInput(v: string): string {
+  const singleSpaces = v.replace(/\s{2,}/g, " ");
+  return capitalizeWordsLoose(singleSpaces);
+}
+
+function normalizeHumanTextForSave(v: string): string {
+  return capitalizeWordsLoose(collapseSpaces(onlyLettersSpaces(v)).toLowerCase());
+}
+
+function normalizeGeneralTextForSave(v: string): string {
+  return capitalizeWordsLoose(collapseSpaces(v).toLowerCase());
 }
 
 function onlyDigits(v: string): string {
@@ -153,11 +169,24 @@ function isValidEmail(email: string): boolean {
 }
 
 function normalizeRfc(v: string): string {
-  return v.replace(/\s+/g, "").toUpperCase();
+  return onlyAlphaNumeric(v).toUpperCase();
 }
 
 function clampLen(v: string, max: number): string {
   return v.length > max ? v.slice(0, max) : v;
+}
+
+function getRfcLengthByType(type: SupplierType): number {
+  return type === "moral" ? 12 : 13;
+}
+
+function inferSupplierTypeFromSupplier(s: Supplier | null): SupplierType {
+  const rfc = getRfc(s) ?? "";
+  const businessName = (getBusinessName(s) ?? "").trim().toLowerCase();
+
+  if (businessName === "no aplica" && rfc.length === 13) return "fisica";
+  if (rfc.length === 13) return "fisica";
+  return "moral";
 }
 
 export default function SupplierPage() {
@@ -395,35 +424,47 @@ export default function SupplierPage() {
 
   function validateForm(f: FormDto): string {
     const rfc = normalizeRfc(f.rfc);
+    const rfcLen = getRfcLengthByType(f.supplierType);
+
     if (!rfc) return "El RFC es obligatorio.";
-    if (rfc.length < 12 || rfc.length > 13) {
-      return "El RFC debe tener 12 o 13 caracteres.";
+    if (!/^[A-Z0-9]+$/.test(rfc)) {
+      return "El RFC solo debe contener letras y números.";
+    }
+    if (rfc.length !== rfcLen) {
+      return `El RFC debe tener exactamente ${rfcLen} caracteres para persona ${f.supplierType === "moral" ? "moral" : "física"}.`;
     }
 
-    const bn = asTrim(f.businessName);
-    if (!bn) return "La razón social es obligatoria.";
-    if (bn.length < 3) return "La razón social es muy corta.";
+    if (f.supplierType === "moral") {
+      const bn = collapseSpaces(f.businessName);
+      if (!bn) return "La razón social es obligatoria.";
+      if (bn.length < 3) return "La razón social es muy corta.";
+    }
 
-    const street = asTrim(f.street);
+    const street = collapseSpaces(f.street);
     if (!street) return "La calle es obligatoria.";
 
     const cp = onlyDigits(f.postalCode);
     if (!cp) return "El código postal es obligatorio.";
     if (cp.length !== 5) return "El código postal debe tener 5 dígitos.";
 
-    const mun = asTrim(f.municipality);
+    const city = collapseSpaces(f.city);
+    if (city && /\d/.test(city)) {
+      return "La ciudad no debe contener números.";
+    }
+
+    const mun = collapseSpaces(f.municipality);
     if (!mun) return "El municipio es obligatorio.";
     if (/\d/.test(mun)) return "El municipio no debe contener números.";
 
-    const st = asTrim(f.state);
+    const st = collapseSpaces(f.state);
     if (!st) return "El estado es obligatorio.";
     if (/\d/.test(st)) return "El estado no debe contener números.";
 
-    const country = asTrim(f.country);
+    const country = collapseSpaces(f.country);
     if (!country) return "El país es obligatorio.";
     if (/\d/.test(country)) return "El país no debe contener números.";
 
-    const contactName = asTrim(f.contactName);
+    const contactName = collapseSpaces(f.contactName);
     if (contactName && /\d/.test(contactName)) {
       return "El nombre y apellidos no debe contener números.";
     }
@@ -450,21 +491,24 @@ export default function SupplierPage() {
     return {
       IdSupplier: 0,
       Rfc: normalizeRfc(f.rfc),
-      BusinessName: asTrim(f.businessName),
+      BusinessName:
+        f.supplierType === "fisica"
+          ? "No aplica"
+          : normalizeGeneralTextForSave(f.businessName),
 
-      Street: asTrim(f.street),
+      Street: normalizeGeneralTextForSave(f.street),
       ExternalNumber: asTrim(f.externalNumber) || null,
       InternalNumber: asTrim(f.internalNumber) || null,
-      Neighborhood: asTrim(f.neighborhood) || null,
+      Neighborhood: normalizeGeneralTextForSave(f.neighborhood) || null,
       PostalCode: Number(onlyDigits(f.postalCode)),
 
-      City: normalizeHumanText(f.city) || null,
-      Municipality: normalizeHumanText(f.municipality),
-      State: normalizeHumanText(f.state),
-      Country: normalizeHumanText(f.country),
+      City: normalizeHumanTextForSave(f.city) || null,
+      Municipality: normalizeHumanTextForSave(f.municipality),
+      State: normalizeHumanTextForSave(f.state),
+      Country: normalizeHumanTextForSave(f.country),
 
       Phone: onlyDigits(f.phone) || null,
-      ContactName: normalizeHumanText(f.contactName) || null,
+      ContactName: normalizeHumanTextForSave(f.contactName) || null,
       ContactPhone: onlyDigits(f.contactPhone) || null,
       Email: asTrim(f.email) || null,
 
@@ -631,6 +675,8 @@ export default function SupplierPage() {
   );
 
   const formDisabled = saving || loading;
+  const rfcSearchValid =
+    normalizeRfc(search).length === 12 || normalizeRfc(search).length === 13;
 
   return (
     <div className={styles.page}>
@@ -677,9 +723,8 @@ export default function SupplierPage() {
               onChange={(e) => setSearch(e.target.value)}
               disabled={formDisabled}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const q = normalizeRfc(search);
-                  if (q.length === 12 || q.length === 13) void onSearchByRfc();
+                if (e.key === "Enter" && rfcSearchValid) {
+                  void onSearchByRfc();
                 }
               }}
             />
@@ -877,298 +922,29 @@ export default function SupplierPage() {
                   void onCreate();
                 }}
               >
-                <div className={styles.detailBox}>
-                  <div className={styles.detailCard}>
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>RFC</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.rfc}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            rfc: clampLen(normalizeRfc(e.target.value), 13),
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="XAXX010101000"
-                        maxLength={13}
-                      />
-                    </div>
+                <SupplierFormFields
+                  form={formCreate}
+                  setForm={setFormCreate}
+                  formDisabled={formDisabled}
+                />
 
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Razón social</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.businessName}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            businessName: e.target.value,
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="Nombre / Razón social"
-                      />
-                    </div>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
+                    Cancelar
+                  </button>
 
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Calle</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.street}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({ ...p, street: e.target.value }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="Calle"
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>No. exterior</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.externalNumber}
-                          onChange={(e) =>
-                            setFormCreate((p) => ({
-                              ...p,
-                              externalNumber: e.target.value,
-                            }))
-                          }
-                          disabled={formDisabled}
-                          placeholder="Ej: 123"
-                          maxLength={10}
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>No. interior</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.internalNumber}
-                          onChange={(e) =>
-                            setFormCreate((p) => ({
-                              ...p,
-                              internalNumber: e.target.value,
-                            }))
-                          }
-                          disabled={formDisabled}
-                          placeholder="Ej: 2B"
-                          maxLength={10}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Colonia</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.neighborhood}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            neighborhood: e.target.value,
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="Colonia"
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>
-                        Código postal
-                      </span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.postalCode}
-                        onChange={(e) => {
-                          const next = clampLen(onlyDigits(e.target.value), 5);
-                          setFormCreate((p) => ({ ...p, postalCode: next }));
-                        }}
-                        disabled={formDisabled}
-                        inputMode="numeric"
-                        placeholder="Ej: 42800"
-                        maxLength={5}
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Ciudad</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.city}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            city: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="Ciudad"
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Municipio</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.municipality}
-                          onChange={(e) =>
-                            setFormCreate((p) => ({
-                              ...p,
-                              municipality: normalizeHumanText(e.target.value),
-                            }))
-                          }
-                          disabled={formDisabled}
-                          placeholder="Municipio"
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Estado</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.state}
-                          onChange={(e) =>
-                            setFormCreate((p) => ({
-                              ...p,
-                              state: normalizeHumanText(e.target.value),
-                            }))
-                          }
-                          disabled={formDisabled}
-                          placeholder="Estado"
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>País</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.country}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            country: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="País"
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Teléfono</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.phone}
-                          onChange={(e) => {
-                            const next = clampLen(
-                              onlyDigits(e.target.value),
-                              10,
-                            );
-                            setFormCreate((p) => ({ ...p, phone: next }));
-                          }}
-                          disabled={formDisabled}
-                          inputMode="numeric"
-                          placeholder="Ej: 7711234567"
-                          maxLength={10}
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>
-                          Teléfono contacto
-                        </span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formCreate.contactPhone}
-                          onChange={(e) => {
-                            const next = clampLen(
-                              onlyDigits(e.target.value),
-                              10,
-                            );
-                            setFormCreate((p) => ({
-                              ...p,
-                              contactPhone: next,
-                            }));
-                          }}
-                          disabled={formDisabled}
-                          inputMode="numeric"
-                          placeholder="Ej: 7711234567"
-                          maxLength={10}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>
-                        Nombre y apellidos (Contacto)
-                      </span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.contactName}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({
-                            ...p,
-                            contactName: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="Ej: Juan Carlos Pérez López"
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Correo</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formCreate.email}
-                        onChange={(e) =>
-                          setFormCreate((p) => ({ ...p, email: e.target.value }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="correo@dominio.com"
-                        inputMode="email"
-                      />
-                    </div>
-
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>Activo</span>
-                      <Switch
-                        checked={formCreate.active}
-                        disabled={formDisabled}
-                        label={formCreate.active ? "Activo" : "Inactivo"}
-                        onChange={(next) =>
-                          setFormCreate((p) => ({ ...p, active: next }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles.actions}>
-                    <button
-                      type="button"
-                      className={styles.btnGhost}
-                      onClick={() => setMode("view")}
-                      disabled={saving}
-                    >
-                      Cancelar
-                    </button>
-
-                    <button
-                      type="submit"
-                      className={styles.btnSave}
-                      disabled={formDisabled}
-                    >
-                      {saving ? "Guardando..." : "Guardar"}
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={formDisabled}
+                  >
+                    {saving ? "Guardando..." : "Guardar"}
+                  </button>
                 </div>
               </form>
             ) : !selected ? (
@@ -1183,289 +959,43 @@ export default function SupplierPage() {
                   void onUpdate();
                 }}
               >
-                <div className={styles.detailBox}>
-                  <div className={styles.detailCard}>
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>RFC</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.rfc}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            rfc: clampLen(normalizeRfc(e.target.value), 13),
-                          }))
-                        }
-                        disabled={formDisabled}
-                        placeholder="XAXX010101000"
-                        maxLength={13}
-                      />
-                    </div>
+                <SupplierFormFields
+                  form={formEdit}
+                  setForm={setFormEdit}
+                  formDisabled={formDisabled}
+                />
 
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Razón social</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.businessName}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            businessName: e.target.value,
-                          }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                  >
+                    Cancelar
+                  </button>
 
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Calle</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.street}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({ ...p, street: e.target.value }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>No. exterior</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.externalNumber}
-                          onChange={(e) =>
-                            setFormEdit((p) => ({
-                              ...p,
-                              externalNumber: e.target.value,
-                            }))
-                          }
-                          disabled={formDisabled}
-                          maxLength={10}
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>No. interior</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.internalNumber}
-                          onChange={(e) =>
-                            setFormEdit((p) => ({
-                              ...p,
-                              internalNumber: e.target.value,
-                            }))
-                          }
-                          disabled={formDisabled}
-                          maxLength={10}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Colonia</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.neighborhood}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            neighborhood: e.target.value,
-                          }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>
-                        Código postal
-                      </span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.postalCode}
-                        onChange={(e) => {
-                          const next = clampLen(onlyDigits(e.target.value), 5);
-                          setFormEdit((p) => ({ ...p, postalCode: next }));
-                        }}
-                        disabled={formDisabled}
-                        inputMode="numeric"
-                        maxLength={5}
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Ciudad</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.city}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            city: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Municipio</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.municipality}
-                          onChange={(e) =>
-                            setFormEdit((p) => ({
-                              ...p,
-                              municipality: normalizeHumanText(e.target.value),
-                            }))
-                          }
-                          disabled={formDisabled}
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Estado</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.state}
-                          onChange={(e) =>
-                            setFormEdit((p) => ({
-                              ...p,
-                              state: normalizeHumanText(e.target.value),
-                            }))
-                          }
-                          disabled={formDisabled}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>País</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.country}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            country: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
-
-                    <div className={styles.doubleRow}>
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>Teléfono</span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.phone}
-                          onChange={(e) => {
-                            const next = clampLen(
-                              onlyDigits(e.target.value),
-                              10,
-                            );
-                            setFormEdit((p) => ({ ...p, phone: next }));
-                          }}
-                          disabled={formDisabled}
-                          inputMode="numeric"
-                          maxLength={10}
-                        />
-                      </div>
-
-                      <div className={styles.floatingField}>
-                        <span className={styles.floatingLabel}>
-                          Teléfono contacto
-                        </span>
-                        <input
-                          className={styles.floatingInput}
-                          value={formEdit.contactPhone}
-                          onChange={(e) => {
-                            const next = clampLen(
-                              onlyDigits(e.target.value),
-                              10,
-                            );
-                            setFormEdit((p) => ({
-                              ...p,
-                              contactPhone: next,
-                            }));
-                          }}
-                          disabled={formDisabled}
-                          inputMode="numeric"
-                          maxLength={10}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>
-                        Nombre y apellidos (Contacto)
-                      </span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.contactName}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({
-                            ...p,
-                            contactName: normalizeHumanText(e.target.value),
-                          }))
-                        }
-                        disabled={formDisabled}
-                      />
-                    </div>
-
-                    <div className={styles.floatingField}>
-                      <span className={styles.floatingLabel}>Correo</span>
-                      <input
-                        className={styles.floatingInput}
-                        value={formEdit.email}
-                        onChange={(e) =>
-                          setFormEdit((p) => ({ ...p, email: e.target.value }))
-                        }
-                        disabled={formDisabled}
-                        inputMode="email"
-                      />
-                    </div>
-
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>Activo</span>
-                      <Switch
-                        checked={formEdit.active}
-                        disabled={formDisabled}
-                        label={formEdit.active ? "Activo" : "Inactivo"}
-                        onChange={(next) =>
-                          setFormEdit((p) => ({ ...p, active: next }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles.actions}>
-                    <button
-                      type="button"
-                      className={styles.btnGhost}
-                      onClick={() => setMode("view")}
-                      disabled={saving}
-                    >
-                      Cancelar
-                    </button>
-
-                    <button
-                      type="submit"
-                      className={styles.btnSave}
-                      disabled={saving}
-                    >
-                      {saving ? "Guardando..." : "Guardar cambios"}
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Guardando..." : "Guardar cambios"}
+                  </button>
                 </div>
               </form>
             ) : (
               <div className={styles.detailBox}>
                 <div className={styles.detailCard}>
+                  <div className={styles.floatingField}>
+                    <span className={styles.floatingLabel}>Tipo de persona</span>
+                    <div className={styles.floatingValue}>
+                      {inferSupplierTypeFromSupplier(selected) === "moral"
+                        ? "Persona moral"
+                        : "Persona física"}
+                    </div>
+                  </div>
+
                   <div className={styles.floatingField}>
                     <span className={styles.floatingLabel}>RFC</span>
                     <div className={styles.floatingValue}>
@@ -1565,6 +1095,334 @@ export default function SupplierPage() {
   );
 }
 
+/** =========================
+ * FORM FIELDS
+ * ========================= */
+
+type SupplierFormFieldsProps = {
+  form: FormDto;
+  setForm: React.Dispatch<React.SetStateAction<FormDto>>;
+  formDisabled: boolean;
+};
+
+function SupplierFormFields({
+  form,
+  setForm,
+  formDisabled,
+}: SupplierFormFieldsProps) {
+  const isFisica = form.supplierType === "fisica";
+  const rfcMax = getRfcLengthByType(form.supplierType);
+
+  return (
+    <div className={styles.detailBox}>
+      <div className={styles.detailCard}>
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Tipo de persona</span>
+          <select
+            className={`${styles.floatingInput} ${styles.selectInput}`}
+            value={form.supplierType}
+            onChange={(e) => {
+              const nextType = e.target.value as SupplierType;
+              const nextRfcLen = getRfcLengthByType(nextType);
+
+              setForm((p) => ({
+                ...p,
+                supplierType: nextType,
+                rfc: clampLen(normalizeRfc(p.rfc), nextRfcLen),
+                businessName:
+                  nextType === "fisica"
+                    ? "No aplica"
+                    : p.businessName === "No aplica"
+                      ? ""
+                      : p.businessName,
+              }));
+            }}
+            disabled={formDisabled}
+          >
+            <option value="moral">Persona moral</option>
+            <option value="fisica">Persona física</option>
+          </select>
+        </div>
+
+        <div className={styles.fieldHelp}>
+          {isFisica
+            ? "Persona física: el RFC debe tener 13 caracteres y la razón social se enviará como “No aplica”."
+            : "Persona moral: el RFC debe tener 12 caracteres y la razón social es obligatoria."}
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>RFC</span>
+          <input
+            className={styles.floatingInput}
+            value={form.rfc}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                rfc: clampLen(normalizeRfc(e.target.value), rfcMax),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder={isFisica ? "RFC de 13 caracteres" : "RFC de 12 caracteres"}
+            maxLength={rfcMax}
+          />
+        </div>
+
+        {!isFisica && (
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>Razón social</span>
+            <input
+              className={styles.floatingInput}
+              value={form.businessName}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  businessName: normalizeGeneralTextInput(e.target.value),
+                }))
+              }
+              disabled={formDisabled}
+              placeholder="Nombre / Razón social"
+            />
+          </div>
+        )}
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Calle</span>
+          <input
+            className={styles.floatingInput}
+            value={form.street}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                street: normalizeGeneralTextInput(e.target.value),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="Calle"
+          />
+        </div>
+
+        <div className={styles.doubleRow}>
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>No. exterior</span>
+            <input
+              className={styles.floatingInput}
+              value={form.externalNumber}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  externalNumber: e.target.value,
+                }))
+              }
+              disabled={formDisabled}
+              placeholder="Ej: 123"
+              maxLength={10}
+            />
+          </div>
+
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>No. interior</span>
+            <input
+              className={styles.floatingInput}
+              value={form.internalNumber}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  internalNumber: e.target.value,
+                }))
+              }
+              disabled={formDisabled}
+              placeholder="Ej: 2B"
+              maxLength={10}
+            />
+          </div>
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Colonia</span>
+          <input
+            className={styles.floatingInput}
+            value={form.neighborhood}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                neighborhood: normalizeGeneralTextInput(e.target.value),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="Colonia"
+          />
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Código postal</span>
+          <input
+            className={styles.floatingInput}
+            value={form.postalCode}
+            onChange={(e) => {
+              const next = clampLen(onlyDigits(e.target.value), 5);
+              setForm((p) => ({ ...p, postalCode: next }));
+            }}
+            disabled={formDisabled}
+            inputMode="numeric"
+            placeholder="Ej: 42800"
+            maxLength={5}
+          />
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Ciudad</span>
+          <input
+            className={styles.floatingInput}
+            value={form.city}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                city: normalizeHumanTextInput(e.target.value),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="Ciudad"
+          />
+        </div>
+
+        <div className={styles.doubleRow}>
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>Municipio</span>
+            <input
+              className={styles.floatingInput}
+              value={form.municipality}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  municipality: normalizeHumanTextInput(e.target.value),
+                }))
+              }
+              disabled={formDisabled}
+              placeholder="Municipio"
+            />
+          </div>
+
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>Estado</span>
+            <input
+              className={styles.floatingInput}
+              value={form.state}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  state: normalizeHumanTextInput(e.target.value),
+                }))
+              }
+              disabled={formDisabled}
+              placeholder="Estado"
+            />
+          </div>
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>País</span>
+          <input
+            className={styles.floatingInput}
+            value={form.country}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                country: normalizeHumanTextInput(e.target.value),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="País"
+          />
+        </div>
+
+        <div className={styles.doubleRow}>
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>Teléfono</span>
+            <input
+              className={styles.floatingInput}
+              value={form.phone}
+              onChange={(e) => {
+                const next = clampLen(onlyDigits(e.target.value), 10);
+                setForm((p) => ({ ...p, phone: next }));
+              }}
+              disabled={formDisabled}
+              inputMode="numeric"
+              placeholder="Ej: 7711234567"
+              maxLength={10}
+            />
+          </div>
+
+          <div className={styles.floatingField}>
+            <span className={styles.floatingLabel}>Teléfono contacto</span>
+            <input
+              className={styles.floatingInput}
+              value={form.contactPhone}
+              onChange={(e) => {
+                const next = clampLen(onlyDigits(e.target.value), 10);
+                setForm((p) => ({
+                  ...p,
+                  contactPhone: next,
+                }));
+              }}
+              disabled={formDisabled}
+              inputMode="numeric"
+              placeholder="Ej: 7711234567"
+              maxLength={10}
+            />
+          </div>
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>
+            Nombre y apellidos (Contacto)
+          </span>
+          <input
+            className={styles.floatingInput}
+            value={form.contactName}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                contactName: normalizeHumanTextInput(e.target.value),
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="Ej: Juan Carlos Pérez López"
+          />
+        </div>
+
+        <div className={styles.floatingField}>
+          <span className={styles.floatingLabel}>Correo</span>
+          <input
+            className={styles.floatingInput}
+            value={form.email}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                email: e.target.value,
+              }))
+            }
+            disabled={formDisabled}
+            placeholder="correo@dominio.com"
+            inputMode="email"
+          />
+        </div>
+
+        <div className={styles.detailItem}>
+          <span className={styles.detailLabel}>Activo</span>
+          <Switch
+            checked={form.active}
+            disabled={formDisabled}
+            label={form.active ? "Activo" : "Inactivo"}
+            onChange={(next) =>
+              setForm((p) => ({ ...p, active: next }))
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Switch */
 type SwitchProps = {
   checked: boolean;
@@ -1593,9 +1451,13 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
 
 /** Helpers (Supplier) */
 function formFromSupplier(s: Supplier): FormDto {
+  const supplierType = inferSupplierTypeFromSupplier(s);
+
   return {
+    supplierType,
     rfc: getRfc(s) ?? "",
-    businessName: getBusinessName(s) ?? "",
+    businessName:
+      supplierType === "fisica" ? "No aplica" : getBusinessName(s) ?? "",
 
     street: getStreet(s) ?? "",
     externalNumber: getExternalNumber(s) ?? "",
