@@ -1,5 +1,5 @@
 // src/Modules/Community/pages/Community.tsx
-import React, {
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -10,6 +10,7 @@ import styles from "../styles/Community.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
+import { requestJson } from "../../../services/api";
 
 type CommunityRow = {
   idCommunity?: number;
@@ -33,11 +34,9 @@ type Form = {
   active: boolean;
 };
 
-type AuthStored = { token?: string; Token?: string };
 type UnknownObject = Record<string, unknown>;
 
-const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/Community`;
+const API_BASE = "/api/Community";
 
 const initialForm: Form = {
   code: "",
@@ -85,69 +84,11 @@ export default function Community() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function readToken(): string {
-    const rawAuth = localStorage.getItem("auth");
-    if (rawAuth) {
-      try {
-        const parsed = JSON.parse(rawAuth) as AuthStored;
-        const token = asTrim(parsed.token ?? parsed.Token);
-        if (token) return token;
-      } catch {
-        // ignore
-      }
-    }
-    return "";
-  }
-
-  function authHeaders(): HeadersInit {
-    const token = readToken();
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function requestJson(
-    url: string,
-    init?: RequestInit,
-  ): Promise<
-    | { ok: true; data: unknown; status: number }
-    | { ok: false; error: string; status: number }
-  > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
-
-    if (res.status === 204) return { ok: true, data: [], status: 204 };
-
-    const text = await safeText(res);
-    const parsed = tryParseJson(text);
-
-    if (!res.ok) {
-      const apiMsg = isRecord(parsed) ? getStringProp(parsed, "message") ?? "" : "";
-      const msg =
-        apiMsg ||
-        (typeof parsed === "string" ? parsed : "") ||
-        text ||
-        `HTTP ${res.status}`;
-
-      return { ok: false, error: msg, status: res.status };
-    }
-
-    return { ok: true, data: parsed, status: res.status };
-  }
-
   async function loadAll(keepSelectedCode?: number | null) {
     setLoading(true);
     try {
-      const token = readToken();
-      if (!token) {
-        showToast("error", "No hay token. Inicia sesión nuevamente.");
-        setRows([]);
-        return;
-      }
-
-      const result = await requestJson(`${API_BASE}`, {
+      const result = await requestJson(API_BASE, {
         method: "GET",
-        headers: authHeaders(),
       });
 
       if (!result.ok) {
@@ -364,9 +305,8 @@ export default function Community() {
         active: Boolean(formCreate.active),
       };
 
-      const result = await requestJson(`${API_BASE}`, {
+      const result = await requestJson(API_BASE, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -386,7 +326,10 @@ export default function Community() {
   async function onSaveEdit() {
     const id = selectedId;
     if (id == null || id <= 0) {
-      return showToast("error", "No pude identificar la comunidad seleccionada.");
+      return showToast(
+        "error",
+        "No pude identificar la comunidad seleccionada.",
+      );
     }
 
     const msg = validateForm(formEdit, { excludeId: id });
@@ -408,7 +351,6 @@ export default function Community() {
 
       const result = await requestJson(`${API_BASE}/${id}`, {
         method: "PUT",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -680,7 +622,7 @@ export default function Community() {
                         onChange={(e) =>
                           setFormCreate((p) => ({
                             ...p,
-                            description: e.target.value,
+                            description: normalizeTextInput(e.target.value),
                           }))
                         }
                         disabled={formDisabled}
@@ -761,7 +703,7 @@ export default function Community() {
                         onChange={(e) =>
                           setFormEdit((p) => ({
                             ...p,
-                            description: e.target.value,
+                            description: normalizeTextInput(e.target.value),
                           }))
                         }
                         disabled={formDisabled}
@@ -921,11 +863,6 @@ function getActive(r: CommunityRow | null): boolean | null {
   return null;
 }
 
-function getStringProp(obj: UnknownObject, key: string): string | undefined {
-  const v = obj[key];
-  return typeof v === "string" ? v : undefined;
-}
-
 function asString(v: unknown): string {
   if (v == null) return "";
   return typeof v === "string" ? v : String(v);
@@ -935,22 +872,12 @@ function asTrim(v: unknown): string {
   return asString(v).trim();
 }
 
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
-}
+function normalizeTextInput(value: string): string {
+  const noLeadingSpaces = value.replace(/^\s+/, "");
 
-function tryParseJson(text: string): unknown {
-  const t = asTrim(text);
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return text;
-  }
+  if (!noLeadingSpaces) return "";
+
+  return noLeadingSpaces.charAt(0).toUpperCase() + noLeadingSpaces.slice(1);
 }
 
 function isRecord(v: unknown): v is UnknownObject {

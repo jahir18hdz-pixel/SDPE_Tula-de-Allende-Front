@@ -340,10 +340,13 @@ export default function PaymentPolicy() {
     }
 
     try {
-      const response = await fetch(`${POLICY_BASE}/payment-policies/${id}/download`, {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const response = await fetch(
+        `${POLICY_BASE}/payment-policies/${id}/download`,
+        {
+          method: "GET",
+          headers: authHeaders(),
+        }
+      );
 
       if (!response.ok) {
         const txt = await safeReadError(response);
@@ -355,7 +358,8 @@ export default function PaymentPolicy() {
       const url = window.URL.createObjectURL(blob);
 
       const disposition = response.headers.get("content-disposition");
-      const fileName = extractFileName(disposition) || `${getPolicyCode(row) ?? "poliza"}.pdf`;
+      const fileName =
+        extractFileName(disposition) || `${getPolicyCode(row) ?? "poliza"}.pdf`;
 
       const a = document.createElement("a");
       a.href = url;
@@ -386,12 +390,21 @@ export default function PaymentPolicy() {
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Pólizas de pago</h1>
-            <p className={styles.sub}>Administra las pólizas y sus archivos PDF.</p>
+            <p className={styles.sub}>
+              Administra las pólizas y sus archivos PDF.
+            </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -413,7 +426,14 @@ export default function PaymentPolicy() {
                 aria-label="Limpiar búsqueda"
                 disabled={busy}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -509,7 +529,8 @@ export default function PaymentPolicy() {
                   displayedRows.map((d, idx) => {
                     const id = getId(d);
                     const key = id != null ? String(id) : `row-${idx}`;
-                    const isSelected = selectedId != null && id != null && id === selectedId;
+                    const isSelected =
+                      selectedId != null && id != null && id === selectedId;
 
                     return (
                       <tr
@@ -543,7 +564,11 @@ export default function PaymentPolicy() {
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>
-              {mode === "create" ? "Nueva póliza" : mode === "edit" ? "Editar póliza" : "Detalle"}
+              {mode === "create"
+                ? "Nueva póliza"
+                : mode === "edit"
+                  ? "Editar póliza"
+                  : "Detalle"}
             </p>
           </div>
 
@@ -565,7 +590,12 @@ export default function PaymentPolicy() {
                       <input
                         className={styles.floatingInput}
                         value={create.policyCode}
-                        onChange={(e) => setCreate((p) => ({ ...p, policyCode: e.target.value }))}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            policyCode: e.target.value,
+                          }))
+                        }
                         disabled={busy}
                         placeholder="Ej. POL-2026-001"
                       />
@@ -576,15 +606,22 @@ export default function PaymentPolicy() {
                       <textarea
                         className={styles.floatingTextareaArea}
                         value={create.description}
-                        onChange={(e) => setCreate((p) => ({ ...p, description: e.target.value }))}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            description: normalizeTextInput(e.target.value),
+                          }))
+                        }
                         disabled={busy}
                         placeholder="Descripción breve..."
                         rows={4}
                       />
                     </div>
 
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>Archivo PDF *</span>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>
+                        PDF <span className={styles.required}>*</span>
+                      </span>
 
                       <label className={styles.fileBox}>
                         <input
@@ -599,9 +636,13 @@ export default function PaymentPolicy() {
                             }))
                           }
                         />
-                        <span className={styles.fileButton}>Seleccionar archivo</span>
+                        <span className={styles.fileButton}>
+                          Seleccionar archivo
+                        </span>
                         <span className={styles.fileName}>
-                          {create.file ? create.file.name : "Ningún archivo seleccionado"}
+                          {create.file
+                            ? create.file.name
+                            : "Ningún archivo seleccionado"}
                         </span>
                       </label>
                     </div>
@@ -624,7 +665,9 @@ export default function PaymentPolicy() {
                 </div>
               </form>
             ) : !selected ? (
-              <div className={styles.helper}>Selecciona una póliza de la tabla para ver detalles.</div>
+              <div className={styles.helper}>
+                Selecciona una póliza de la tabla para ver detalles.
+              </div>
             ) : mode === "edit" ? (
               <form
                 className={styles.form}
@@ -642,7 +685,12 @@ export default function PaymentPolicy() {
                       <input
                         className={styles.floatingInput}
                         value={edit.policyCode}
-                        onChange={(e) => setEdit((p) => ({ ...p, policyCode: e.target.value }))}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            policyCode: e.target.value,
+                          }))
+                        }
                         disabled={busy}
                         placeholder="Código..."
                       />
@@ -653,15 +701,20 @@ export default function PaymentPolicy() {
                       <textarea
                         className={styles.floatingTextareaArea}
                         value={edit.description}
-                        onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))}
+                        onChange={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            description: normalizeTextInput(e.target.value),
+                          }))
+                        }
                         disabled={busy}
                         placeholder="Descripción..."
                         rows={4}
                       />
                     </div>
 
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>Reemplazar PDF</span>
+                    <div className={styles.floatingFieldArea}>
+                      <span className={styles.floatingLabel}>PDF</span>
 
                       <label className={styles.fileBox}>
                         <input
@@ -676,7 +729,9 @@ export default function PaymentPolicy() {
                             }))
                           }
                         />
-                        <span className={styles.fileButton}>Seleccionar archivo</span>
+                        <span className={styles.fileButton}>
+                          Seleccionar archivo
+                        </span>
                         <span className={styles.fileName}>
                           {edit.file ? edit.file.name : "Sin cambios en el archivo"}
                         </span>
@@ -705,7 +760,9 @@ export default function PaymentPolicy() {
                 <div className={styles.detailCard}>
                   <div className={styles.floatingField}>
                     <span className={styles.floatingLabel}>Código</span>
-                    <div className={styles.floatingValue}>{getPolicyCode(selected) ?? "—"}</div>
+                    <div className={styles.floatingValue}>
+                      {getPolicyCode(selected) ?? "—"}
+                    </div>
                   </div>
 
                   <div className={styles.floatingFieldArea}>
@@ -715,21 +772,28 @@ export default function PaymentPolicy() {
                     </div>
                   </div>
 
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Archivo</span>
-                    <button
-                      type="button"
-                      className={styles.btnMini}
-                      onClick={() => void onDownload(selected)}
-                      disabled={busy}
-                    >
-                      Descargar PDF
-                    </button>
+                  <div className={styles.floatingFieldArea}>
+                    <span className={styles.floatingLabel}>PDF</span>
+                    <div className={styles.floatingValueArea}>
+                      <button
+                        type="button"
+                        className={styles.btnMini}
+                        onClick={() => void onDownload(selected)}
+                        disabled={busy}
+                      >
+                        Descargar PDF
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className={styles.actions}>
-                  <button className={styles.btnGhost} type="button" onClick={clearSelection} disabled={busy}>
+                  <button
+                    className={styles.btnGhost}
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={busy}
+                  >
                     Cerrar
                   </button>
 
@@ -742,7 +806,12 @@ export default function PaymentPolicy() {
                     Eliminar
                   </button>
 
-                  <button className={styles.btnEdit} type="button" onClick={startEdit} disabled={busy}>
+                  <button
+                    className={styles.btnEdit}
+                    type="button"
+                    onClick={startEdit}
+                    disabled={busy}
+                  >
                     Editar
                   </button>
                 </div>
@@ -784,7 +853,9 @@ export default function PaymentPolicy() {
               </div>
 
               <div className={styles.deleteConfirmHeaderText}>
-                <div className={styles.deleteConfirmTitle}>Confirmar eliminación</div>
+                <div className={styles.deleteConfirmTitle}>
+                  Confirmar eliminación
+                </div>
                 <div className={styles.deleteConfirmSubtitle}>
                   Esta acción eliminará la póliza seleccionada.
                 </div>
@@ -823,7 +894,11 @@ export default function PaymentPolicy() {
                   disabled={deleting}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !deleting && deleteForm.password.trim()) {
+                    if (
+                      e.key === "Enter" &&
+                      !deleting &&
+                      deleteForm.password.trim()
+                    ) {
                       void onDelete();
                     }
                   }}
@@ -897,6 +972,14 @@ function getDescription(d: PaymentPolicyRow | null): string | null {
   return s ? s : null;
 }
 
+function normalizeTextInput(value: string): string {
+  const noLeadingSpaces = value.replace(/^\s+/, "");
+
+  if (!noLeadingSpaces) return "";
+
+  return noLeadingSpaces.charAt(0).toUpperCase() + noLeadingSpaces.slice(1);
+}
+
 function isPdfFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return file.type === "application/pdf" || name.endsWith(".pdf");
@@ -911,12 +994,15 @@ function authFormHeaders(): HeadersInit {
   }
 
   if (Array.isArray(headers)) {
-    const authorization = headers.find(([key]) => key.toLowerCase() === "authorization")?.[1];
+    const authorization = headers.find(
+      ([key]) => key.toLowerCase() === "authorization"
+    )?.[1];
     return authorization ? { Authorization: authorization } : {};
   }
 
   const recordHeaders = headers as Record<string, string | undefined>;
-  const authorization = recordHeaders.Authorization ?? recordHeaders.authorization;
+  const authorization =
+    recordHeaders.Authorization ?? recordHeaders.authorization;
 
   return authorization ? { Authorization: authorization } : {};
 }

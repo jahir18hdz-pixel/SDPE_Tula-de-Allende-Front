@@ -9,6 +9,7 @@ import styles from "../styles/administrativeUnits.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
+import { requestJson } from "../../../services/api";
 
 type AdministrativeUnit = {
   IdAdministrativeUnit?: number;
@@ -39,15 +40,9 @@ type FormDto = {
   active: boolean;
 };
 
-type AuthStored = {
-  token?: string;
-  Token?: string;
-};
-
 type UnknownRecord = Record<string, unknown>;
 
-const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/AdministrativeUnit`;
+const API_BASE = "/api/AdministrativeUnit";
 
 const initialForm: FormDto = {
   code: "",
@@ -95,59 +90,15 @@ export default function AdministrativeUnits() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function readToken(): string {
-    const rawAuth = localStorage.getItem("auth");
-    if (rawAuth) {
-      try {
-        const parsed = JSON.parse(rawAuth) as AuthStored;
-        const token = (parsed.token ?? parsed.Token ?? "").trim();
-        if (token) return token;
-      } catch {
-        // ignore
-      }
-    }
-    return "";
-  }
+  function smartCapitalize(value: string): string {
+    if (!value) return "";
 
-  function authHeaders(): HeadersInit {
-    const token = readToken();
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
+    const first = value.charAt(0);
+    const rest = value.slice(1);
 
-  async function requestJson(
-    url: string,
-    init?: RequestInit,
-  ): Promise<
-    | { ok: true; data: unknown; status: number }
-    | { ok: false; error: string; status: number }
-  > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
+    if (first === first.toUpperCase()) return value;
 
-    if (res.status === 204) return { ok: true, data: [], status: 204 };
-
-    const text = await safeText(res);
-    const parsed = tryParseJson(text);
-
-    if (!res.ok) {
-      const apiMsg = isRecord(parsed)
-        ? getStringProp(parsed, "message") ??
-          getStringProp(parsed, "title") ??
-          ""
-        : "";
-
-      const msg =
-        apiMsg ||
-        (typeof parsed === "string" ? parsed : "") ||
-        text ||
-        `HTTP ${res.status}`;
-
-      return { ok: false, error: msg, status: res.status };
-    }
-
-    return { ok: true, data: parsed, status: res.status };
+    return first.toUpperCase() + rest;
   }
 
   function extractList(payload: unknown): AdministrativeUnit[] {
@@ -227,16 +178,8 @@ export default function AdministrativeUnits() {
   async function loadAll() {
     setLoading(true);
     try {
-      const token = readToken();
-      if (!token) {
-        showToast("error", "No hay token. Inicia sesión nuevamente.");
-        setRows([]);
-        return;
-      }
-
       const result = await requestJson(API_BASE, {
         method: "GET",
-        headers: authHeaders(),
       });
 
       if (!result.ok) {
@@ -255,7 +198,7 @@ export default function AdministrativeUnits() {
         if (found && modeRef.current === "edit") {
           setFormEdit({
             code: String(getCode(found) ?? ""),
-            description: String(getDescription(found) ?? ""),
+            description: capitalizeFirst(getDescription(found) ?? ""),
             active: getActive(found) ?? true,
           });
         }
@@ -319,7 +262,7 @@ export default function AdministrativeUnits() {
     if (!selected) return;
     setFormEdit({
       code: String(getCode(selected) ?? ""),
-      description: String(getDescription(selected) ?? ""),
+      description: capitalizeFirst(getDescription(selected) ?? ""),
       active: getActive(selected) ?? true,
     });
     setMode("edit");
@@ -368,13 +311,12 @@ export default function AdministrativeUnits() {
     try {
       const payload = {
         Code: codeNum,
-        Description: asTrim(formCreate.description),
+        Description: capitalizeFirst(formCreate.description),
         Active: Boolean(formCreate.active),
       };
 
       const result = await requestJson(API_BASE, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -405,13 +347,12 @@ export default function AdministrativeUnits() {
       const payload = {
         IdAdministrativeUnit: id,
         Code: Number(formEdit.code),
-        Description: asTrim(formEdit.description),
+        Description: capitalizeFirst(formEdit.description),
         Active: Boolean(formEdit.active),
       };
 
       const result = await requestJson(`${API_BASE}/${id}`, {
         method: "PUT",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -682,12 +623,14 @@ export default function AdministrativeUnits() {
                       <textarea
                         className={styles.floatingTextareaArea}
                         value={formCreate.description}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value;
+
                           setFormCreate((p) => ({
                             ...p,
-                            description: e.target.value,
-                          }))
-                        }
+                            description: smartCapitalize(val),
+                          }));
+                        }}
                         disabled={formDisabled}
                         placeholder="Descripción de la unidad"
                         rows={4}
@@ -763,12 +706,14 @@ export default function AdministrativeUnits() {
                       <textarea
                         className={styles.floatingTextareaArea}
                         value={formEdit.description}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value;
+
                           setFormEdit((p) => ({
                             ...p,
-                            description: e.target.value,
-                          }))
-                        }
+                            description: smartCapitalize(val),
+                          }));
+                        }}
                         disabled={formDisabled}
                         placeholder="Descripción"
                         rows={4}
@@ -930,11 +875,6 @@ function getActive(u: AdministrativeUnit | null): boolean | null {
   return null;
 }
 
-function getStringProp(obj: UnknownRecord, key: string): string | undefined {
-  const v = obj[key];
-  return typeof v === "string" ? v : undefined;
-}
-
 function asString(v: unknown): string {
   if (v == null) return "";
   return typeof v === "string" ? v : String(v);
@@ -944,22 +884,10 @@ function asTrim(v: unknown): string {
   return asString(v).trim();
 }
 
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
-}
-
-function tryParseJson(text: string): unknown {
-  const t = asTrim(text);
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return text;
-  }
+function capitalizeFirst(value: unknown): string {
+  const text = asTrim(value);
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function isRecord(v: unknown): v is UnknownRecord {
