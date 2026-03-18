@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
 import { FiSearch, FiTrash2 } from "react-icons/fi";
@@ -37,14 +37,6 @@ type Row = {
   requestDateRaw?: string | null;
 };
 
-type ChecklistItem = {
-  documentTypeId: number;
-  documentName: string;
-  requiredByRule: boolean;
-  noApplies: boolean;
-  uploaded: boolean;
-};
-
 type PaymentPolicyPreviewRow = {
   idPaymentPolicy?: number;
   IdPaymentPolicy?: number;
@@ -63,7 +55,6 @@ type PreviewItem = {
 };
 
 const API_BASE = "/api/AcquisitionRequest";
-const EXPEDIENT_API = "/api/expedient-documents";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy";
 
 function formatDate(iso?: string | null) {
@@ -91,68 +82,6 @@ function getItemsFromUnknown<T>(value: unknown): T[] {
   return [];
 }
 
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(v: unknown): v is UnknownRecord {
-  return typeof v === "object" && v !== null;
-}
-
-function asArray(v: unknown): unknown[] {
-  return Array.isArray(v) ? v : [];
-}
-
-function toBool(v: unknown): boolean {
-  if (typeof v === "boolean") return v;
-  if (typeof v === "number") return v !== 0;
-  if (typeof v === "string") {
-    const t = v.trim().toLowerCase();
-    return t === "true" || t === "1" || t === "si" || t === "sí";
-  }
-  return false;
-}
-
-function toNumber(v: unknown): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-  return Number.isFinite(n) ? n : null;
-}
-
-function toStringSafe(v: unknown) {
-  if (typeof v === "string") return v;
-  if (typeof v === "number") return String(v);
-  return "";
-}
-
-function normalizeChecklist(payload: unknown): ChecklistItem[] {
-  const list = Array.isArray(payload)
-    ? payload
-    : isRecord(payload)
-      ? asArray(payload["items"] ?? payload["data"] ?? payload["result"])
-      : [];
-
-  return list
-    .map((raw): ChecklistItem | null => {
-      if (!isRecord(raw)) return null;
-
-      const documentTypeId = toNumber(
-        raw["documentTypeId"] ?? raw["DocumentTypeId"],
-      );
-      const documentName = toStringSafe(
-        raw["documentName"] ?? raw["DocumentName"],
-      ).trim();
-
-      if (!documentTypeId || !documentName) return null;
-
-      return {
-        documentTypeId,
-        documentName,
-        requiredByRule: toBool(raw["requiredByRule"] ?? raw["RequiredByRule"]),
-        noApplies: toBool(raw["noApplies"] ?? raw["NoApplies"]),
-        uploaded: toBool(raw["uploaded"] ?? raw["Uploaded"]),
-      };
-    })
-    .filter((x): x is ChecklistItem => x !== null);
-}
-
 type StatusFilter = "Todos" | "Completo" | "Incompleto";
 
 function hasValidClassification(label: string) {
@@ -162,13 +91,6 @@ function hasValidClassification(label: string) {
   if (t === "sin clasificación") return false;
   if (t === "sin clasificacion") return false;
   return true;
-}
-
-function computeCompletoFromChecklist(list: ChecklistItem[]) {
-  const missingRequired = list.some(
-    (x) => x.requiredByRule && !x.noApplies && !x.uploaded,
-  );
-  return missingRequired ? "Incompleto" : "Completo";
 }
 
 function hasPolicy(value: string) {
@@ -235,13 +157,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [hasNext, setHasNext] = useState(false);
 
-  const [calcStatus, setCalcStatus] = useState<
-    Record<number, "Completo" | "Incompleto">
-  >({});
-  const statusCacheRef = useRef<Map<number, "Completo" | "Incompleto">>(
-    new Map(),
-  );
-
   const [toast, setToast] = useState<{
     open: boolean;
     type: ToastType;
@@ -302,8 +217,11 @@ export default function Home() {
             x.acquisitionClassification ??
             x.AcquisitionClassification ??
             "Sin clasificación";
+
           const requestDate = x.requestDate ?? x.RequestDate ?? null;
-          const estado = x.status ?? x.Status ?? "Sin estatus";
+
+          // Fuente única de verdad: estado del backend
+          const estado = (x.status ?? x.Status ?? "").trim() || "Sin estatus";
 
           return {
             idRequest,
@@ -342,51 +260,6 @@ export default function Home() {
   useEffect(() => {
     void fetchData();
   }, [fetchData, location.key]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function calcForVisibleRows() {
-      const toFetch = rows
-        .map((r) => r.idRequest)
-        .filter((id) => !statusCacheRef.current.has(id));
-
-      if (toFetch.length === 0) return;
-
-      await Promise.all(
-        toFetch.map(async (requestId) => {
-          try {
-            const res = (await requestJson(
-              `${EXPEDIENT_API}/requests/${requestId}/checklist`,
-              {
-                method: "GET",
-                headers: authHeaders(),
-              },
-            )) as RequestResult;
-
-            if (!res.ok) return;
-
-            const checklist = normalizeChecklist(res.data);
-            const status = computeCompletoFromChecklist(checklist);
-
-            statusCacheRef.current.set(requestId, status);
-
-            if (!cancelled) {
-              setCalcStatus((prev) => ({ ...prev, [requestId]: status }));
-            }
-          } catch {
-            // no bloquea la UI si falla
-          }
-        }),
-      );
-    }
-
-    void calcForVisibleRows();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
 
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
@@ -537,14 +410,6 @@ export default function Home() {
       });
 
       closeDeleteModal();
-
-      statusCacheRef.current.delete(deleteTarget.idRequest);
-      setCalcStatus((prev) => {
-        const copy = { ...prev };
-        delete copy[deleteTarget.idRequest];
-        return copy;
-      });
-
       await fetchData();
     } catch {
       setToast({
@@ -578,58 +443,60 @@ export default function Home() {
   }, [previewOpen, deleteModalOpen, closePreview, closeDeleteModal]);
 
   const filtered = useMemo(() => {
-  const q = normalizeText(query);
-  let list = [...rows];
+    const q = normalizeText(query);
+    let list = [...rows];
 
-  if (statusFilter !== "Todos") {
-    const wanted = normalizeText(statusFilter);
-    list = list.filter((r) => {
-      const real = calcStatus[r.idRequest] ?? (r.estado as "Completo" | "Incompleto" | string);
-      return normalizeText(real) === wanted;
-    });
-  }
-
-  if (q) {
-    list = list.filter((r) => {
-      const real = calcStatus[r.idRequest] ?? r.estado;
-
-      return (
-        normalizeText(r.folio).includes(q) ||
-        normalizeText(r.poliza).includes(q) ||
-        normalizeText(r.cfdi).includes(q) ||
-        normalizeText(r.adquisicion).includes(q) ||
-        normalizeText(r.fecha).includes(q) ||
-        normalizeText(real).includes(q)
-      );
-    });
-  }
-
-  list.sort((a, b) => {
-    const statusA = normalizeText(calcStatus[a.idRequest] ?? a.estado);
-    const statusB = normalizeText(calcStatus[b.idRequest] ?? b.estado);
-
-    const aIsComplete = statusA === "completo";
-    const bIsComplete = statusB === "completo";
-
-    if (aIsComplete !== bIsComplete) {
-      return aIsComplete ? 1 : -1;
+    // 1) Filtro usa solo r.estado
+    if (statusFilter !== "Todos") {
+      const wanted = normalizeText(statusFilter);
+      list = list.filter((r) => normalizeText(r.estado) === wanted);
     }
 
-    const dateA = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
-    const dateB = b.requestDateRaw ? new Date(b.requestDateRaw).getTime() : 0;
+    // 2) Búsqueda usa solo r.estado
+    if (q) {
+      list = list.filter((r) => {
+        const real = r.estado;
 
-    return dateB - dateA;
-  });
+        return (
+          normalizeText(r.folio).includes(q) ||
+          normalizeText(r.poliza).includes(q) ||
+          normalizeText(r.cfdi).includes(q) ||
+          normalizeText(r.adquisicion).includes(q) ||
+          normalizeText(r.fecha).includes(q) ||
+          normalizeText(real).includes(q)
+        );
+      });
+    }
 
-  return list;
-}, [rows, query, statusFilter, calcStatus]);
+    // 3) Orden usa solo r.estado
+    list.sort((a, b) => {
+      const statusA = normalizeText(a.estado);
+      const statusB = normalizeText(b.estado);
 
+      const aIsComplete = statusA === "completo";
+      const bIsComplete = statusB === "completo";
+
+      // Incompleto primero, Completo después (como tu segunda vista)
+      if (aIsComplete !== bIsComplete) {
+        return aIsComplete ? 1 : -1;
+      }
+
+      const dateA = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
+      const dateB = b.requestDateRaw ? new Date(b.requestDateRaw).getTime() : 0;
+
+      return dateB - dateA;
+    });
+
+    return list;
+  }, [rows, query, statusFilter]);
+
+  // 4) KPIs usan solo r.estado
   const kpiTotal = filtered.length;
   const kpiCompleto = filtered.filter(
-    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "completo",
+    (r) => normalizeText(r.estado) === "completo",
   ).length;
   const kpiIncompleto = filtered.filter(
-    (r) => normalizeText(calcStatus[r.idRequest] ?? r.estado) === "incompleto",
+    (r) => normalizeText(r.estado) === "incompleto",
   ).length;
 
   function goRegister() {
@@ -664,7 +531,9 @@ export default function Home() {
       />
 
       <div
-        className={`${styles.mainContent} ${isAnyModalOpen ? styles.mainContentBlurred : ""}`}
+        className={`${styles.mainContent} ${
+          isAnyModalOpen ? styles.mainContentBlurred : ""
+        }`}
       >
         <div className={styles.topbar}>
           <div className={styles.topbarLeft}>
@@ -778,10 +647,10 @@ export default function Home() {
                   </tr>
                 ) : (
                   filtered.map((r) => {
-                    const realEstado = calcStatus[r.idRequest];
-                    const shownEstado = realEstado ?? "Calculando…";
+                    // Columna Estado: r.estado o "Sin estatus"
+                    const shownEstado = r.estado || "Sin estatus";
+                    const st = normalizeText(shownEstado);
 
-                    const st = normalizeText(realEstado ?? "");
                     const badgeClass =
                       st === "completo"
                         ? styles.badgeOk
@@ -835,8 +704,10 @@ export default function Home() {
                           )}
                         </td>
 
-                        <td className={styles.ellipsis} title={r.adquisicion}>
-                          {r.adquisicion}
+                        <td title={r.adquisicion}>
+                          <span className={styles.ellipsis}>
+                            {r.adquisicion}
+                          </span>
                         </td>
 
                         <td className={styles.mono}>{r.fecha}</td>
@@ -1043,6 +914,7 @@ export default function Home() {
           </div>
         </div>
       )}
+
       {deleteModalOpen && deleteTarget && (
         <div
           className={styles.deleteConfirmOverlay}
