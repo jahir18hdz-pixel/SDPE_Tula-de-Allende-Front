@@ -19,6 +19,7 @@ import DocumentType from "../Modules/Documents/pages/DocumentType";
 import PaymentPolicy from "../Modules/Policy/pages/PaymentPolicy";
 import AcquisitionRequest from "../Modules/AcquisitionRequest/pages/AcquisitionRequest";
 import ExpedientDocuments from "../Modules/ExpedientDocument/pages/ExpedientDocuments";
+import NotificationsView from "../Modules/Notifications/pages/NotificationsView";
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -37,6 +38,11 @@ export default function AppRouter() {
             {/* Home */}
             <Route element={<RequireModule modulePath="/home" />}>
               <Route path="/home" element={<Home />} />
+            </Route>
+
+            {/* Notificaciones */}
+            <Route element={<RequireModule modulePath="/notificaciones" />}>
+              <Route path="/notificaciones" element={<NotificationsView />} />
             </Route>
 
             {/* Usuarios */}
@@ -88,7 +94,6 @@ export default function AppRouter() {
               <Route path="/catalogos/fondo-financiamiento" element={<FundingSource />} />
             </Route>
 
-            
             {/* Pólizas de pago */}
             <Route element={<RequireModule modulePath="/catalogos/polizas" />}>
               <Route path="/catalogos/polizas" element={<PaymentPolicy />} />

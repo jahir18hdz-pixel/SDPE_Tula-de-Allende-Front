@@ -8,11 +8,20 @@ import { requestJson, authHeaders } from "../../../services/api";
 
 type CatalogItem = { id: number; name: string };
 
+type CreateDetail = {
+  idCog: number | null;
+  quantity: string;
+  unitMeasure: string;
+  description: string;
+  unitAmount: string;
+};
+
 type CreateForm = {
   requestNumber: string;
   requestDate: string;
   justification: string;
   authorizationDate: string;
+  completeMaximeDate: string;
   observations: string;
   cfdi: string;
 
@@ -26,6 +35,8 @@ type CreateForm = {
   idProgram: number | null;
   idCommunity: number | null;
   idBeneficiary: number | null;
+
+  details: CreateDetail[];
 };
 
 type ManagerForm = {
@@ -63,13 +74,23 @@ const CATALOG_ENDPOINTS = {
   programs: "/api/Prog",
   communities: "/api/Community",
   beneficiaries: "/api/Beneficiary",
+  cogs: "/api/Cog",
 } as const;
+
+const emptyDetail = (): CreateDetail => ({
+  idCog: null,
+  quantity: "",
+  unitMeasure: "",
+  description: "",
+  unitAmount: "",
+});
 
 const initialCreate: CreateForm = {
   requestNumber: "",
   requestDate: "",
   justification: "",
   authorizationDate: "",
+  completeMaximeDate: "",
   observations: "",
   cfdi: "",
 
@@ -83,6 +104,8 @@ const initialCreate: CreateForm = {
   idProgram: null,
   idCommunity: null,
   idBeneficiary: null,
+
+  details: [emptyDetail()],
 };
 
 const initialManager: ManagerForm = {
@@ -159,6 +182,13 @@ function toNullableNumber(s: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function toPositiveNumber(s: string): number | null {
+  const t = String(s ?? "").trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function toNullableIsoDate(yyyyMmDd: string): string | null {
   const t = String(yyyyMmDd ?? "").trim();
   if (!t) return null;
@@ -192,6 +222,7 @@ function hasCreateChanges(form: CreateForm): boolean {
     form.requestDate.trim() !== "" ||
     form.justification.trim() !== "" ||
     form.authorizationDate.trim() !== "" ||
+    form.completeMaximeDate.trim() !== "" ||
     form.observations.trim() !== "" ||
     form.cfdi.trim() !== "" ||
     form.idAdministrativeUnit !== null ||
@@ -202,7 +233,15 @@ function hasCreateChanges(form: CreateForm): boolean {
     form.idAcquisitionClassification !== null ||
     form.idProgram !== null ||
     form.idCommunity !== null ||
-    form.idBeneficiary !== null
+    form.idBeneficiary !== null ||
+    form.details.some(
+      (d) =>
+        d.idCog !== null ||
+        d.quantity.trim() !== "" ||
+        d.unitMeasure.trim() !== "" ||
+        d.description.trim() !== "" ||
+        d.unitAmount.trim() !== ""
+    )
   );
 }
 
@@ -246,6 +285,7 @@ export default function AcquisitionRequest() {
   const [programs, setPrograms] = useState<CatalogItem[]>([]);
   const [communities, setCommunities] = useState<CatalogItem[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<CatalogItem[]>([]);
+  const [cogs, setCogs] = useState<CatalogItem[]>([]);
 
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsSaving, setDocsSaving] = useState(false);
@@ -263,6 +303,7 @@ export default function AcquisitionRequest() {
 
   const requestDateRef = useRef<HTMLInputElement | null>(null);
   const authDateRef = useRef<HTMLInputElement | null>(null);
+  const maxDateRef = useRef<HTMLInputElement | null>(null);
   const lastOutsideToastRef = useRef(0);
 
   const createDisabled = saving || loadingCats;
@@ -464,6 +505,14 @@ export default function AcquisitionRequest() {
             }),
         },
         { key: "beneficiaries", run: () => loadBeneficiaries() },
+        {
+          key: "cogs",
+          run: () =>
+            loadCatalogGeneric(CATALOG_ENDPOINTS.cogs, "COG", {
+              idKeys: ["idCog", "IdCog", "id", "Id"],
+              nameKeys: ["description", "Description", "name", "Name"],
+            }),
+        },
       ] as const;
 
       const results = await Promise.allSettled(tasks.map((t) => t.run()));
@@ -505,6 +554,9 @@ export default function AcquisitionRequest() {
           case "beneficiaries":
             setBeneficiaries(list);
             break;
+          case "cogs":
+            setCogs(list);
+            break;
         }
       });
 
@@ -517,6 +569,32 @@ export default function AcquisitionRequest() {
     };
   }, [loadCatalogGeneric, loadProjects, loadBeneficiaries, showToast]);
 
+  function updateDetail(index: number, patch: Partial<CreateDetail>) {
+    setCreate((prev) => ({
+      ...prev,
+      details: prev.details.map((d, i) => (i === index ? { ...d, ...patch } : d)),
+    }));
+  }
+
+  function addDetail() {
+    setCreate((prev) => ({
+      ...prev,
+      details: [...prev.details, emptyDetail()],
+    }));
+  }
+
+  function removeDetail(index: number) {
+    setCreate((prev) => {
+      if (prev.details.length === 1) {
+        return { ...prev, details: [emptyDetail()] };
+      }
+      return {
+        ...prev,
+        details: prev.details.filter((_, i) => i !== index),
+      };
+    });
+  }
+
   function validateCreate(): string {
     const req = create.requestNumber.trim();
     const date = create.requestDate.trim();
@@ -528,6 +606,26 @@ export default function AcquisitionRequest() {
     if (!just) return "La justificación es obligatoria.";
     if (just.length < 5) return "La justificación es demasiado corta.";
     if (!create.idAcquisitionClassification) return "Selecciona la clasificación de adquisición.";
+
+    if (!create.details.length) return "Debes agregar al menos un detalle.";
+
+    for (let i = 0; i < create.details.length; i++) {
+      const d = create.details[i];
+      const row = i + 1;
+
+      if (!d.idCog) return `Selecciona el COG del detalle ${row}.`;
+
+      const quantity = toPositiveNumber(d.quantity);
+      if (!quantity) return `La cantidad del detalle ${row} debe ser mayor a 0.`;
+
+      if (!d.unitMeasure.trim()) return `La unidad de medida del detalle ${row} es obligatoria.`;
+
+      if (!d.description.trim()) return `La descripción del detalle ${row} es obligatoria.`;
+
+      const unitAmount = toPositiveNumber(d.unitAmount);
+      if (!unitAmount) return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
+    }
+
     return "";
   }
 
@@ -542,6 +640,7 @@ export default function AcquisitionRequest() {
         requestDate: toNullableIsoDate(create.requestDate),
         justification: create.justification.trim() || null,
         authorizationDate: toNullableIsoDate(create.authorizationDate),
+        completeMaximeDate: toNullableIsoDate(create.completeMaximeDate),
         observations: create.observations.trim() || null,
         cfdi: create.cfdi.trim() || null,
 
@@ -550,13 +649,21 @@ export default function AcquisitionRequest() {
         idAcquisitionType: create.idAcquisitionType,
         idSupplier: create.idSupplier,
 
-        idApplicationStatus: 0,
-
+        idApplicationStatus: null,
         idFundingSource: create.idFundingSource,
         idAcquisitionClassification: create.idAcquisitionClassification,
         idProgram: create.idProgram,
         idCommunity: create.idCommunity,
         idBeneficiary: create.idBeneficiary,
+        idPayementPolicy: null,
+
+        details: create.details.map((d) => ({
+          idCog: d.idCog!,
+          quantity: Number(d.quantity),
+          unitMeasure: d.unitMeasure.trim(),
+          description: d.description.trim(),
+          unitAmount: Number(d.unitAmount),
+        })),
       };
 
       const result = await requestJson(API_BASE, {
@@ -604,7 +711,13 @@ export default function AcquisitionRequest() {
 
       if (!res.ok) throw new Error(res.error);
 
-      const arr: unknown[] = Array.isArray(res.data) ? res.data : [];
+      const payload = res.data;
+      const arr: unknown[] = Array.isArray(payload)
+        ? payload
+        : isRecord(payload)
+          ? asArray(getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]))
+          : [];
+
       const mapped: DocState[] = arr
         .map((raw): DocState | null => {
           if (!isRecord(raw)) return null;
@@ -734,7 +847,10 @@ export default function AcquisitionRequest() {
   function openDatePicker(ref: React.RefObject<HTMLInputElement | null>) {
     const el = ref.current as DatePickerInput | null;
     if (!el) return;
-    if (typeof el.showPicker === "function") return el.showPicker();
+    if (typeof el.showPicker === "function") {
+      el.showPicker();
+      return;
+    }
     el.focus();
     el.click();
   }
@@ -742,7 +858,7 @@ export default function AcquisitionRequest() {
   const headerHint = useMemo(() => {
     if (loadingCats) return "Cargando catálogos...";
     if (step === "postCreate") return "Ahora registra el responsable y define los documentos que no aplican.";
-    return "Completa los campos y guarda la solicitud.";
+    return "Completa los campos, agrega al menos un detalle y guarda la solicitud.";
   }, [loadingCats, step]);
 
   const titleRight = useMemo(() => {
@@ -890,16 +1006,39 @@ export default function AcquisitionRequest() {
                     </div>
                   </FloatingField>
 
-                  <FloatingField label="CFDI">
-                    <input
-                      className={styles.floatingInput}
-                      value={create.cfdi}
-                      onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
-                      disabled={createDisabled}
-                      placeholder="Ej. UUID, folio o referencia CFDI"
-                    />
+                  <FloatingField label="Fecha límite">
+                    <div className={styles.dateWrap}>
+                      <input
+                        ref={maxDateRef}
+                        className={`${styles.floatingInput} ${styles.dateInput}`}
+                        type="date"
+                        value={create.completeMaximeDate}
+                        onChange={(e) => setCreate((p) => ({ ...p, completeMaximeDate: e.target.value }))}
+                        disabled={createDisabled}
+                      />
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => openDatePicker(maxDateRef)}
+                        disabled={createDisabled}
+                        aria-label="Abrir calendario (fecha límite)"
+                        title="Calendario"
+                      >
+                        <CalendarIcon />
+                      </button>
+                    </div>
                   </FloatingField>
                 </div>
+
+                <FloatingField label="CFDI">
+                  <input
+                    className={styles.floatingInput}
+                    value={create.cfdi}
+                    onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
+                    disabled={createDisabled}
+                    placeholder="Ej. UUID, folio o referencia CFDI"
+                  />
+                </FloatingField>
 
                 <FloatingField label="Observaciones">
                   <input
@@ -1072,7 +1211,107 @@ export default function AcquisitionRequest() {
                   </FloatingField>
                 </div>
 
+                <div className={styles.sectionTitle}>Detalles de la solicitud</div>
+
+                <div className={styles.docsHint}>
+                  Debes capturar al menos un detalle para poder guardar la solicitud.
+                </div>
+
+                <div className={styles.docsWrap}>
+                  {create.details.map((detail, index) => (
+                    <div key={index} className={styles.docRow}>
+                      <div className={styles.docLeft}>
+                        <div className={styles.sectionTitle}>Detalle {index + 1}</div>
+
+                        <div className={styles.grid3}>
+                          <FloatingField label="COG" required>
+                            <select
+                              className={styles.floatingSelect}
+                              value={detail.idCog ?? ""}
+                              onChange={(e) =>
+                                updateDetail(index, { idCog: toNullableNumber(e.target.value) })
+                              }
+                              disabled={createDisabled}
+                            >
+                              <option value="">Selecciona...</option>
+                              {cogs.map((x) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.name}
+                                </option>
+                              ))}
+                            </select>
+                          </FloatingField>
+
+                          <FloatingField label="Cantidad" required>
+                            <input
+                              className={styles.floatingInput}
+                              value={detail.quantity}
+                              onChange={(e) => updateDetail(index, { quantity: e.target.value })}
+                              disabled={createDisabled}
+                              placeholder="Ej. 2"
+                              inputMode="numeric"
+                            />
+                          </FloatingField>
+
+                          <FloatingField label="Unidad de medida" required>
+                            <input
+                              className={styles.floatingInput}
+                              value={detail.unitMeasure}
+                              onChange={(e) => updateDetail(index, { unitMeasure: e.target.value })}
+                              disabled={createDisabled}
+                              placeholder="Ej. Pieza"
+                            />
+                          </FloatingField>
+                        </div>
+
+                        <div className={styles.doubleRow}>
+                          <FloatingField label="Descripción" required>
+                            <input
+                              className={styles.floatingInput}
+                              value={detail.description}
+                              onChange={(e) => updateDetail(index, { description: e.target.value })}
+                              disabled={createDisabled}
+                              placeholder="Describe el concepto"
+                            />
+                          </FloatingField>
+
+                          <FloatingField label="Importe unitario" required>
+                            <input
+                              className={styles.floatingInput}
+                              value={detail.unitAmount}
+                              onChange={(e) => updateDetail(index, { unitAmount: e.target.value })}
+                              disabled={createDisabled}
+                              placeholder="Ej. 1500"
+                              inputMode="decimal"
+                            />
+                          </FloatingField>
+                        </div>
+
+                        <div className={styles.actions}>
+                          <button
+                            type="button"
+                            className={styles.btnGhost}
+                            onClick={() => removeDetail(index)}
+                            disabled={createDisabled}
+                          >
+                            Quitar detalle
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={addDetail}
+                    disabled={createDisabled}
+                  >
+                    Agregar detalle
+                  </button>
+
                   <button type="submit" className={styles.btnSave} disabled={createDisabled}>
                     {saving ? "Guardando..." : "Guardar"}
                   </button>

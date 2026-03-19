@@ -563,29 +563,29 @@
 }
 
 /* =========================
-   DOCS
+   DOCS + DETALLES
 ========================= */
 .docsWrap {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  margin-top: 4px;
 }
 
 .docsHint {
   font-size: 13px;
-  opacity: 0.78;
+  opacity: 0.82;
   background: rgba(107, 114, 128, 0.08);
   border: 1px dashed rgba(66, 71, 81, 0.35);
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 12px;
+  line-height: 1.45;
 }
 
 .docRow {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  padding: 13px 14px;
-  border-radius: 14px;
+  display: block;
+  padding: 16px;
+  border-radius: 16px;
   border: 1px solid var(--border);
   background: linear-gradient(180deg, #ffffff, #fbfbfd);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.05);
@@ -601,7 +601,8 @@
 .docLeft {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
+  width: 100%;
 }
 
 .docName {
@@ -623,6 +624,25 @@
 .docMini {
   font-size: 12px;
   opacity: 0.8;
+}
+
+/* Hace que el titulo "Detalle X" se vea más compacto dentro del card */
+.docLeft .sectionTitle {
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+/* Más aire entre campos dentro de cada detalle */
+.docLeft .grid3,
+.docLeft .doubleRow {
+  gap: 16px;
+}
+
+/* Botones dentro del detalle */
+.docLeft .actions {
+  justify-content: flex-end;
+  padding-top: 2px;
+  margin-top: 0;
 }
 
 /* =========================
@@ -655,13 +675,6 @@
 /* =========================
    RESPONSIVE
 ========================= */
-@media (min-width: 900px) {
-  .docRow {
-    grid-template-columns: 1fr 1.2fr;
-    align-items: center;
-  }
-}
-
 @media (max-width: 900px) {
   .headerTop {
     grid-template-columns: 1fr;
@@ -683,6 +696,11 @@
 
   .doubleRow,
   .grid3 {
+    grid-template-columns: 1fr;
+  }
+
+  .docLeft .grid3,
+  .docLeft .doubleRow {
     grid-template-columns: 1fr;
   }
 }
@@ -722,5 +740,9 @@
   .floatingLabel {
     left: 14px;
     font-size: 12px;
+  }
+
+  .docRow {
+    padding: 14px;
   }
 }

@@ -8,6 +8,7 @@ import {
   FiUser,
   FiLogOut,
   FiSettings,
+  FiBell,
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
@@ -59,6 +60,7 @@ export default function Sidebar({
   const menu: MenuItem[] = useMemo(
     () => [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
+      { label: "Notificaciones", to: "/notificaciones", icon: <FiBell /> },
       {
         label: "Catálogos",
         icon: <FiFolder />,
