@@ -1,4 +1,4 @@
-import React, {
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -9,6 +9,7 @@ import styles from "../styles/Beneficiary.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
+import { requestJson } from "../../../services/api";
 
 type Beneficiary = {
   IdBeneficiary?: number;
@@ -89,11 +90,9 @@ type FormDto = {
   active: boolean;
 };
 
-type AuthStored = { token?: string; Token?: string };
 type UnknownRecord = Record<string, unknown>;
 
-const BASE_API = "https://localhost:7197";
-const API_BASE = `${BASE_API}/api/Beneficiary`;
+const API_BASE = "/api/Beneficiary";
 
 const CURP_ALNUM_18 = /^[A-Z0-9]{18}$/;
 const INE_MIN = 12;
@@ -179,58 +178,6 @@ export default function BeneficiaryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function readToken(): string {
-    const rawAuth = localStorage.getItem("auth");
-    if (rawAuth) {
-      try {
-        const parsed = JSON.parse(rawAuth) as AuthStored;
-        const token = (parsed.token ?? parsed.Token ?? "").trim();
-        if (token) return token;
-      } catch {
-        // ignore
-      }
-    }
-    return "";
-  }
-
-  function authHeaders(): HeadersInit {
-    const token = readToken();
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function requestJson(
-    url: string,
-    init?: RequestInit,
-  ): Promise<
-    | { ok: true; data: unknown; status: number }
-    | { ok: false; error: string; status: number }
-  > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
-
-    if (res.status === 204) return { ok: true, data: [], status: 204 };
-
-    const text = await safeText(res);
-    const parsed = tryParseJson(text);
-
-    if (!res.ok) {
-      const apiMsg =
-        isRecord(parsed) && typeof (parsed as UnknownRecord).message === "string"
-          ? String((parsed as UnknownRecord).message)
-          : "";
-      const msg =
-        apiMsg ||
-        (typeof parsed === "string" ? parsed : "") ||
-        text ||
-        `HTTP ${res.status}`;
-      return { ok: false, error: msg, status: res.status };
-    }
-
-    return { ok: true, data: parsed, status: res.status };
-  }
-
   function extractList(payload: unknown): Beneficiary[] {
     if (Array.isArray(payload)) return payload as Beneficiary[];
     if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
@@ -268,10 +215,20 @@ export default function BeneficiaryPage() {
 
     const obj = payload as UnknownRecord;
 
-    const values = obj["$values"];
+    const values = obj.$values;
     if (Array.isArray(values)) return values;
 
-    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
+    const keys = [
+      "data",
+      "result",
+      "items",
+      "value",
+      "values",
+      "Items",
+      "Data",
+      "Result",
+    ];
+
     for (const k of keys) {
       const v = obj[k];
       if (Array.isArray(v)) return v;
@@ -284,17 +241,10 @@ export default function BeneficiaryPage() {
   async function loadAll(keepSelectedCurp?: string | null) {
     setLoading(true);
     try {
-      const token = readToken();
-      if (!token) {
-        showToast("error", "No hay token. Inicia sesión nuevamente.");
-        setRows([]);
-        return;
-      }
-
       const result = await requestJson(API_BASE, {
         method: "GET",
-        headers: authHeaders(),
       });
+
       if (!result.ok) {
         showToast("error", result.error);
         setRows([]);
@@ -312,7 +262,9 @@ export default function BeneficiaryPage() {
           ) ?? null;
         setSelected(found);
         setMode("view");
-        if (found && modeRef.current === "edit") setFormEdit(toForm(found));
+        if (found && modeRef.current === "edit") {
+          setFormEdit(toForm(found));
+        }
       }
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
@@ -430,7 +382,10 @@ export default function BeneficiaryPage() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
   }
 
-  function isDuplicateCurp(nextCurpUpper: string, currentId: number | null): boolean {
+  function isDuplicateCurp(
+    nextCurpUpper: string,
+    currentId: number | null,
+  ): boolean {
     for (const r of rows) {
       const c = (getCurp(r) ?? "").trim().toUpperCase();
       if (!c) continue;
@@ -481,7 +436,9 @@ export default function BeneficiaryPage() {
     }
 
     const curp = normalizeUpperAlnum(f.curp, 18);
-    if (curp.length !== 18) return "La CURP debe tener exactamente 18 caracteres.";
+    if (curp.length !== 18) {
+      return "La CURP debe tener exactamente 18 caracteres.";
+    }
     if (!CURP_ALNUM_18.test(curp)) {
       return "La CURP debe ser alfanumérica (A-Z, 0-9) y sin espacios.";
     }
@@ -513,7 +470,9 @@ export default function BeneficiaryPage() {
           IdBeneficiary: 0,
 
           FirstName: normalizeLettersSpacesTitle(formCreate.firstName),
-          PaternalLastName: normalizeLettersSpacesTitle(formCreate.paternalLastName),
+          PaternalLastName: normalizeLettersSpacesTitle(
+            formCreate.paternalLastName,
+          ),
           MaternalLastName: asTrim(formCreate.maternalLastName)
             ? normalizeLettersSpacesTitle(formCreate.maternalLastName)
             : null,
@@ -545,7 +504,6 @@ export default function BeneficiaryPage() {
 
       const result = await requestJson(API_BASE, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -563,8 +521,12 @@ export default function BeneficiaryPage() {
   }
 
   async function onUpdate() {
-    if (!selected) return showToast("error", "Selecciona un beneficiario para editar.");
-    if (selectedId == null) return showToast("error", "No se pudo resolver el IdBeneficiary.");
+    if (!selected) {
+      return showToast("error", "Selecciona un beneficiario para editar.");
+    }
+    if (selectedId == null) {
+      return showToast("error", "No se pudo resolver el IdBeneficiary.");
+    }
 
     const msg = validateForm(formEdit, { currentId: selectedId });
     if (msg) return showToast("error", msg);
@@ -575,7 +537,9 @@ export default function BeneficiaryPage() {
         IdBeneficiary: selectedId,
 
         FirstName: normalizeLettersSpacesTitle(formEdit.firstName),
-        PaternalLastName: normalizeLettersSpacesTitle(formEdit.paternalLastName),
+        PaternalLastName: normalizeLettersSpacesTitle(
+          formEdit.paternalLastName,
+        ),
         MaternalLastName: asTrim(formEdit.maternalLastName)
           ? normalizeLettersSpacesTitle(formEdit.maternalLastName)
           : null,
@@ -609,7 +573,6 @@ export default function BeneficiaryPage() {
 
       const result = await requestJson(`${API_BASE}/${selectedId}`, {
         method: "PUT",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -629,7 +592,7 @@ export default function BeneficiaryPage() {
   const formDisabled = saving || loading;
   const setCreate = (patch: Partial<FormDto>) =>
     setFormCreate((p) => ({ ...p, ...patch }));
-  const setEdit = (patch: Partial<FormDto>) =>
+  const patchEdit = (patch: Partial<FormDto>) =>
     setFormEdit((p) => ({ ...p, ...patch }));
 
   return (
@@ -871,7 +834,9 @@ export default function BeneficiaryPage() {
                           value={formCreate.firstName}
                           onChange={(e) =>
                             setCreate({
-                              firstName: sanitizeLettersSpacesLive(e.target.value),
+                              firstName: sanitizeLettersSpacesLive(
+                                e.target.value,
+                              ),
                             })
                           }
                           onBlur={() =>
@@ -1019,9 +984,7 @@ export default function BeneficiaryPage() {
                       <input
                         className={styles.floatingInput}
                         value={formCreate.street}
-                        onChange={(e) =>
-                          setCreate({ street: e.target.value })
-                        }
+                        onChange={(e) => setCreate({ street: e.target.value })}
                         disabled={formDisabled}
                         placeholder="Calle"
                       />
@@ -1150,7 +1113,9 @@ export default function BeneficiaryPage() {
                           }
                           onBlur={() =>
                             setCreate({
-                              state: normalizeLettersSpacesTitle(formCreate.state),
+                              state: normalizeLettersSpacesTitle(
+                                formCreate.state,
+                              ),
                             })
                           }
                           disabled={formDisabled}
@@ -1235,14 +1200,14 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.firstName}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               firstName: sanitizeLettersSpacesLive(
                                 e.target.value,
                               ),
                             })
                           }
                           onBlur={() =>
-                            setEdit({
+                            patchEdit({
                               firstName: normalizeLettersSpacesTitle(
                                 formEdit.firstName,
                               ),
@@ -1260,14 +1225,14 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.paternalLastName}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               paternalLastName: sanitizeLettersSpacesLive(
                                 e.target.value,
                               ),
                             })
                           }
                           onBlur={() =>
-                            setEdit({
+                            patchEdit({
                               paternalLastName: normalizeLettersSpacesTitle(
                                 formEdit.paternalLastName,
                               ),
@@ -1286,14 +1251,14 @@ export default function BeneficiaryPage() {
                         className={styles.floatingInput}
                         value={formEdit.maternalLastName}
                         onChange={(e) =>
-                          setEdit({
+                          patchEdit({
                             maternalLastName: sanitizeLettersSpacesLive(
                               e.target.value,
                             ),
                           })
                         }
                         onBlur={() =>
-                          setEdit({
+                          patchEdit({
                             maternalLastName: normalizeLettersSpacesTitle(
                               formEdit.maternalLastName,
                             ),
@@ -1310,7 +1275,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.curp}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               curp: normalizeUpperAlnum(e.target.value, 18),
                             })
                           }
@@ -1326,7 +1291,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.ine}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               ine: onlyDigits(e.target.value, INE_MAX),
                             })
                           }
@@ -1346,7 +1311,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.phone}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               phone: onlyDigits(e.target.value, PHONE_LEN),
                             })
                           }
@@ -1362,7 +1327,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.email}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               email: normalizeEmail(e.target.value),
                             })
                           }
@@ -1379,7 +1344,7 @@ export default function BeneficiaryPage() {
                       <input
                         className={styles.floatingInput}
                         value={formEdit.street}
-                        onChange={(e) => setEdit({ street: e.target.value })}
+                        onChange={(e) => patchEdit({ street: e.target.value })}
                         disabled={formDisabled}
                       />
                     </div>
@@ -1393,7 +1358,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.externalNumber}
                           onChange={(e) =>
-                            setEdit({ externalNumber: e.target.value })
+                            patchEdit({ externalNumber: e.target.value })
                           }
                           disabled={formDisabled}
                         />
@@ -1407,7 +1372,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.internalNumber}
                           onChange={(e) =>
-                            setEdit({ internalNumber: e.target.value })
+                            patchEdit({ internalNumber: e.target.value })
                           }
                           disabled={formDisabled}
                         />
@@ -1420,7 +1385,7 @@ export default function BeneficiaryPage() {
                         className={styles.floatingInput}
                         value={formEdit.neighborhood}
                         onChange={(e) =>
-                          setEdit({ neighborhood: e.target.value })
+                          patchEdit({ neighborhood: e.target.value })
                         }
                         disabled={formDisabled}
                       />
@@ -1435,7 +1400,7 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.postalCode}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               postalCode: onlyDigits(e.target.value, CP_LEN),
                             })
                           }
@@ -1451,12 +1416,12 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.city}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               city: sanitizeLettersSpacesLive(e.target.value),
                             })
                           }
                           onBlur={() =>
-                            setEdit({
+                            patchEdit({
                               city: normalizeLettersSpacesTitle(formEdit.city),
                             })
                           }
@@ -1472,14 +1437,14 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.municipality}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               municipality: sanitizeLettersSpacesLive(
                                 e.target.value,
                               ),
                             })
                           }
                           onBlur={() =>
-                            setEdit({
+                            patchEdit({
                               municipality: normalizeLettersSpacesTitle(
                                 formEdit.municipality,
                               ),
@@ -1495,12 +1460,12 @@ export default function BeneficiaryPage() {
                           className={styles.floatingInput}
                           value={formEdit.state}
                           onChange={(e) =>
-                            setEdit({
+                            patchEdit({
                               state: sanitizeLettersSpacesLive(e.target.value),
                             })
                           }
                           onBlur={() =>
-                            setEdit({
+                            patchEdit({
                               state: normalizeLettersSpacesTitle(formEdit.state),
                             })
                           }
@@ -1515,12 +1480,12 @@ export default function BeneficiaryPage() {
                         className={styles.floatingInput}
                         value={formEdit.country}
                         onChange={(e) =>
-                          setEdit({
+                          patchEdit({
                             country: sanitizeLettersSpacesLive(e.target.value),
                           })
                         }
                         onBlur={() =>
-                          setEdit({
+                          patchEdit({
                             country: normalizeLettersSpacesTitle(
                               formEdit.country,
                             ),
@@ -1536,7 +1501,7 @@ export default function BeneficiaryPage() {
                         checked={formEdit.active}
                         disabled={formDisabled}
                         label={formEdit.active ? "Activo" : "Inactivo"}
-                        onChange={(next) => setEdit({ active: next })}
+                        onChange={(next) => patchEdit({ active: next })}
                       />
                     </div>
                   </div>
@@ -1877,22 +1842,6 @@ function asString(v: unknown): string {
 }
 function asTrim(v: unknown): string {
   return asString(v).trim();
-}
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
-}
-function tryParseJson(text: string): unknown {
-  const t = asTrim(text);
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return text;
-  }
 }
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;

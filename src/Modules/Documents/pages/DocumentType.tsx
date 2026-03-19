@@ -609,7 +609,13 @@ export default function DocumentType() {
                         onChange={(e) =>
                           setCreate((p) => ({
                             ...p,
-                            documentName: e.target.value,
+                            documentName: normalizeTextInput(e.target.value),
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            documentName: normalizeTextInput(e.target.value),
                           }))
                         }
                         disabled={formDisabled}
@@ -626,13 +632,15 @@ export default function DocumentType() {
                         onChange={(e) =>
                           setCreate((p) => ({
                             ...p,
-                            description: e.target.value,
+                            description: normalizeTextInput(e.target.value),
                           }))
                         }
                         onBlur={(e) =>
                           setCreate((p) => ({
                             ...p,
-                            description: breakTextEvery12Words(e.target.value),
+                            description: breakTextEvery12Words(
+                              normalizeTextInput(e.target.value),
+                            ),
                           }))
                         }
                         disabled={formDisabled}
@@ -696,7 +704,13 @@ export default function DocumentType() {
                         onChange={(e) =>
                           setEdit((p) => ({
                             ...p,
-                            documentName: e.target.value,
+                            documentName: normalizeTextInput(e.target.value),
+                          }))
+                        }
+                        onBlur={(e) =>
+                          setEdit((p) => ({
+                            ...p,
+                            documentName: normalizeTextInput(e.target.value),
                           }))
                         }
                         disabled={formDisabled}
@@ -713,13 +727,15 @@ export default function DocumentType() {
                         onChange={(e) =>
                           setEdit((p) => ({
                             ...p,
-                            description: e.target.value,
+                            description: normalizeTextInput(e.target.value),
                           }))
                         }
                         onBlur={(e) =>
                           setEdit((p) => ({
                             ...p,
-                            description: breakTextEvery12Words(e.target.value),
+                            description: breakTextEvery12Words(
+                              normalizeTextInput(e.target.value),
+                            ),
                           }))
                         }
                         disabled={formDisabled}
@@ -879,6 +895,14 @@ function getActive(d: DocumentTypeRow | null): boolean | null {
   }
 
   return null;
+}
+
+function normalizeTextInput(value: string): string {
+  const cleanValue = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+
+  if (!cleanValue) return "";
+
+  return cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1);
 }
 
 function breakTextEvery12Words(text: string): string {

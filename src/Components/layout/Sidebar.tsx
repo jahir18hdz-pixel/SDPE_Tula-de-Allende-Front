@@ -6,8 +6,8 @@ import {
   FiFolder,
   FiChevronDown,
   FiUser,
-  FiUserPlus,
   FiLogOut,
+  FiSettings,
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
@@ -48,8 +48,13 @@ export default function Sidebar({
   const { email } = getUser();
 
   const [catalogsManualOpen, setCatalogsManualOpen] = useState(false);
+  const [adminManualOpen, setAdminManualOpen] = useState(false);
 
   const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
+  const isInAdminRoute =
+    location.pathname.startsWith("/usuarios") ||
+    location.pathname.startsWith("/catalogos/roles") ||
+    location.pathname.startsWith("/catalogos/permisos");
 
   const menu: MenuItem[] = useMemo(
     () => [
@@ -59,8 +64,6 @@ export default function Sidebar({
         icon: <FiFolder />,
         children: [
           { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
-          { label: "Roles", to: "/catalogos/roles" },
-          { label: "Permisos", to: "/catalogos/permisos" },
           { label: "COG", to: "/catalogos/cog" },
           { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
           { label: "Pólizas de Pago", to: "/catalogos/polizas" },
@@ -74,12 +77,19 @@ export default function Sidebar({
           { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
         ],
       },
-      { label: "Usuarios", to: "/usuarios/nuevo", icon: <FiUserPlus /> },
+      {
+        label: "Administración",
+        icon: <FiSettings />,
+        children: [
+          { label: "Roles", to: "/catalogos/roles" },
+          { label: "Permisos", to: "/catalogos/permisos" },
+          { label: "Usuarios", to: "/usuarios/nuevo" },
+        ],
+      },
     ],
     []
   );
 
-  // Filtrado por permisos
   const filteredMenu: MenuItem[] = useMemo(() => {
     const canSee = (path?: string) => {
       if (!path) return true;
@@ -100,13 +110,11 @@ export default function Sidebar({
       .filter((x): x is MenuItem => !!x);
   }, [menu, allowedModules]);
 
-  // Abre/cierra Catálogos
   useEffect(() => {
     if (!isInCatalogsRoute) return;
 
-    const hasCatalogs = filteredMenu.some(
-      (m) => Array.isArray(m.children) && m.children.length > 0
-    );
+    const catalogsGroup = filteredMenu.find((m) => m.label === "Catálogos");
+    const hasCatalogs = Array.isArray(catalogsGroup?.children) && catalogsGroup.children.length > 0;
 
     const id = window.setTimeout(() => {
       setCatalogsManualOpen(hasCatalogs);
@@ -115,18 +123,49 @@ export default function Sidebar({
     return () => window.clearTimeout(id);
   }, [isInCatalogsRoute, filteredMenu]);
 
+  useEffect(() => {
+    if (!isInAdminRoute) return;
+
+    const adminGroup = filteredMenu.find((m) => m.label === "Administración");
+    const hasAdmin = Array.isArray(adminGroup?.children) && adminGroup.children.length > 0;
+
+    const id = window.setTimeout(() => {
+      setAdminManualOpen(hasAdmin);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [isInAdminRoute, filteredMenu]);
+
   const handleLogout = () => {
     onNavigate?.();
     logout();
     navigate("/login", { replace: true });
   };
 
-  const handleCatalogClick = () => {
+  const handleGroupClick = (label: string) => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
-    setCatalogsManualOpen((v) => !v);
+
+    if (label === "Catálogos") {
+      setCatalogsManualOpen((v) => !v);
+    }
+
+    if (label === "Administración") {
+      setAdminManualOpen((v) => !v);
+    }
   };
 
-  const shouldShowSubmenu = catalogsManualOpen && !collapsed;
+  const shouldShowSubmenu = (label: string) => {
+    if (collapsed) return false;
+    if (label === "Catálogos") return catalogsManualOpen;
+    if (label === "Administración") return adminManualOpen;
+    return false;
+  };
+
+  const isGroupOpen = (label: string) => {
+    if (label === "Catálogos") return catalogsManualOpen;
+    if (label === "Administración") return adminManualOpen;
+    return false;
+  };
 
   return (
     <aside
@@ -141,7 +180,6 @@ export default function Sidebar({
         onBackgroundToggle();
       }}
     >
-      {/* TOP */}
       <div className={styles.top}>
         {!collapsed && (
           <h1 className={styles.title}>
@@ -169,7 +207,6 @@ export default function Sidebar({
         <div className={styles.goldLine} />
       </div>
 
-      {/* MENÚ */}
       <div className={styles.scrollArea}>
         <nav className={styles.nav}>
           {filteredMenu.map((item) =>
@@ -178,7 +215,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   className={styles.itemBtn}
-                  onClick={handleCatalogClick}
+                  onClick={() => handleGroupClick(item.label)}
                 >
                   <span className={styles.left}>
                     <span className={styles.icon}>{item.icon}</span>
@@ -188,7 +225,7 @@ export default function Sidebar({
                   {!collapsed && (
                     <span
                       className={`${styles.chev} ${
-                        catalogsManualOpen ? styles.chevOpen : ""
+                        isGroupOpen(item.label) ? styles.chevOpen : ""
                       }`}
                     >
                       <FiChevronDown />
@@ -196,10 +233,10 @@ export default function Sidebar({
                   )}
                 </button>
 
-                {shouldShowSubmenu && (
+                {shouldShowSubmenu(item.label) && (
                   <div
                     className={`${styles.submenu} ${
-                      catalogsManualOpen ? styles.submenuOpen : ""
+                      isGroupOpen(item.label) ? styles.submenuOpen : ""
                     }`}
                   >
                     {item.children.map((c) => (
@@ -234,7 +271,6 @@ export default function Sidebar({
         </nav>
       </div>
 
-      {/* BOTTOM */}
       <div className={styles.bottom}>
         <button type="button" className={styles.bottomBtn} onClick={handleLogout}>
           <span className={styles.icon}>
