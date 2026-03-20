@@ -1,9 +1,10 @@
 // src/services/api.ts
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || "https://localhost:7197";
+export const BASE_URL =
+  (import.meta.env.VITE_API_URL as string) || "https://localhost:7197";
 
 type AuthStored = { token?: string; Token?: string };
 
-function readToken(): string {
+export function readToken(): string {
   const rawAuth = localStorage.getItem("auth");
   if (rawAuth) {
     try {
@@ -57,7 +58,7 @@ export function authHeaders(extra?: HeadersInit): HeadersInit {
 }
 
 export async function requestJson(
-  path: string, 
+  path: string,
   init?: RequestInit
 ): Promise<
   | { ok: true; data: unknown; status: number }
@@ -79,7 +80,8 @@ export async function requestJson(
   if (!res.ok) {
     const apiMsg =
       isRecord(parsed) && typeof parsed.message === "string" ? String(parsed.message) : "";
-    const msg = apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
+    const msg =
+      apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
     return { ok: false, error: msg, status: res.status };
   }
 

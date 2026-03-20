@@ -5,7 +5,7 @@ import styles from "../styles/NotificationsView.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
-import { authHeaders } from "../../../services/api";
+import { BASE_URL, readToken, requestJson } from "../../../services/api";
 
 type NotificationItem = {
   id: number;
@@ -19,17 +19,15 @@ type NotificationItem = {
 type NotificationApiItem = {
   id?: number;
   idNotification?: number;
-  title: string;
   message: string;
-  requestId?: number | null;
-  isRead?: boolean;
-  read?: boolean;
   createdAt: string;
+  isRead?: boolean;
+  requestId?: number | null;
 };
 
 type NotificationSignalRPayload = {
   id: number;
-  title: string;
+  title?: string;
   message: string;
   requestId?: number | null;
   createdAt: string;
@@ -37,10 +35,64 @@ type NotificationSignalRPayload = {
 
 type FilterType = "all" | "unread" | "read";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const json = atob(padded);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function getUserId(): number | null {
+  const token = readToken();
+  if (!token) return null;
+
+  const payload = parseJwtPayload(token);
+  if (!payload) return null;
+
+  const possibleKeys = [
+    "userId",
+    "userid",
+    "idUsuario",
+    "IdUsuario",
+    "nameid",
+    "sub",
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+  ];
+
+  for (const key of possibleKeys) {
+    const value = payload[key];
+    if (typeof value === "number") return value;
+
+    if (
+      typeof value === "string" &&
+      value.trim() !== "" &&
+      !Number.isNaN(Number(value))
+    ) {
+      return Number(value);
+    }
+  }
+
+  return null;
+}
+
+function buildNotificationTitle(item: {
+  requestId?: number | null;
+  message: string;
+}): string {
+  if (item.requestId) return `Solicitud #${item.requestId}`;
+  return "Notificación";
+}
 
 export default function NotificationsView() {
   const navigate = useNavigate();
+  const userId = getUserId();
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,33 +115,38 @@ export default function NotificationsView() {
   }, []);
 
   const fetchNotifications = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      showAppToast("No se pudo identificar el usuario actual.", "error");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE}/api/notifications`, {
+      const response = await requestJson(`/api/notifications/all/${userId}`, {
         method: "GET",
-        headers: {
-          ...authHeaders(),
-          "Content-Type": "application/json",
-        },
       });
 
       if (!response.ok) {
-        throw new Error("No se pudieron cargar las notificaciones.");
+        throw new Error(response.error || "No se pudieron cargar las notificaciones.");
       }
 
-      const data: NotificationApiItem[] = await response.json();
+      const data = Array.isArray(response.data)
+        ? (response.data as NotificationApiItem[])
+        : [];
 
-      const mapped: NotificationItem[] = (Array.isArray(data) ? data : []).map(
-        (item) => ({
-          id: item.id ?? item.idNotification ?? 0,
-          title: item.title,
-          message: item.message,
+      const mapped: NotificationItem[] = data.map((item) => ({
+        id: item.id ?? item.idNotification ?? 0,
+        title: buildNotificationTitle({
           requestId: item.requestId ?? null,
-          isRead: item.isRead ?? item.read ?? false,
-          createdAt: item.createdAt,
-        })
-      );
+          message: item.message,
+        }),
+        message: item.message,
+        requestId: item.requestId ?? null,
+        isRead: item.isRead ?? false,
+        createdAt: item.createdAt,
+      }));
 
       mapped.sort(
         (a, b) =>
@@ -103,28 +160,28 @@ export default function NotificationsView() {
     } finally {
       setLoading(false);
     }
-  }, [showAppToast]);
+  }, [showAppToast, userId]);
 
   const markAsRead = useCallback(
     async (notificationId: number) => {
       try {
-        const response = await fetch(
-          `${API_BASE}/api/notifications/${notificationId}/read`,
+        const response = await requestJson(
+          `/api/notifications/read/${notificationId}`,
           {
             method: "PUT",
-            headers: {
-              ...authHeaders(),
-              "Content-Type": "application/json",
-            },
           }
         );
 
         if (!response.ok) {
-          throw new Error("No se pudo marcar la notificación como leída.");
+          throw new Error(
+            response.error || "No se pudo marcar la notificación como leída."
+          );
         }
 
         setNotifications((prev) =>
-          prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, isRead: true } : n
+          )
         );
       } catch (error) {
         console.error(error);
@@ -135,19 +192,22 @@ export default function NotificationsView() {
   );
 
   const markAllAsRead = useCallback(async () => {
+    if (!userId) {
+      showAppToast("No se pudo identificar el usuario actual.", "error");
+      return;
+    }
+
     try {
       setMarkingAll(true);
 
-      const response = await fetch(`${API_BASE}/api/notifications/read-all`, {
+      const response = await requestJson(`/api/notifications/read-all/${userId}`, {
         method: "PUT",
-        headers: {
-          ...authHeaders(),
-          "Content-Type": "application/json",
-        },
       });
 
       if (!response.ok) {
-        throw new Error("No se pudieron marcar todas como leídas.");
+        throw new Error(
+          response.error || "No se pudieron marcar todas como leídas."
+        );
       }
 
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
@@ -158,7 +218,7 @@ export default function NotificationsView() {
     } finally {
       setMarkingAll(false);
     }
-  }, [showAppToast]);
+  }, [showAppToast, userId]);
 
   const connectToHub = useCallback(async () => {
     try {
@@ -166,44 +226,42 @@ export default function NotificationsView() {
 
       setConnectionState("connecting");
 
-      const token =
-        localStorage.getItem("token") ||
-        localStorage.getItem("accessToken") ||
-        sessionStorage.getItem("token") ||
-        "";
+      const token = readToken();
 
       const connection = new signalR.HubConnectionBuilder()
-        .withUrl(`${API_BASE}/hubs/notifications`, {
+        .withUrl(`${BASE_URL}/notifications`, {
           accessTokenFactory: () => token,
         })
         .withAutomaticReconnect()
         .build();
 
-      connection.on(
-        "ReceiveNotification",
-        (notification: NotificationSignalRPayload) => {
-          const newNotification: NotificationItem = {
-            id: notification.id,
-            title: notification.title,
-            message: notification.message,
-            requestId: notification.requestId ?? null,
-            isRead: false,
-            createdAt: notification.createdAt,
-          };
+      connection.on("ReceiveNotification", (notification: NotificationSignalRPayload) => {
+        const newNotification: NotificationItem = {
+          id: notification.id,
+          title:
+            notification.title ??
+            buildNotificationTitle({
+              requestId: notification.requestId ?? null,
+              message: notification.message,
+            }),
+          message: notification.message,
+          requestId: notification.requestId ?? null,
+          isRead: false,
+          createdAt: notification.createdAt,
+        };
 
-          setNotifications((prev) => {
-            const exists = prev.some((x) => x.id === newNotification.id);
-            if (exists) return prev;
+        setNotifications((prev) => {
+          const exists = prev.some((x) => x.id === newNotification.id);
+          if (exists) return prev;
 
-            return [newNotification, ...prev].sort(
-              (a, b) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-          });
+          return [newNotification, ...prev].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
 
-          showAppToast("Nueva notificación recibida.", "success");
-        }
-      );
+        showAppToast("Nueva notificación recibida.", "success");
+      });
 
       connection.onreconnecting(() => {
         setConnectionState("connecting");
@@ -262,7 +320,7 @@ export default function NotificationsView() {
       }
 
       if (notification.requestId) {
-        navigate(`/adquisiciones/${notification.requestId}`);
+        navigate(`/adquisiciones/${notification.requestId}/expediente`);
       }
     },
     [markAsRead, navigate]
