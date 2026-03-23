@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as signalR from "@microsoft/signalr";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
 import { FiSearch, FiTrash2 } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
-import { requestJson, authHeaders } from "../../../services/api";
+import NotificationToast from "../../../Components/layout/NotificationToast";
+import {
+  BASE_URL,
+  readToken,
+  requestJson,
+  authHeaders,
+} from "../../../services/api";
 
 type ApiRow = {
   folio?: string | null;
@@ -52,6 +59,14 @@ type PreviewItem = {
   url: string;
   name: string;
   type: "pdf" | "image" | "other";
+};
+
+type NotificationSignalRPayload = {
+  id: number;
+  title?: string | null;
+  message: string;
+  requestId?: number | null;
+  createdAt: string;
 };
 
 const API_BASE = "/api/AcquisitionRequest";
@@ -106,7 +121,7 @@ function hasCfdi(value: string) {
 function getExtensionFromSource(source: string) {
   const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
   const parts = clean.split(".");
-  return parts.length > 1 ? (parts.pop() ?? "") : "";
+  return parts.length > 1 ? parts.pop() ?? "" : "";
 }
 
 function getPreviewType(
@@ -143,9 +158,19 @@ function normalizeUrlMaybe(u: string) {
   return (u ?? "").trim();
 }
 
+function buildNotificationTitle(item: {
+  requestId?: number | null;
+  message: string;
+}) {
+  if (item.requestId) return `Solicitud #${item.requestId}`;
+  return "Notificación";
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
@@ -167,6 +192,18 @@ export default function Home() {
     message: "",
   });
 
+  const [notificationToast, setNotificationToast] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    requestId?: number | null;
+  }>({
+    open: false,
+    title: "",
+    message: "",
+    requestId: null,
+  });
+
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -177,6 +214,20 @@ export default function Home() {
   const [deleting, setDeleting] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
+
+  const closeNotificationToast = () =>
+    setNotificationToast((prev) => ({
+      ...prev,
+      open: false,
+    }));
+
+  const showAppToast = useCallback((message: string, type: ToastType) => {
+    setToast({
+      open: true,
+      type,
+      message,
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -192,11 +243,7 @@ export default function Home() {
       if (!res.ok) {
         setRows([]);
         setHasNext(false);
-        setToast({
-          open: true,
-          type: "error",
-          message: res.error || "Error al cargar adquisiciones.",
-        });
+        showAppToast(res.error || "Error al cargar adquisiciones.", "error");
         return;
       }
 
@@ -219,8 +266,6 @@ export default function Home() {
             "Sin clasificación";
 
           const requestDate = x.requestDate ?? x.RequestDate ?? null;
-
-          // Fuente única de verdad: estado del backend
           const estado = (x.status ?? x.Status ?? "").trim() || "Sin estatus";
 
           return {
@@ -247,19 +292,65 @@ export default function Home() {
     } catch {
       setRows([]);
       setHasNext(false);
-      setToast({
-        open: true,
-        type: "error",
-        message: "Error inesperado al cargar adquisiciones.",
-      });
+      showAppToast("Error inesperado al cargar adquisiciones.", "error");
     } finally {
       setLoading(false);
     }
-  }, [pageNumber, pageSize]);
+  }, [pageNumber, pageSize, showAppToast]);
+
+  const connectToHub = useCallback(async () => {
+    try {
+      if (connectionRef.current) return;
+
+      const token = readToken();
+
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl(`${BASE_URL}/notifications`, {
+          accessTokenFactory: () => token,
+        })
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on(
+        "ReceiveNotification",
+        (notification: NotificationSignalRPayload) => {
+          setNotificationToast({
+            open: true,
+            title:
+              notification.title ??
+              buildNotificationTitle({
+                requestId: notification.requestId ?? null,
+                message: notification.message,
+              }),
+            message: notification.message,
+            requestId: notification.requestId ?? null,
+          });
+        },
+      );
+
+      await connection.start();
+      connectionRef.current = connection;
+    } catch (error) {
+      console.error("Error conectando a SignalR:", error);
+    }
+  }, []);
 
   useEffect(() => {
     void fetchData();
   }, [fetchData, location.key]);
+
+  useEffect(() => {
+    void connectToHub();
+
+    return () => {
+      const connection = connectionRef.current;
+      connectionRef.current = null;
+
+      if (connection) {
+        connection.stop().catch(() => undefined);
+      }
+    };
+  }, [connectToHub]);
 
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
@@ -272,90 +363,77 @@ export default function Home() {
     window.open(url, "_blank", "noopener,noreferrer");
   }, []);
 
-  const openPolicyPreview = useCallback(async (policyCode: string) => {
-    const code = policyCode.trim();
+  const openPolicyPreview = useCallback(
+    async (policyCode: string) => {
+      const code = policyCode.trim();
 
-    if (
-      !code ||
-      code.toLowerCase() === "sin póliza" ||
-      code.toLowerCase() === "sin poliza"
-    ) {
-      setToast({
-        open: true,
-        type: "error",
-        message: "Esta adquisición no tiene póliza asignada.",
-      });
-      return;
-    }
-
-    setLoadingPreview(true);
-
-    try {
-      const res = (await requestJson(
-        `${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`,
-        {
-          method: "GET",
-          headers: authHeaders(),
-        },
-      )) as RequestResult;
-
-      if (!res.ok) {
-        setToast({
-          open: true,
-          type: "error",
-          message: res.error || "No se pudieron consultar las pólizas.",
-        });
+      if (
+        !code ||
+        code.toLowerCase() === "sin póliza" ||
+        code.toLowerCase() === "sin poliza"
+      ) {
+        showAppToast("Esta adquisición no tiene póliza asignada.", "error");
         return;
       }
 
-      const list = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+      setLoadingPreview(true);
 
-      const found =
-        list.find((x) => {
-          const currentCode = (x.policyCode ?? x.PolicyCode ?? "")
-            .trim()
-            .toLowerCase();
-          return currentCode === code.toLowerCase();
-        }) ?? null;
+      try {
+        const res = (await requestJson(
+          `${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`,
+          {
+            method: "GET",
+            headers: authHeaders(),
+          },
+        )) as RequestResult;
 
-      if (!found) {
-        setToast({
-          open: true,
-          type: "error",
-          message: `No se encontró la póliza ${code}.`,
+        if (!res.ok) {
+          showAppToast(
+            res.error || "No se pudieron consultar las pólizas.",
+            "error",
+          );
+          return;
+        }
+
+        const list = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+        const found =
+          list.find((x) => {
+            const currentCode = (x.policyCode ?? x.PolicyCode ?? "")
+              .trim()
+              .toLowerCase();
+            return currentCode === code.toLowerCase();
+          }) ?? null;
+
+        if (!found) {
+          showAppToast(`No se encontró la póliza ${code}.`, "error");
+          return;
+        }
+
+        const previewUrl = normalizeUrlMaybe(
+          found.previewUrl ?? found.PreviewUrl ?? "",
+        );
+
+        if (!previewUrl) {
+          showAppToast("La póliza no tiene PreviewUrl disponible.", "error");
+          return;
+        }
+
+        const fileName = `${code}`;
+        setPreviewItem({
+          url: previewUrl,
+          name: fileName,
+          type: getPreviewType(previewUrl, fileName),
         });
-        return;
+        setPreviewOpen(true);
+      } catch {
+        showAppToast("Error inesperado al abrir la póliza.", "error");
+      } finally {
+        setLoadingPreview(false);
       }
-
-      const previewUrl = normalizeUrlMaybe(
-        found.previewUrl ?? found.PreviewUrl ?? "",
-      );
-      if (!previewUrl) {
-        setToast({
-          open: true,
-          type: "error",
-          message: "La póliza no tiene PreviewUrl disponible.",
-        });
-        return;
-      }
-
-      const fileName = `${code}`;
-      setPreviewItem({
-        url: previewUrl,
-        name: fileName,
-        type: getPreviewType(previewUrl, fileName),
-      });
-      setPreviewOpen(true);
-    } catch {
-      setToast({
-        open: true,
-        type: "error",
-        message: "Error inesperado al abrir la póliza.",
-      });
-    } finally {
-      setLoadingPreview(false);
-    }
-  }, []);
+    },
+    [showAppToast],
+  );
 
   const openDeleteModal = useCallback((row: Row) => {
     setDeleteTarget(row);
@@ -375,11 +453,10 @@ export default function Home() {
 
     const password = deletePassword.trim();
     if (!password) {
-      setToast({
-        open: true,
-        type: "error",
-        message: "Ingresa la contraseña para confirmar la eliminación.",
-      });
+      showAppToast(
+        "Ingresa la contraseña para confirmar la eliminación.",
+        "error",
+      );
       return;
     }
 
@@ -395,32 +472,26 @@ export default function Home() {
       })) as RequestResult;
 
       if (!res.ok) {
-        setToast({
-          open: true,
-          type: "error",
-          message: res.error || "No se pudo eliminar la adquisición.",
-        });
+        showAppToast(
+          res.error || "No se pudo eliminar la adquisición.",
+          "error",
+        );
         return;
       }
 
-      setToast({
-        open: true,
-        type: "success",
-        message: `La adquisición ${deleteTarget.folio} se eliminó correctamente.`,
-      });
+      showAppToast(
+        `La adquisición ${deleteTarget.folio} se eliminó correctamente.`,
+        "success",
+      );
 
       closeDeleteModal();
       await fetchData();
     } catch {
-      setToast({
-        open: true,
-        type: "error",
-        message: "Error inesperado al eliminar la adquisición.",
-      });
+      showAppToast("Error inesperado al eliminar la adquisición.", "error");
     } finally {
       setDeleting(false);
     }
-  }, [deletePassword, deleteTarget, closeDeleteModal, fetchData]);
+  }, [deletePassword, deleteTarget, closeDeleteModal, fetchData, showAppToast]);
 
   useEffect(() => {
     if (!previewOpen && !deleteModalOpen) return;
@@ -446,13 +517,11 @@ export default function Home() {
     const q = normalizeText(query);
     let list = [...rows];
 
-    // 1) Filtro usa solo r.estado
     if (statusFilter !== "Todos") {
       const wanted = normalizeText(statusFilter);
       list = list.filter((r) => normalizeText(r.estado) === wanted);
     }
 
-    // 2) Búsqueda usa solo r.estado
     if (q) {
       list = list.filter((r) => {
         const real = r.estado;
@@ -468,7 +537,6 @@ export default function Home() {
       });
     }
 
-    // 3) Orden usa solo r.estado
     list.sort((a, b) => {
       const statusA = normalizeText(a.estado);
       const statusB = normalizeText(b.estado);
@@ -476,7 +544,6 @@ export default function Home() {
       const aIsComplete = statusA === "completo";
       const bIsComplete = statusB === "completo";
 
-      // Incompleto primero, Completo después (como tu segunda vista)
       if (aIsComplete !== bIsComplete) {
         return aIsComplete ? 1 : -1;
       }
@@ -490,7 +557,6 @@ export default function Home() {
     return list;
   }, [rows, query, statusFilter]);
 
-  // 4) KPIs usan solo r.estado
   const kpiTotal = filtered.length;
   const kpiCompleto = filtered.filter(
     (r) => normalizeText(r.estado) === "completo",
@@ -505,12 +571,10 @@ export default function Home() {
 
   function goDetail(idRequest: number, classificationLabel: string) {
     if (!hasValidClassification(classificationLabel)) {
-      setToast({
-        open: true,
-        type: "error",
-        message:
-          "Esta solicitud no tiene clasificación asignada. No se puede generar el checklist del expediente.",
-      });
+      showAppToast(
+        "Esta solicitud no tiene clasificación asignada. No se puede generar el checklist del expediente.",
+        "error",
+      );
       return;
     }
 
@@ -528,6 +592,19 @@ export default function Home() {
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
+      />
+
+      <NotificationToast
+        open={notificationToast.open}
+        title={notificationToast.title}
+        message={notificationToast.message}
+        onClose={closeNotificationToast}
+        onView={() => {
+          if (notificationToast.requestId) {
+            navigate(`/adquisiciones/${notificationToast.requestId}/expediente`);
+            closeNotificationToast();
+          }
+        }}
       />
 
       <div
@@ -647,7 +724,6 @@ export default function Home() {
                   </tr>
                 ) : (
                   filtered.map((r) => {
-                    // Columna Estado: r.estado o "Sin estatus"
                     const shownEstado = r.estado || "Sin estatus";
                     const st = normalizeText(shownEstado);
 
@@ -854,62 +930,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deleteModalOpen && deleteTarget && (
-        <div
-          className={styles.confirmOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirmar eliminación"
-          onClick={closeDeleteModal}
-        >
-          <div
-            className={styles.confirmModal}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.confirmHeader}>
-              <h3 className={styles.confirmTitle}>Confirmar eliminación</h3>
-              <p className={styles.confirmText}>
-                Vas a eliminar la adquisición <b>{deleteTarget.folio}</b>. Esta
-                acción no se puede deshacer.
-              </p>
-            </div>
-
-            <div className={styles.confirmBody}>
-              <label className={styles.confirmField}>
-                <span>Contraseña</span>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  placeholder="Ingresa tu contraseña"
-                  autoFocus
-                />
-              </label>
-            </div>
-
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.ghostBtn}
-                onClick={closeDeleteModal}
-                disabled={deleting}
-              >
-                Cancelar
-              </button>
-
-              <button
-                type="button"
-                className={styles.deleteConfirmBtn}
-                onClick={() => void confirmDelete()}
-                disabled={deleting}
-              >
-                {deleting ? "Eliminando..." : "Sí, eliminar"}
-              </button>
             </div>
           </div>
         </div>

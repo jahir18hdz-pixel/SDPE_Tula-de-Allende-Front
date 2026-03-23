@@ -20,6 +20,7 @@ import PaymentPolicy from "../Modules/Policy/pages/PaymentPolicy";
 import AcquisitionRequest from "../Modules/AcquisitionRequest/pages/AcquisitionRequest";
 import ExpedientDocuments from "../Modules/ExpedientDocument/pages/ExpedientDocuments";
 import NotificationsView from "../Modules/Notifications/pages/NotificationsView";
+import SystemConfigurationView from "../Modules/SystemConfigurationView/pages/SystemConfigurationView";
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
@@ -57,7 +58,6 @@ export default function AppRouter() {
               <Route path="/adquisiciones/registrar" element={<AcquisitionRequest />} />
             </Route>
 
-            {/* LISTA / CHECKLIST DE EXPEDIENTE POR SOLICITUD */}
             <Route element={<RequireModule modulePath="/adquisiciones/expediente" />}>
               <Route path="/adquisiciones/:id/expediente" element={<ExpedientDocuments />} />
             </Route>
@@ -66,7 +66,6 @@ export default function AppRouter() {
                 CATÁLOGOS
             ========================== */}
 
-            {/* Unidades administrativas */}
             <Route element={<RequireModule modulePath="/catalogos/unidades-administrativas" />}>
               <Route
                 path="/catalogos/unidades-administrativas"
@@ -74,57 +73,46 @@ export default function AppRouter() {
               />
             </Route>
 
-            {/* Roles */}
             <Route element={<RequireModule modulePath="/catalogos/roles" />}>
               <Route path="/catalogos/roles" element={<Roles />} />
             </Route>
 
-            {/* Permisos */}
             <Route element={<RequireModule modulePath="/catalogos/permisos" />}>
               <Route path="/catalogos/permisos" element={<PermissionsByRole />} />
             </Route>
 
-            {/* COG */}
             <Route element={<RequireModule modulePath="/catalogos/cog" />}>
               <Route path="/catalogos/cog" element={<Cog />} />
             </Route>
 
-            {/* Fondo financiamiento */}
             <Route element={<RequireModule modulePath="/catalogos/fondo-financiamiento" />}>
               <Route path="/catalogos/fondo-financiamiento" element={<FundingSource />} />
             </Route>
 
-            {/* Pólizas de pago */}
             <Route element={<RequireModule modulePath="/catalogos/polizas" />}>
               <Route path="/catalogos/polizas" element={<PaymentPolicy />} />
             </Route>
 
-            {/* Comunidades */}
             <Route element={<RequireModule modulePath="/catalogos/comunidades" />}>
               <Route path="/catalogos/comunidades" element={<Community />} />
             </Route>
 
-            {/* Beneficiarios */}
             <Route element={<RequireModule modulePath="/catalogos/beneficiarios" />}>
               <Route path="/catalogos/beneficiarios" element={<BeneficiaryPage />} />
             </Route>
 
-            {/* Proveedores */}
             <Route element={<RequireModule modulePath="/catalogos/proveedores" />}>
               <Route path="/catalogos/proveedores" element={<SupplierPage />} />
             </Route>
 
-            {/* Prog */}
             <Route element={<RequireModule modulePath="/catalogos/prog" />}>
               <Route path="/catalogos/prog" element={<Prog />} />
             </Route>
 
-            {/* Proyectos */}
             <Route element={<RequireModule modulePath="/catalogos/proyectos" />}>
               <Route path="/catalogos/proyectos" element={<Proyect />} />
             </Route>
 
-            {/* Clasificación de adquisiciones */}
             <Route element={<RequireModule modulePath="/catalogos/clasificacion-adquisiciones" />}>
               <Route
                 path="/catalogos/clasificacion-adquisiciones"
@@ -132,14 +120,19 @@ export default function AppRouter() {
               />
             </Route>
 
-            {/* Tipos de adquisición */}
             <Route element={<RequireModule modulePath="/catalogos/tipos-adquisicion" />}>
               <Route path="/catalogos/tipos-adquisicion" element={<AcquisitionTypePage />} />
             </Route>
 
-            {/* Tipos de documento */}
             <Route element={<RequireModule modulePath="/catalogos/tipos-documento" />}>
               <Route path="/catalogos/tipos-documento" element={<DocumentType />} />
+            </Route>
+
+            <Route element={<RequireModule modulePath="/catalogos/configuracion-sistema" />}>
+              <Route
+                path="/catalogos/configuracion-sistema"
+                element={<SystemConfigurationView />}
+              />
             </Route>
           </Route>
         </Route>

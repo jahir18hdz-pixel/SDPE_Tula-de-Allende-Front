@@ -55,12 +55,14 @@ export default function Sidebar({
   const isInAdminRoute =
     location.pathname.startsWith("/usuarios") ||
     location.pathname.startsWith("/catalogos/roles") ||
-    location.pathname.startsWith("/catalogos/permisos");
+    location.pathname.startsWith("/catalogos/permisos") ||
+    location.pathname.startsWith("/catalogos/configuracion-sistema");
 
   const menu: MenuItem[] = useMemo(
     () => [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
       { label: "Notificaciones", to: "/notificaciones", icon: <FiBell /> },
+
       {
         label: "Catálogos",
         icon: <FiFolder />,
@@ -79,6 +81,7 @@ export default function Sidebar({
           { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
         ],
       },
+
       {
         label: "Administración",
         icon: <FiSettings />,
@@ -86,6 +89,7 @@ export default function Sidebar({
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
           { label: "Usuarios", to: "/usuarios/nuevo" },
+          { label: "Configuración del sistema", to: "/catalogos/configuracion-sistema" },
         ],
       },
     ],
@@ -116,7 +120,8 @@ export default function Sidebar({
     if (!isInCatalogsRoute) return;
 
     const catalogsGroup = filteredMenu.find((m) => m.label === "Catálogos");
-    const hasCatalogs = Array.isArray(catalogsGroup?.children) && catalogsGroup.children.length > 0;
+    const hasCatalogs =
+      Array.isArray(catalogsGroup?.children) && catalogsGroup.children.length > 0;
 
     const id = window.setTimeout(() => {
       setCatalogsManualOpen(hasCatalogs);
@@ -129,7 +134,8 @@ export default function Sidebar({
     if (!isInAdminRoute) return;
 
     const adminGroup = filteredMenu.find((m) => m.label === "Administración");
-    const hasAdmin = Array.isArray(adminGroup?.children) && adminGroup.children.length > 0;
+    const hasAdmin =
+      Array.isArray(adminGroup?.children) && adminGroup.children.length > 0;
 
     const id = window.setTimeout(() => {
       setAdminManualOpen(hasAdmin);
@@ -247,7 +253,9 @@ export default function Sidebar({
                         to={c.to}
                         onClick={() => onNavigate?.()}
                         className={({ isActive }) =>
-                          isActive ? `${styles.subItem} ${styles.active}` : styles.subItem
+                          isActive
+                            ? `${styles.subItem} ${styles.active}`
+                            : styles.subItem
                         }
                       >
                         {c.label}
