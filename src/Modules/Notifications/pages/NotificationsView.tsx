@@ -19,6 +19,7 @@ type NotificationItem = {
 type NotificationApiItem = {
   id?: number;
   idNotification?: number;
+  title?: string;
   message: string;
   createdAt: string;
   isRead?: boolean;
@@ -41,7 +42,10 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
     if (parts.length < 2) return null;
 
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "="
+    );
     const json = atob(padded);
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
@@ -68,6 +72,7 @@ function getUserId(): number | null {
 
   for (const key of possibleKeys) {
     const value = payload[key];
+
     if (typeof value === "number") return value;
 
     if (
@@ -85,9 +90,17 @@ function getUserId(): number | null {
 function buildNotificationTitle(item: {
   requestId?: number | null;
   message: string;
+  title?: string;
 }): string {
+  if (item.title && item.title.trim()) return item.title.trim();
   if (item.requestId) return `Solicitud #${item.requestId}`;
   return "Notificación";
+}
+
+function sortNotifications(list: NotificationItem[]) {
+  return [...list].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 export default function NotificationsView() {
@@ -100,7 +113,10 @@ export default function NotificationsView() {
     "connected" | "disconnected" | "connecting"
   >("disconnected");
   const [filter, setFilter] = useState<FilterType>("all");
+
   const [markingAll, setMarkingAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -116,6 +132,7 @@ export default function NotificationsView() {
 
   const fetchNotifications = useCallback(async () => {
     if (!userId) {
+      setNotifications([]);
       setLoading(false);
       showAppToast("No se pudo identificar el usuario actual.", "error");
       return;
@@ -136,24 +153,22 @@ export default function NotificationsView() {
         ? (response.data as NotificationApiItem[])
         : [];
 
-      const mapped: NotificationItem[] = data.map((item) => ({
-        id: item.id ?? item.idNotification ?? 0,
-        title: buildNotificationTitle({
-          requestId: item.requestId ?? null,
+      const mapped: NotificationItem[] = data
+        .map((item) => ({
+          id: item.id ?? item.idNotification ?? 0,
+          title: buildNotificationTitle({
+            requestId: item.requestId ?? null,
+            message: item.message,
+            title: item.title,
+          }),
           message: item.message,
-        }),
-        message: item.message,
-        requestId: item.requestId ?? null,
-        isRead: item.isRead ?? false,
-        createdAt: item.createdAt,
-      }));
+          requestId: item.requestId ?? null,
+          isRead: item.isRead ?? false,
+          createdAt: item.createdAt,
+        }))
+        .filter((item) => item.id > 0);
 
-      mapped.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      setNotifications(mapped);
+      setNotifications(sortNotifications(mapped));
     } catch (error) {
       console.error(error);
       showAppToast("No se pudieron cargar las notificaciones.", "error");
@@ -165,6 +180,8 @@ export default function NotificationsView() {
   const markAsRead = useCallback(
     async (notificationId: number) => {
       try {
+        setProcessingId(notificationId);
+
         const response = await requestJson(
           `/api/notifications/read/${notificationId}`,
           {
@@ -186,6 +203,8 @@ export default function NotificationsView() {
       } catch (error) {
         console.error(error);
         showAppToast("No se pudo marcar la notificación como leída.", "error");
+      } finally {
+        setProcessingId(null);
       }
     },
     [showAppToast]
@@ -220,9 +239,66 @@ export default function NotificationsView() {
     }
   }, [showAppToast, userId]);
 
+  const deleteNotification = useCallback(
+    async (notificationId: number) => {
+      try {
+        setProcessingId(notificationId);
+
+        const response = await requestJson(`/api/notifications/${notificationId}`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) {
+          throw new Error(response.error || "No se pudo eliminar la notificación.");
+        }
+
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        showAppToast("Notificación eliminada.", "success");
+      } catch (error) {
+        console.error(error);
+        showAppToast("No se pudo eliminar la notificación.", "error");
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [showAppToast]
+  );
+
+  const deleteAllNotifications = useCallback(async () => {
+    if (!userId) {
+      showAppToast("No se pudo identificar el usuario actual.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "¿Seguro que deseas eliminar todas las notificaciones?"
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingAll(true);
+
+      const response = await requestJson(`/api/notifications/user/${userId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error || "No se pudieron eliminar las notificaciones.");
+      }
+
+      setNotifications([]);
+      showAppToast("Se eliminaron todas las notificaciones.", "success");
+    } catch (error) {
+      console.error(error);
+      showAppToast("No se pudieron eliminar todas las notificaciones.", "error");
+    } finally {
+      setDeletingAll(false);
+    }
+  }, [showAppToast, userId]);
+
   const connectToHub = useCallback(async () => {
     try {
-      if (connectionRef.current) return;
+      if (connectionRef.current || !userId) return;
 
       setConnectionState("connecting");
 
@@ -230,38 +306,36 @@ export default function NotificationsView() {
 
       const connection = new signalR.HubConnectionBuilder()
         .withUrl(`${BASE_URL}/notifications`, {
-          accessTokenFactory: () => token,
+          accessTokenFactory: () => token ?? "",
         })
         .withAutomaticReconnect()
         .build();
 
-      connection.on("ReceiveNotification", (notification: NotificationSignalRPayload) => {
-        const newNotification: NotificationItem = {
-          id: notification.id,
-          title:
-            notification.title ??
-            buildNotificationTitle({
+      connection.on(
+        "ReceiveNotification",
+        (notification: NotificationSignalRPayload) => {
+          const newNotification: NotificationItem = {
+            id: notification.id,
+            title: buildNotificationTitle({
               requestId: notification.requestId ?? null,
               message: notification.message,
+              title: notification.title,
             }),
-          message: notification.message,
-          requestId: notification.requestId ?? null,
-          isRead: false,
-          createdAt: notification.createdAt,
-        };
+            message: notification.message,
+            requestId: notification.requestId ?? null,
+            isRead: false,
+            createdAt: notification.createdAt,
+          };
 
-        setNotifications((prev) => {
-          const exists = prev.some((x) => x.id === newNotification.id);
-          if (exists) return prev;
+          setNotifications((prev) => {
+            const exists = prev.some((x) => x.id === newNotification.id);
+            if (exists) return prev;
+            return sortNotifications([newNotification, ...prev]);
+          });
 
-          return [newNotification, ...prev].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
-
-        showAppToast("Nueva notificación recibida.", "success");
-      });
+          showAppToast("Nueva notificación recibida.", "success");
+        }
+      );
 
       connection.onreconnecting(() => {
         setConnectionState("connecting");
@@ -283,7 +357,7 @@ export default function NotificationsView() {
       console.error("Error conectando a SignalR:", error);
       setConnectionState("disconnected");
     }
-  }, [showAppToast]);
+  }, [showAppToast, userId]);
 
   useEffect(() => {
     fetchNotifications();
@@ -302,16 +376,21 @@ export default function NotificationsView() {
     };
   }, [connectToHub]);
 
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
+
+  const readCount = useMemo(
+    () => notifications.filter((n) => n.isRead).length,
+    [notifications]
+  );
+
   const filteredNotifications = useMemo(() => {
     if (filter === "unread") return notifications.filter((n) => !n.isRead);
     if (filter === "read") return notifications.filter((n) => n.isRead);
     return notifications;
   }, [filter, notifications]);
-
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
-  );
 
   const handleNotificationClick = useCallback(
     async (notification: NotificationItem) => {
@@ -326,72 +405,116 @@ export default function NotificationsView() {
     [markAsRead, navigate]
   );
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString("es-MX", {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  };
+  }, []);
+
+  const getRelativeTime = useCallback((dateString: string) => {
+    const now = new Date().getTime();
+    const value = new Date(dateString).getTime();
+    const diffMs = value - now;
+
+    const rtf = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
+
+    const minutes = Math.round(diffMs / (1000 * 60));
+    const hours = Math.round(diffMs / (1000 * 60 * 60));
+    const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    if (Math.abs(minutes) < 60) return rtf.format(minutes, "minute");
+    if (Math.abs(hours) < 24) return rtf.format(hours, "hour");
+    return rtf.format(days, "day");
+  }, []);
+
+  const currentFilterLabel =
+    filter === "all"
+      ? "todas"
+      : filter === "unread"
+      ? "no leídas"
+      : "leídas";
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Notificaciones</h1>
-          <p className={styles.subtitle}>
-            Aquí puedes ver las notificaciones recientes, el historial y su estado.
-          </p>
+      <div className={styles.hero}>
+        <div className={styles.header}>
+          <div className={styles.headerText}>
+            <h1 className={styles.title}>Notificaciones</h1>
+            <p className={styles.subtitle}>
+              Consulta el historial, revisa alertas pendientes y accede rápido a
+              las solicitudes relacionadas.
+            </p>
+          </div>
+
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => navigate(-1)}
+            >
+              Volver
+            </button>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={fetchNotifications}
+              disabled={loading}
+            >
+              {loading ? "Actualizando..." : "Actualizar"}
+            </button>
+
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={markAllAsRead}
+              disabled={markingAll || unreadCount === 0}
+            >
+              {markingAll ? "Marcando..." : "Marcar todas como leídas"}
+            </button>
+          </div>
         </div>
 
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => navigate(-1)}
-          >
-            Volver
-          </button>
+        <div className={styles.summaryGrid}>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>Total</span>
+            <strong className={styles.summaryValue}>{notifications.length}</strong>
+            <span className={styles.summaryHint}>Notificaciones registradas</span>
+          </div>
 
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={markAllAsRead}
-            disabled={markingAll || unreadCount === 0}
-          >
-            {markingAll ? "Marcando..." : "Marcar todas como leídas"}
-          </button>
-        </div>
-      </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>No leídas</span>
+            <strong className={styles.summaryValue}>{unreadCount}</strong>
+            <span className={styles.summaryHint}>Pendientes de revisar</span>
+          </div>
 
-      <div className={styles.summaryGrid}>
-        <div className={styles.summaryCard}>
-          <span className={styles.summaryLabel}>Total</span>
-          <strong className={styles.summaryValue}>{notifications.length}</strong>
-        </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>Leídas</span>
+            <strong className={styles.summaryValue}>{readCount}</strong>
+            <span className={styles.summaryHint}>Ya revisadas</span>
+          </div>
 
-        <div className={styles.summaryCard}>
-          <span className={styles.summaryLabel}>No leídas</span>
-          <strong className={styles.summaryValue}>{unreadCount}</strong>
-        </div>
-
-        <div className={styles.summaryCard}>
-          <span className={styles.summaryLabel}>Conexión en tiempo real</span>
-          <strong
-            className={`${styles.connectionBadge} ${
-              connectionState === "connected"
-                ? styles.connected
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>Conexión en tiempo real</span>
+            <strong
+              className={`${styles.connectionBadge} ${
+                connectionState === "connected"
+                  ? styles.connected
+                  : connectionState === "connecting"
+                  ? styles.connecting
+                  : styles.disconnected
+              }`}
+            >
+              {connectionState === "connected"
+                ? "Conectado"
                 : connectionState === "connecting"
-                ? styles.connecting
-                : styles.disconnected
-            }`}
-          >
-            {connectionState === "connected"
-              ? "Conectado"
-              : connectionState === "connecting"
-              ? "Conectando..."
-              : "Desconectado"}
-          </strong>
+                ? "Conectando..."
+                : "Desconectado"}
+            </strong>
+            <span className={styles.summaryHint}>Estado de SignalR</span>
+          </div>
         </div>
       </div>
 
@@ -405,6 +528,7 @@ export default function NotificationsView() {
             onClick={() => setFilter("all")}
           >
             Todas
+            <span className={styles.filterCount}>{notifications.length}</span>
           </button>
 
           <button
@@ -415,6 +539,7 @@ export default function NotificationsView() {
             onClick={() => setFilter("unread")}
           >
             No leídas
+            <span className={styles.filterCount}>{unreadCount}</span>
           </button>
 
           <button
@@ -425,71 +550,153 @@ export default function NotificationsView() {
             onClick={() => setFilter("read")}
           >
             Leídas
+            <span className={styles.filterCount}>{readCount}</span>
+          </button>
+        </div>
+
+        <div className={styles.toolbarActions}>
+          <span className={styles.resultsText}>
+            Mostrando {filteredNotifications.length} {currentFilterLabel}
+          </span>
+
+          <button
+            type="button"
+            className={styles.dangerButton}
+            onClick={deleteAllNotifications}
+            disabled={deletingAll || notifications.length === 0}
+          >
+            {deletingAll ? "Eliminando..." : "Eliminar todas"}
           </button>
         </div>
       </div>
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.emptyState}>Cargando notificaciones...</div>
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>🔄</div>
+            <p className={styles.emptyTitle}>Cargando notificaciones...</p>
+          </div>
         ) : filteredNotifications.length === 0 ? (
           <div className={styles.emptyState}>
-            No hay notificaciones para mostrar.
+            <div className={styles.emptyIcon}>🔔</div>
+            <p className={styles.emptyTitle}>No hay notificaciones para mostrar</p>
+            <p className={styles.emptyDescription}>
+              Cuando tengas nuevas alertas aparecerán aquí.
+            </p>
           </div>
         ) : (
           <div className={styles.notificationList}>
-            {filteredNotifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`${styles.notificationCard} ${
-                  !notification.isRead ? styles.unreadCard : ""
-                }`}
-              >
-                <div className={styles.notificationMain}>
-                  <div className={styles.notificationTop}>
-                    <h3 className={styles.notificationTitle}>
-                      {notification.title}
-                    </h3>
-                    {!notification.isRead && <span className={styles.unreadDot} />}
+            {filteredNotifications.map((notification) => {
+              const isBusy = processingId === notification.id;
+
+              return (
+                <article
+                  key={notification.id}
+                  className={`${styles.notificationCard} ${
+                    !notification.isRead ? styles.unreadCard : ""
+                  } ${notification.requestId ? styles.clickableCard : ""}`}
+                  onClick={() =>
+                    notification.requestId
+                      ? handleNotificationClick(notification)
+                      : undefined
+                  }
+                  role={notification.requestId ? "button" : undefined}
+                  tabIndex={notification.requestId ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (
+                      notification.requestId &&
+                      (e.key === "Enter" || e.key === " ")
+                    ) {
+                      e.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
+                >
+                  <div className={styles.notificationMain}>
+                    <div className={styles.notificationTop}>
+                      <div className={styles.notificationTitleRow}>
+                        <h3 className={styles.notificationTitle}>
+                          {notification.title}
+                        </h3>
+                        {!notification.isRead && (
+                          <span className={styles.statusChipUnread}>Nueva</span>
+                        )}
+                        {notification.isRead && (
+                          <span className={styles.statusChipRead}>Leída</span>
+                        )}
+                      </div>
+
+                      {!notification.isRead && (
+                        <span
+                          className={styles.unreadDot}
+                          aria-label="No leída"
+                          title="No leída"
+                        />
+                      )}
+                    </div>
+
+                    <p className={styles.notificationMessage}>
+                      {notification.message}
+                    </p>
+
+                    <div className={styles.notificationMeta}>
+                      <span className={styles.metaPill}>
+                        {formatDate(notification.createdAt)}
+                      </span>
+                      <span className={styles.metaPillSoft}>
+                        {getRelativeTime(notification.createdAt)}
+                      </span>
+                      {notification.requestId ? (
+                        <span className={styles.metaPill}>
+                          Solicitud #{notification.requestId}
+                        </span>
+                      ) : (
+                        <span className={styles.metaPillSoft}>
+                          Sin solicitud relacionada
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <p className={styles.notificationMessage}>
-                    {notification.message}
-                  </p>
-
-                  <div className={styles.notificationMeta}>
-                    <span>{formatDate(notification.createdAt)}</span>
-                    {notification.requestId ? (
-                      <span>Solicitud #{notification.requestId}</span>
-                    ) : (
-                      <span>Sin solicitud relacionada</span>
+                  <div
+                    className={styles.notificationActions}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!notification.isRead && (
+                      <button
+                        type="button"
+                        className={styles.smallSecondaryButton}
+                        onClick={() => markAsRead(notification.id)}
+                        disabled={isBusy}
+                      >
+                        {isBusy ? "Procesando..." : "Marcar como leída"}
+                      </button>
                     )}
+
+                    {notification.requestId && (
+                      <button
+                        type="button"
+                        className={styles.smallPrimaryButton}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        Ver detalle
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className={styles.iconDangerButton}
+                      onClick={() => deleteNotification(notification.id)}
+                      disabled={isBusy}
+                      title="Eliminar notificación"
+                      aria-label="Eliminar notificación"
+                    >
+                      ✕
+                    </button>
                   </div>
-                </div>
-
-                <div className={styles.notificationActions}>
-                  {!notification.isRead && (
-                    <button
-                      type="button"
-                      className={styles.smallSecondaryButton}
-                      onClick={() => markAsRead(notification.id)}
-                    >
-                      Marcar como leída
-                    </button>
-                  )}
-
-                  {notification.requestId && (
-                    <button
-                      type="button"
-                      className={styles.smallPrimaryButton}
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      Ver detalle
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

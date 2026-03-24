@@ -6,10 +6,11 @@ import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import { requestJson, authHeaders } from "../../../services/api";
 
-type SystemConfigurationDto = {
-  idConfiguration?: number;
-  emailsEnabled: boolean;
-  notificationStartDate: string | null;
+type SystemConfigurationStatusDto = {
+  status?: boolean;
+  date?: string | null;
+  Status?: boolean;
+  Date?: string | null;
 };
 
 type RequestSuccess<T> = {
@@ -31,15 +32,52 @@ type FormState = {
 
 const toInputDate = (value: string | null | undefined): string => {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    const plainDate = String(value).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(plainDate) ? plainDate : "";
+  }
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateLabel = (value: string): string => {
+  if (!value) return "Sin fecha configurada";
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "Fecha inválida";
+
+  return date.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const resolveStatus = (data: SystemConfigurationStatusDto): boolean => {
+  if (typeof data.status === "boolean") return data.status;
+  if (typeof data.Status === "boolean") return data.Status;
+  return false;
+};
+
+const resolveDate = (data: SystemConfigurationStatusDto): string | null => {
+  return data.date ?? data.Date ?? null;
 };
 
 const SystemConfigurationView: React.FC = () => {
   const navigate = useNavigate();
 
   const [form, setForm] = useState<FormState>({
+    emailsEnabled: false,
+    notificationStartDate: "",
+  });
+
+  const [initialForm, setInitialForm] = useState<FormState>({
     emailsEnabled: false,
     notificationStartDate: "",
   });
@@ -57,6 +95,13 @@ const SystemConfigurationView: React.FC = () => {
     setToastOpen(true);
   };
 
+  const hasChanges = useMemo(() => {
+    return (
+      form.emailsEnabled !== initialForm.emailsEnabled ||
+      form.notificationStartDate !== initialForm.notificationStartDate
+    );
+  }, [form, initialForm]);
+
   const canSave = useMemo(() => {
     if (!form.emailsEnabled) return true;
     return form.notificationStartDate.trim().length > 0;
@@ -66,32 +111,27 @@ const SystemConfigurationView: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = (await requestJson("/api/system-configuration/active", {
+      const response = (await requestJson("/api/system-configuration/status", {
         method: "GET",
         headers: {
           ...authHeaders(),
         },
-      })) as RequestSuccess<SystemConfigurationDto> | RequestError;
+      })) as RequestSuccess<SystemConfigurationStatusDto> | RequestError;
 
       if (!response.ok) {
-        if (response.status === 404) {
-          setForm({
-            emailsEnabled: false,
-            notificationStartDate: "",
-          });
-          return;
-        }
-
         showToast("No se pudo cargar la configuración actual.", "error");
         return;
       }
 
-      setForm({
-        emailsEnabled: response.data.emailsEnabled,
-        notificationStartDate: toInputDate(response.data.notificationStartDate),
-      });
-    } catch (error: unknown) {
-      console.error(error);
+      const nextForm: FormState = {
+        emailsEnabled: resolveStatus(response.data),
+        notificationStartDate: toInputDate(resolveDate(response.data)),
+      };
+
+      setForm(nextForm);
+      setInitialForm(nextForm);
+    } catch (error) {
+      console.error("Error loading configuration:", error);
       showToast("No se pudo cargar la configuración actual.", "error");
     } finally {
       setLoading(false);
@@ -102,19 +142,27 @@ const SystemConfigurationView: React.FC = () => {
     loadConfiguration();
   }, [loadConfiguration]);
 
-  const handleChangeEmails = (value: boolean) => {
-    setForm((prev) => ({
-      ...prev,
-      emailsEnabled: value,
-      notificationStartDate: value ? prev.notificationStartDate : "",
-    }));
+  const handleToggleEmails = () => {
+    setForm((prev) => {
+      const nextEnabled = !prev.emailsEnabled;
+
+      return {
+        ...prev,
+        emailsEnabled: nextEnabled,
+        notificationStartDate: nextEnabled ? prev.notificationStartDate : "",
+      };
+    });
   };
 
-  const handleChangeDate = (value: string) => {
+  const handleDateChange = (value: string) => {
     setForm((prev) => ({
       ...prev,
       notificationStartDate: value,
     }));
+  };
+
+  const handleReset = () => {
+    setForm(initialForm);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,7 +170,7 @@ const SystemConfigurationView: React.FC = () => {
 
     if (!canSave) {
       showToast(
-        "Debes seleccionar la fecha de inicio cuando los correos estén habilitados.",
+        "Debes seleccionar una fecha de inicio si los correos están habilitados.",
         "error"
       );
       return;
@@ -132,10 +180,10 @@ const SystemConfigurationView: React.FC = () => {
 
     try {
       const payload = {
-        emailsEnabled: form.emailsEnabled,
-        notificationStartDate:
+        EmailsEnabled: form.emailsEnabled,
+        NotificationStartDate:
           form.emailsEnabled && form.notificationStartDate
-            ? new Date(`${form.notificationStartDate}T00:00:00`).toISOString()
+            ? `${form.notificationStartDate}T00:00:00`
             : null,
       };
 
@@ -146,20 +194,27 @@ const SystemConfigurationView: React.FC = () => {
           ...authHeaders(),
         },
         body: JSON.stringify(payload),
-      })) as RequestSuccess<{
-        message: string;
-        idConfiguration: number;
-      }> | RequestError;
+      })) as
+        | RequestSuccess<{
+            message: string;
+            idConfiguration: number;
+          }>
+        | RequestError;
 
       if (!response.ok) {
         showToast("No se pudo guardar la configuración.", "error");
         return;
       }
 
+      const savedForm = { ...form };
+      setForm(savedForm);
+      setInitialForm(savedForm);
+
       showToast("Configuración guardada correctamente.", "success");
+
       await loadConfiguration();
-    } catch (error: unknown) {
-      console.error(error);
+    } catch (error) {
+      console.error("Error saving configuration:", error);
       showToast("No se pudo guardar la configuración.", "error");
     } finally {
       setSaving(false);
@@ -168,104 +223,158 @@ const SystemConfigurationView: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <button
-          type="button"
-          className={styles.backButton}
-          onClick={() => navigate(-1)}
-          disabled={loading || saving}
-        >
-          Volver
-        </button>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <button
+            type="button"
+            className={styles.backButton}
+            onClick={() => navigate(-1)}
+            disabled={loading || saving}
+          >
+            ← Volver
+          </button>
 
-        <div>
-          <h1 className={styles.title}>Configuración del sistema</h1>
-          <p className={styles.subtitle}>
-            Administra el envío de correos y la fecha de inicio de las
-            notificaciones.
-          </p>
-        </div>
-      </div>
-
-      <form className={styles.card} onSubmit={handleSubmit}>
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>Notificaciones por correo</h2>
-          <p className={styles.sectionText}>
-            Aquí puedes definir si el sistema enviará correos automáticos y
-            desde cuándo estarán habilitados.
-          </p>
-
-          <div className={styles.fieldGroup}>
-            <label className={styles.switchRow}>
-              <div>
-                <span className={styles.label}>
-                  Habilitar envío de correos
-                </span>
-                <p className={styles.helpText}>
-                  Activa esta opción para permitir el envío de notificaciones
-                  por correo.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className={`${styles.switch} ${
-                  form.emailsEnabled ? styles.switchActive : ""
-                }`}
-                onClick={() => handleChangeEmails(!form.emailsEnabled)}
-                aria-pressed={form.emailsEnabled}
-                disabled={loading || saving}
-              >
-                <span className={styles.switchThumb} />
-              </button>
-            </label>
-          </div>
-
-          <div className={styles.fieldGroup}>
-            <label htmlFor="notificationStartDate" className={styles.label}>
-              Fecha de inicio de notificaciones
-            </label>
-
-            <input
-              id="notificationStartDate"
-              type="date"
-              className={styles.input}
-              value={form.notificationStartDate}
-              onChange={(e) => handleChangeDate(e.target.value)}
-              disabled={!form.emailsEnabled || loading || saving}
-            />
-
-            <p className={styles.helpText}>
-              {form.emailsEnabled
-                ? "Selecciona la fecha desde la cual se comenzarán a enviar las notificaciones."
-                : "Primero activa el envío de correos para habilitar este campo."}
+          <div className={styles.headerContent}>
+            <h1 className={styles.title}>Configuración del sistema</h1>
+            <p className={styles.subtitle}>
+              Administra el envío de correos automáticos y define desde qué fecha
+              estarán habilitadas las notificaciones del sistema.
             </p>
           </div>
         </div>
 
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => navigate(-1)}
-            disabled={loading || saving}
-          >
-            Cancelar
-          </button>
+        <form className={styles.card} onSubmit={handleSubmit}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.sectionTitle}>Notificaciones por correo</h2>
+              <p className={styles.sectionText}>
+                Configura si el sistema enviará correos automáticos y establece
+                la fecha de inicio para las notificaciones.
+              </p>
+            </div>
 
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            disabled={loading || saving || !canSave}
-          >
-            {loading
-              ? "Cargando..."
-              : saving
-              ? "Guardando..."
-              : "Guardar configuración"}
-          </button>
-        </div>
-      </form>
+            <div className={styles.statusBadgeWrap}>
+              <span
+                className={`${styles.statusBadge} ${
+                  form.emailsEnabled
+                    ? styles.statusEnabled
+                    : styles.statusDisabled
+                }`}
+              >
+                {form.emailsEnabled
+                  ? "Correos habilitados"
+                  : "Correos deshabilitados"}
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <div className={styles.fieldGroup}>
+              <div className={styles.switchRow}>
+                <div className={styles.switchText}>
+                  <span className={styles.label}>Habilitar envío de correos</span>
+                  <p className={styles.helpText}>
+                    Activa esta opción para permitir que el sistema envíe
+                    notificaciones automáticas por correo.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className={`${styles.switch} ${
+                    form.emailsEnabled ? styles.switchActive : ""
+                  }`}
+                  onClick={handleToggleEmails}
+                  aria-pressed={form.emailsEnabled}
+                  aria-label={
+                    form.emailsEnabled
+                      ? "Deshabilitar envío de correos"
+                      : "Habilitar envío de correos"
+                  }
+                  disabled={loading || saving}
+                >
+                  <span className={styles.switchThumb} />
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.grid}>
+              <div className={styles.fieldGroup}>
+                <label htmlFor="notificationStartDate" className={styles.label}>
+                  Fecha de inicio de notificaciones
+                </label>
+
+                <input
+                  id="notificationStartDate"
+                  type="date"
+                  className={styles.input}
+                  value={form.notificationStartDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  disabled={!form.emailsEnabled || loading || saving}
+                />
+
+                <p className={styles.helpText}>
+                  {form.emailsEnabled
+                    ? "Selecciona la fecha desde la cual comenzarán a enviarse las notificaciones."
+                    : "Activa primero el envío de correos para habilitar este campo."}
+                </p>
+              </div>
+
+              <div className={styles.infoPanel}>
+                <span className={styles.infoLabel}>Resumen actual</span>
+
+                <div className={styles.infoItem}>
+                  <span className={styles.infoItemTitle}>Estado:</span>
+                  <span className={styles.infoItemValue}>
+                    {form.emailsEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                </div>
+
+                <div className={styles.infoItem}>
+                  <span className={styles.infoItemTitle}>Fecha configurada:</span>
+                  <span className={styles.infoItemValue}>
+                    {form.emailsEnabled && form.notificationStartDate
+                      ? formatDateLabel(form.notificationStartDate)
+                      : "No aplica"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={handleReset}
+              disabled={loading || saving || !hasChanges}
+            >
+              Restablecer
+            </button>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => navigate(-1)}
+              disabled={loading || saving}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              className={styles.primaryButton}
+              disabled={loading || saving || !canSave || !hasChanges}
+            >
+              {loading
+                ? "Cargando..."
+                : saving
+                ? "Guardando..."
+                : "Guardar configuración"}
+            </button>
+          </div>
+        </form>
+      </div>
 
       <Toast
         open={toastOpen}

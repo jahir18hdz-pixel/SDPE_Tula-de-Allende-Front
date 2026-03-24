@@ -25,7 +25,9 @@ type ChecklistRow = {
   requiredByRule: boolean;
   noApplies: boolean;
   uploaded: boolean;
-  observations?: string | null;
+  observations: string[];
+  reviewObservations: string[];
+  statusDescriptions: string[];
   files: ChecklistFileItem[];
 };
 
@@ -90,6 +92,8 @@ type PreviewItem = {
   url: string;
   name: string;
   type: "image" | "pdf" | "other";
+  reviewObservation?: string | null;
+  reviewStatus?: string | null;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -143,6 +147,20 @@ function normalizeUrlMaybe(u: string) {
 function toStringArray(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v.map((x) => toStringSafe(x).trim()).filter(Boolean);
+}
+
+function toStatusDescriptions(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((item) => {
+      if (!isRecord(item)) return "";
+      const description = toStringSafe(
+        item["description"] ?? item["Description"],
+      ).trim();
+      const code = toStringSafe(item["code"] ?? item["Code"]).trim();
+      return description || code;
+    })
+    .filter(Boolean);
 }
 
 function getExtensionFromSource(source: string) {
@@ -231,8 +249,17 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
           raw["Active"],
       );
 
-      const observations =
-        toStringSafe(raw["observations"] ?? raw["Observations"]).trim() || null;
+      const observations = toStringArray(
+        raw["observations"] ?? raw["Observations"],
+      );
+
+      const reviewObservations = toStringArray(
+        raw["observationsUpload"] ?? raw["ObservationsUpload"],
+      );
+
+      const statusDescriptions = toStatusDescriptions(
+        raw["status"] ?? raw["Status"],
+      );
 
       const fileIdsRaw = asArray(raw["fileIds"] ?? raw["FileIds"]);
       const fileNames = toStringArray(raw["fileNames"] ?? raw["FileNames"]);
@@ -272,6 +299,8 @@ function normalizeChecklist(payload: unknown): ChecklistRow[] {
         noApplies,
         uploaded,
         observations,
+        reviewObservations,
+        statusDescriptions,
         files,
       };
     })
@@ -309,6 +338,8 @@ const REQUEST_DETAIL_API = "/api/AcquisitionRequest";
 const ADMIN_UNIT_API = "/api/AdministrativeUnit";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy";
 const REQUEST_DOCUMENT_EXCEPTION_API = "/api/RequestDocumentException";
+const DOCUMENT_STATUS_APPROVED = 2;
+const DOCUMENT_STATUS_REJECTED = 3;
 
 export default function ExpedientDocuments() {
   const navigate = useNavigate();
@@ -346,6 +377,9 @@ export default function ExpedientDocuments() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [deletingPreview, setDeletingPreview] = useState(false);
+  const [reviewingDocument, setReviewingDocument] = useState(false);
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectObservations, setRejectObservations] = useState("");
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PreviewItem | null>(null);
@@ -420,6 +454,8 @@ export default function ExpedientDocuments() {
     setDeleteModalOpen(false);
     setDeleteTarget(null);
     setDeletePassword("");
+    setShowRejectBox(false);
+    setRejectObservations("");
   }, []);
 
   const closeManagerPanel = useCallback(() => {
@@ -702,9 +738,16 @@ export default function ExpedientDocuments() {
   const isImagePreview = currentPreview?.type === "image";
   const isPdfPreview = currentPreview?.type === "pdf";
   const canMovePreview = previewItems.length > 1;
+  const hasReviewObservation = Boolean(
+    currentPreview?.reviewObservation?.trim(),
+  );
+  const hasPreviewInfo = Boolean(currentPreview);
 
   const openPreviewFromFiles = useCallback(
-    (documentName: string, files: ChecklistFileItem[], selectedIndex = 0) => {
+    (row: ChecklistRow, selectedIndex = 0) => {
+      const { documentName, files, reviewObservations, statusDescriptions } =
+        row;
+
       if (!files.length) {
         showToast("error", "No hay archivo para previsualizar.");
         return;
@@ -720,6 +763,9 @@ export default function ExpedientDocuments() {
             url: viewUrl,
             name,
             type: getPreviewType(viewUrl, name),
+            reviewObservation: reviewObservations[idx] ?? null,
+            reviewStatus:
+              statusDescriptions[idx] ?? statusDescriptions[0] ?? null,
           };
         })
         .filter((x) => x.url);
@@ -732,22 +778,9 @@ export default function ExpedientDocuments() {
       const safeIndex =
         selectedIndex >= 0 && selectedIndex < mapped.length ? selectedIndex : 0;
 
-      const selected = mapped[safeIndex];
-      const selectedType = selected?.type ?? mapped[0].type;
-
-      if (selectedType === "image") {
-        const onlyImages = mapped.filter((x) => x.type === "image");
-        const imageIndex = onlyImages.findIndex((x) => x.url === selected?.url);
-
-        setPreviewItems(onlyImages.length ? onlyImages : mapped);
-        setPreviewIndex(imageIndex >= 0 ? imageIndex : 0);
-        setAutoPlay(onlyImages.length > 1);
-      } else {
-        setPreviewItems([selected ?? mapped[0]]);
-        setPreviewIndex(0);
-        setAutoPlay(false);
-      }
-
+      setPreviewItems(mapped);
+      setPreviewIndex(safeIndex);
+      setAutoPlay(mapped[safeIndex]?.type === "image" && mapped.length > 1);
       setPreviewOpen(true);
     },
     [showToast],
@@ -829,6 +862,74 @@ export default function ExpedientDocuments() {
     [previewItems, closePreview, loadChecklist, showToast],
   );
 
+  const onReviewPreviewDocument = useCallback(
+    async (
+      item: PreviewItem,
+      documentStatusId: number,
+      observations?: string,
+    ) => {
+      if (!item.id) {
+        showToast(
+          "error",
+          "No se puede revisar este archivo porque no tiene identificador.",
+        );
+        return;
+      }
+
+      if (
+        documentStatusId === DOCUMENT_STATUS_REJECTED &&
+        !observations?.trim()
+      ) {
+        showToast(
+          "error",
+          "Debes escribir las observaciones de la denegación.",
+        );
+        return;
+      }
+
+      setReviewingDocument(true);
+
+      try {
+        const res = (await requestJson(
+          `${EXPEDIENT_API}/expedient-documents/${item.id}/review`,
+          {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              DocumentStatusId: documentStatusId,
+              Observations:
+                documentStatusId === DOCUMENT_STATUS_REJECTED
+                  ? (observations?.trim() ?? "")
+                  : null,
+            }),
+          },
+        )) as RequestResult;
+
+        if (!res.ok) {
+          showToast("error", res.error || "No se pudo revisar el documento.");
+          return;
+        }
+
+        showToast(
+          "success",
+          documentStatusId === DOCUMENT_STATUS_APPROVED
+            ? "Documento aprobado correctamente."
+            : "Documento denegado correctamente.",
+        );
+
+        setShowRejectBox(false);
+        setRejectObservations("");
+        await loadChecklist();
+        closePreview();
+      } catch {
+        showToast("error", "Error inesperado al revisar el documento.");
+      } finally {
+        setReviewingDocument(false);
+      }
+    },
+    [closePreview, loadChecklist, showToast],
+  );
+
   useEffect(() => {
     if (!previewOpen) return;
 
@@ -836,6 +937,11 @@ export default function ExpedientDocuments() {
       if (e.key === "Escape") {
         if (deleteModalOpen) {
           closeDeleteModal();
+          return;
+        }
+        if (showRejectBox) {
+          setShowRejectBox(false);
+          setRejectObservations("");
           return;
         }
         closePreview();
@@ -856,6 +962,7 @@ export default function ExpedientDocuments() {
     canMovePreview,
     goPrevPreview,
     goNextPreview,
+    showRejectBox,
   ]);
 
   useEffect(() => {
@@ -924,7 +1031,7 @@ export default function ExpedientDocuments() {
         documentTypeId: item.documentTypeId,
         documentName: item.documentName,
         doesNotApply: item.noApplies,
-        justification: item.observations?.trim() || "No aplica",
+        justification: item.observations.join(" | ").trim() || "No aplica",
         uploaded: item.uploaded,
       }));
 
@@ -1585,19 +1692,19 @@ export default function ExpedientDocuments() {
                 <tbody>
                   {!canUse ? (
                     <tr>
-                      <td colSpan={3} className={styles.empty}>
+                      <td colSpan={4} className={styles.empty}>
                         No hay requestId válido en la URL.
                       </td>
                     </tr>
                   ) : loadingChecklist ? (
                     <tr>
-                      <td colSpan={3} className={styles.empty}>
+                      <td colSpan={4} className={styles.empty}>
                         Cargando checklist...
                       </td>
                     </tr>
                   ) : filteredChecklist.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className={styles.empty}>
+                      <td colSpan={4} className={styles.empty}>
                         {checklist.length === 0
                           ? "Sin checklist para esta solicitud."
                           : `No se encontraron documentos con “${searchText.trim()}”.`}
@@ -1608,21 +1715,25 @@ export default function ExpedientDocuments() {
                       const isRequired = c.requiredByRule && !c.noApplies;
                       const hasFiles = c.files.length > 0;
 
-                      const stateClass = c.noApplies
-                        ? styles.badgeNeutral
-                        : c.uploaded
-                          ? styles.badgeOk
-                          : isRequired
-                            ? styles.badgeBad
-                            : styles.badgeNeutral;
+                      const reviewStatusText = c.statusDescriptions.join(", ");
 
-                      const stateText = c.noApplies
-                        ? "No aplica"
-                        : c.uploaded
-                          ? "Completo"
-                          : isRequired
-                            ? "Pendiente"
-                            : "Opcional";
+                      const stateClass = c.statusDescriptions.some((s) =>
+                        s.toLowerCase().includes("deneg"),
+                      )
+                        ? styles.badgeBad
+                        : c.statusDescriptions.some((s) =>
+                              s.toLowerCase().includes("aprob"),
+                            )
+                          ? styles.badgeOk
+                          : c.statusDescriptions.some((s) =>
+                                s.toLowerCase().includes("pend"),
+                              )
+                            ? styles.badgeNeutral
+                            : c.noApplies
+                              ? styles.badgeNeutral
+                              : styles.badgeNeutral;
+
+                      const stateText = reviewStatusText || "Pendiente";
 
                       return (
                         <tr key={c.documentTypeId}>
@@ -1634,11 +1745,7 @@ export default function ExpedientDocuments() {
                               tabIndex={hasFiles ? 0 : -1}
                               onClick={() =>
                                 hasFiles
-                                  ? openPreviewFromFiles(
-                                      c.documentName,
-                                      c.files,
-                                      0,
-                                    )
+                                  ? openPreviewFromFiles(c, 0)
                                   : showToast(
                                       "error",
                                       "Este documento aún no tiene archivo.",
@@ -1648,11 +1755,7 @@ export default function ExpedientDocuments() {
                                 if (!hasFiles) return;
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
-                                  openPreviewFromFiles(
-                                    c.documentName,
-                                    c.files,
-                                    0,
-                                  );
+                                  openPreviewFromFiles(c, 0);
                                 }
                               }}
                             >
@@ -1688,12 +1791,6 @@ export default function ExpedientDocuments() {
                                   </span>
                                 )}
                               </div>
-
-                              {c.observations && (
-                                <div className={styles.cardNote}>
-                                  Obs: {c.observations}
-                                </div>
-                              )}
                             </div>
                           </td>
 
@@ -1714,13 +1811,7 @@ export default function ExpedientDocuments() {
                               <button
                                 type="button"
                                 className={styles.fileLink}
-                                onClick={() =>
-                                  openPreviewFromFiles(
-                                    c.documentName,
-                                    c.files,
-                                    0,
-                                  )
-                                }
+                                onClick={() => openPreviewFromFiles(c, 0)}
                                 title={
                                   c.files.length === 1
                                     ? (c.files[0]?.name ??
@@ -2531,6 +2622,7 @@ export default function ExpedientDocuments() {
                     type="button"
                     className={styles.ghostBtn}
                     onClick={() => setAutoPlay((v) => !v)}
+                    disabled={reviewingDocument}
                   >
                     {autoPlay ? "Pausar" : "Reproducir"}
                   </button>
@@ -2540,16 +2632,48 @@ export default function ExpedientDocuments() {
                   type="button"
                   className={styles.primaryBtn}
                   onClick={() => openUrl(currentPreview.url)}
+                  disabled={reviewingDocument}
                 >
                   Abrir aparte
                 </button>
 
                 {currentPreview.id && (
                   <button
+                    id="btn-aprobar-documento"
+                    type="button"
+                    className={styles.saveBtn}
+                    onClick={() =>
+                      void onReviewPreviewDocument(
+                        currentPreview,
+                        DOCUMENT_STATUS_APPROVED,
+                      )
+                    }
+                    disabled={reviewingDocument || deletingPreview}
+                    title="Dar visto bueno al documento"
+                  >
+                    {reviewingDocument ? "Procesando..." : "Aprobar documento"}
+                  </button>
+                )}
+
+                {currentPreview.id && (
+                  <button
+                    id="btn-denegar-documento"
+                    type="button"
+                    className={styles.dangerBtn}
+                    onClick={() => setShowRejectBox((prev) => !prev)}
+                    disabled={reviewingDocument || deletingPreview}
+                    title="Denegar documento"
+                  >
+                    Denegar documento
+                  </button>
+                )}
+
+                {currentPreview.id && (
+                  <button
                     type="button"
                     className={styles.iconDangerBtn}
                     onClick={() => openDeleteModal(currentPreview)}
-                    disabled={deletingPreview}
+                    disabled={deletingPreview || reviewingDocument}
                     title="Eliminar documento"
                     aria-label="Eliminar documento"
                   >
@@ -2576,6 +2700,7 @@ export default function ExpedientDocuments() {
                   type="button"
                   className={styles.ghostBtn}
                   onClick={closePreview}
+                  disabled={reviewingDocument}
                 >
                   Cerrar
                 </button>
@@ -2583,49 +2708,152 @@ export default function ExpedientDocuments() {
             </div>
 
             <div className={styles.previewBody}>
-              {isImagePreview && (
-                <div className={styles.previewCarouselWrap}>
-                  <div className={styles.previewImageStage}>
-                    <img
-                      src={currentPreview.url}
-                      alt={currentPreview.name}
-                      className={styles.previewImage}
-                    />
+              <div
+                className={
+                  hasPreviewInfo
+                    ? styles.previewBodySplit
+                    : styles.previewBodySingle
+                }
+              >
+                <div className={styles.previewViewerPane}>
+                  {isImagePreview && (
+                    <div className={styles.previewCarouselWrap}>
+                      <div className={styles.previewImageStage}>
+                        <img
+                          src={currentPreview.url}
+                          alt={currentPreview.name}
+                          className={styles.previewImage}
+                        />
 
-                    {canMovePreview && (
-                      <>
-                        <button
-                          type="button"
-                          className={`${styles.carouselNav} ${styles.carouselPrev}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goPrevPreview();
-                          }}
-                          aria-label="Imagen anterior"
-                        >
-                          ‹
-                        </button>
+                        {canMovePreview && (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.carouselNav} ${styles.carouselPrev}`}
+                              onClick={() => {
+                                setAutoPlay(false);
+                                goPrevPreview();
+                              }}
+                              aria-label="Archivo anterior"
+                            >
+                              ‹
+                            </button>
 
-                        <button
-                          type="button"
-                          className={`${styles.carouselNav} ${styles.carouselNext}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goNextPreview();
-                          }}
-                          aria-label="Imagen siguiente"
-                        >
-                          ›
-                        </button>
-                      </>
-                    )}
+                            <button
+                              type="button"
+                              className={`${styles.carouselNav} ${styles.carouselNext}`}
+                              onClick={() => {
+                                setAutoPlay(false);
+                                goNextPreview();
+                              }}
+                              aria-label="Archivo siguiente"
+                            >
+                              ›
+                            </button>
+                          </>
+                        )}
 
-                    {canMovePreview && (
-                      <div className={styles.carouselCounter}>
-                        {previewIndex + 1} / {previewItems.length}
+                        {canMovePreview && (
+                          <div className={styles.carouselCounter}>
+                            {previewIndex + 1} / {previewItems.length}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {isPdfPreview && (
+                    <div className={styles.previewPdfWrap}>
+                      <div className={styles.previewPdfStage}>
+                        {canMovePreview && (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.carouselNav} ${styles.carouselPrev}`}
+                              onClick={() => {
+                                setAutoPlay(false);
+                                goPrevPreview();
+                              }}
+                              aria-label="Archivo anterior"
+                            >
+                              ‹
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`${styles.carouselNav} ${styles.carouselNext}`}
+                              onClick={() => {
+                                setAutoPlay(false);
+                                goNextPreview();
+                              }}
+                              aria-label="Archivo siguiente"
+                            >
+                              ›
+                            </button>
+                          </>
+                        )}
+
+                        {canMovePreview && (
+                          <div className={styles.carouselCounter}>
+                            {previewIndex + 1} / {previewItems.length}
+                          </div>
+                        )}
+
+                        <iframe
+                          src={`${currentPreview.url}#view=FitH`}
+                          title={currentPreview.name}
+                          className={styles.previewFrame}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!isImagePreview && !isPdfPreview && (
+                    <div className={styles.previewFallback}>
+                      <div className={styles.previewFallbackTitle}>
+                        No se puede previsualizar este tipo de archivo aquí.
+                      </div>
+                      <div className={styles.previewFallbackText}>
+                        Puedes abrirlo en otra pestaña para verlo completo.
+                      </div>
+
+                      {canMovePreview && (
+                        <div className={styles.previewFallbackNav}>
+                          <button
+                            type="button"
+                            className={styles.carouselNavInline}
+                            onClick={() => {
+                              setAutoPlay(false);
+                              goPrevPreview();
+                            }}
+                            aria-label="Archivo anterior"
+                          >
+                            Anterior
+                          </button>
+
+                          <button
+                            type="button"
+                            className={styles.carouselNavInline}
+                            onClick={() => {
+                              setAutoPlay(false);
+                              goNextPreview();
+                            }}
+                            aria-label="Archivo siguiente"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        className={styles.primaryBtn}
+                        onClick={() => openUrl(currentPreview.url)}
+                      >
+                        Abrir archivo
+                      </button>
+                    </div>
+                  )}
 
                   {previewItems.length > 1 && (
                     <div className={styles.previewThumbs}>
@@ -2647,11 +2875,25 @@ export default function ExpedientDocuments() {
                             }}
                             title={item.name}
                           >
-                            <img
-                              src={item.url}
-                              alt={item.name}
-                              className={styles.previewThumbImg}
-                            />
+                            {item.type === "image" ? (
+                              <img
+                                src={item.url}
+                                alt={item.name}
+                                className={styles.previewThumbImg}
+                              />
+                            ) : (
+                              <div className={styles.previewThumbFile}>
+                                <div className={styles.previewThumbFileIcon}>
+                                  {item.type === "pdf" ? "PDF" : "DOC"}
+                                </div>
+                                <div
+                                  className={styles.previewThumbFileName}
+                                  title={item.name}
+                                >
+                                  {item.name}
+                                </div>
+                              </div>
+                            )}
                           </button>
 
                           {item.id && (
@@ -2685,36 +2927,234 @@ export default function ExpedientDocuments() {
                     </div>
                   )}
                 </div>
-              )}
 
-              {isPdfPreview && (
-                <div className={styles.previewPdfWrap}>
-                  <iframe
-                    src={`${currentPreview.url}#view=FitH`}
-                    title={currentPreview.name}
-                    className={styles.previewFrame}
-                  />
+                {hasPreviewInfo && (
+                  <aside className={styles.previewObservationPane}>
+                    <div className={styles.previewInfoBlock}>
+                      <div className={styles.previewInfoLabel}>Estado</div>
+                      <div>
+                        <span
+                          className={`${styles.statusPill} ${
+                            (currentPreview?.reviewStatus || "")
+                              .toLowerCase()
+                              .includes("deneg")
+                              ? styles.badgeBad
+                              : (currentPreview?.reviewStatus || "")
+                                    .toLowerCase()
+                                    .includes("aprob")
+                                ? styles.badgeOk
+                                : styles.badgeNeutral
+                          }`}
+                        >
+                          {currentPreview?.reviewStatus || "Pendiente"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.previewInfoBlock}>
+                      <div className={styles.previewInfoLabel}>
+                        Nombre del documento
+                      </div>
+                      <div className={styles.previewMetaCard}>
+                        <div
+                          className={styles.previewMetaValue}
+                          title={currentPreview?.name}
+                        >
+                          {currentPreview?.name || "Sin nombre"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.previewInfoBlock}>
+                      <div className={styles.previewInfoLabel}>
+                        Tipo de archivo
+                      </div>
+                      <div className={styles.previewMetaCard}>
+                        <div className={styles.previewMetaValue}>
+                          {currentPreview?.type === "image"
+                            ? "Imagen"
+                            : currentPreview?.type === "pdf"
+                              ? "Documento PDF"
+                              : "Archivo"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.previewInfoBlock}>
+                      <div className={styles.previewInfoLabel}>
+                        Observaciones
+                      </div>
+
+                      <div className={styles.previewObservationCard}>
+                        {hasReviewObservation ? (
+                          <div>
+                            <strong>Observación:</strong>{" "}
+                            {currentPreview?.reviewObservation}
+                          </div>
+                        ) : (
+                          <div className={styles.previewObservationEmpty}>
+                            Este documento no tiene observaciones registradas.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </aside>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewOpen && showRejectBox && currentPreview && currentPreview.id && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar denegación del documento"
+          onClick={() => {
+            if (reviewingDocument) return;
+            setShowRejectBox(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+            zIndex: 3000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(680px, 96vw)",
+              background: "#ffffff",
+              borderRadius: "18px",
+              boxShadow: "0 24px 60px rgba(15, 23, 42, 0.28)",
+              border: "1px solid rgba(239, 68, 68, 0.18)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "18px 20px",
+                borderBottom: "1px solid #fee2e2",
+                background: "#fff7f7",
+              }}
+            >
+              <div
+                style={{ fontSize: "18px", fontWeight: 800, color: "#991b1b" }}
+              >
+                Denegar documento
+              </div>
+              <div
+                style={{ marginTop: "6px", color: "#7f1d1d", fontSize: "14px" }}
+              >
+                Confirma la denegación e indica las observaciones del documento.
+              </div>
+            </div>
+
+            <div style={{ padding: "20px", display: "grid", gap: "14px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gap: "8px",
+                  padding: "14px",
+                  borderRadius: "14px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#475569",
+                    fontWeight: 700,
+                  }}
+                >
+                  Documento
                 </div>
-              )}
-
-              {!isImagePreview && !isPdfPreview && (
-                <div className={styles.previewFallback}>
-                  <div className={styles.previewFallbackTitle}>
-                    No se puede previsualizar este tipo de archivo aquí.
-                  </div>
-                  <div className={styles.previewFallbackText}>
-                    Puedes abrirlo en otra pestaña para verlo completo.
-                  </div>
-
-                  <button
-                    type="button"
-                    className={styles.primaryBtn}
-                    onClick={() => openUrl(currentPreview.url)}
-                  >
-                    Abrir archivo
-                  </button>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#0f172a",
+                    fontWeight: 700,
+                  }}
+                >
+                  {currentPreview.name}
                 </div>
-              )}
+              </div>
+
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>Estado</label>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value="Denegado"
+                  disabled
+                  readOnly
+                />
+              </div>
+
+              <div className={styles.formField}>
+                <label
+                  htmlFor="txt-observaciones-denegacion-documento"
+                  className={styles.fieldLabel}
+                >
+                  Observaciones
+                </label>
+                <textarea
+                  id="txt-observaciones-denegacion-documento"
+                  className={styles.checklistCompactTextarea}
+                  value={rejectObservations}
+                  onChange={(e) => setRejectObservations(e.target.value)}
+                  placeholder="Escribe la razón por la cual se deniega el documento"
+                  rows={6}
+                  disabled={reviewingDocument}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+                padding: "16px 20px 20px",
+                borderTop: "1px solid #f1f5f9",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={() => {
+                  setShowRejectBox(false);
+                  setRejectObservations("");
+                }}
+                disabled={reviewingDocument}
+              >
+                Cancelar
+              </button>
+
+              <button
+                id="btn-confirmar-denegacion-documento"
+                type="button"
+                className={styles.dangerBtn}
+                onClick={() =>
+                  void onReviewPreviewDocument(
+                    currentPreview,
+                    DOCUMENT_STATUS_REJECTED,
+                    rejectObservations,
+                  )
+                }
+                disabled={reviewingDocument || !rejectObservations.trim()}
+              >
+                {reviewingDocument ? "Procesando..." : "Confirmar denegación"}
+              </button>
             </div>
           </div>
         </div>
