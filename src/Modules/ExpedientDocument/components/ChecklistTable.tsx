@@ -12,18 +12,16 @@ type Props = {
   openPreviewFromFiles: (row: ChecklistRow, selectedIndex?: number) => void;
 };
 
-function getStatusClass(status?: string) {
-  const normalized = (status ?? "").trim().toLowerCase();
+const getStatusClass = (status?: string) => {
+  const s = (status ?? "").trim().toLowerCase();
 
-  if (normalized.includes("completo")) return styles.badgeOk;
-  if (normalized.includes("revisión") || normalized.includes("revision")) {
-    return styles.badgeWarn;
-  }
-  if (normalized.includes("cargado")) return styles.badgeInfo;
-  if (normalized.includes("pendiente")) return styles.badgeNeutral;
+  if (s.includes("completo")) return styles.statusComplete;
+  if (s.includes("observado")) return styles.statusObserved;
+  if (s.includes("cargado")) return styles.statusLoaded;
+  if (s.includes("no aplica")) return styles.statusNotApply;
 
-  return styles.badgeNeutral;
-}
+  return styles.statusDefault;
+};
 
 function getStatusText(row: ChecklistRow) {
   return row.globalStatus?.trim() || (row.uploaded ? "Cargado" : "Pendiente");

@@ -46,6 +46,7 @@ export default function PreviewModal({
   const isPdfPreview = currentPreview.type === "pdf";
   const canMovePreview = previewItems.length > 1;
   const hasReviewObservation = Boolean(currentPreview.reviewObservation?.trim());
+  
 
   return (
     <div

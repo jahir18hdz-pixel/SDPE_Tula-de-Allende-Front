@@ -3259,3 +3259,45 @@
   color: #0369a1;
   border: 1px solid #bae6fd;
 }
+.statusBadge {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* 🔵 Cargado */
+.statusLoaded {
+  background: #b7d6eb;
+  color: #0369a1;
+  border-color: #054d75;
+}
+
+/* 🍷 Observado */
+.statusObserved {
+  background: #fce7f3;
+  color: #9d174d;
+  border-color: #90043c;
+}
+
+/* 🟢 Completo */
+.statusComplete {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #065524;
+}
+
+/* ⚪ No aplica */
+.statusNotApply {
+  background: #c0bfbf;
+  color: #475569;
+  border-color: #a1a2a2;
+}
+
+/* Default */
+.statusDefault {
+  background: #f9b67b;
+  color: #8f4606;
+  border-color: #f1760b;
+}

@@ -305,99 +305,112 @@ export function useExpedientData({
   }, [canUse, requestId]);
 
   const loadManager = useCallback(async () => {
-    if (!canUse) return;
+  if (!canUse) return;
 
-    setLoadingManager(true);
-    try {
-      const res = (await requestJson(MANAGER_API, {
-        method: "GET",
-        headers: authHeaders(),
-      })) as RequestResult;
+  setLoadingManager(true);
+  try {
+    const res = (await requestJson(MANAGER_API, {
+      method: "GET",
+      headers: authHeaders(),
+    })) as RequestResult;
 
-      if (!res.ok) {
-        setManager(null);
-        return;
-      }
+    if (!res.ok) {
+      setManager(null);
+      return;
+    }
 
-      const list = unwrapList(res.data);
+    const list = unwrapList(res.data);
 
-      const found =
+    let found: UnknownRecord | null =
+      (list.find((x) => {
+        if (!isRecord(x)) return false;
+
+        const idRequest = toNumber(
+          x["idRequest"] ??
+            x["IdRequest"] ??
+            x["requestId"] ??
+            x["RequestId"],
+        );
+
+        return idRequest === requestId;
+      }) as UnknownRecord) ?? null;
+
+    if (!found && requestNumber.trim()) {
+      found =
         (list.find((x) => {
           if (!isRecord(x)) return false;
 
-          const idRequest = toNumber(
-            x["idRequest"] ??
-              x["IdRequest"] ??
-              x["requestId"] ??
-              x["RequestId"],
-          );
+          const rn = toStringSafe(
+            x["requestNumber"] ?? x["RequestNumber"],
+          ).trim();
 
-          return idRequest === requestId;
+          return rn === requestNumber.trim();
         }) as UnknownRecord) ?? null;
-
-      if (!found) {
-        setManager(null);
-        return;
-      }
-
-      const idRequestManager = toNumber(
-        found["idRequestManager"] ?? found["IdRequestManager"],
-      );
-
-      const firstName = toStringSafe(
-        found["firstName"] ?? found["FirstName"],
-      ).trim();
-
-      const lastName = toStringSafe(
-        found["lastName"] ?? found["LastName"],
-      ).trim();
-
-      const secondLastName = toStringSafe(
-        found["secondLastName"] ?? found["SecondLastName"],
-      ).trim();
-
-      const fullNameDirect = toStringSafe(
-        found["fullName"] ?? found["FullName"],
-      ).trim();
-
-      const fullName =
-        fullNameDirect ||
-        [firstName, lastName, secondLastName].filter(Boolean).join(" ").trim();
-
-      const administrativeUnit =
-        toStringSafe(
-          found["administrativeUnit"] ?? found["AdministrativeUnit"],
-        ).trim() || null;
-
-      const reqNum =
-        toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() ||
-        null;
-
-      const email =
-        toStringSafe(found["email"] ?? found["Email"]).trim() || null;
-
-      const phone =
-        toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
-
-      if (!idRequestManager || !fullName) {
-        setManager(null);
-        return;
-      }
-
-      setManager({
-        idRequestManager,
-        fullName,
-        requestNumber: reqNum,
-        administrativeUnit,
-        email,
-        phone,
-      });
-    } catch {
-      setManager(null);
-    } finally {
-      setLoadingManager(false);
     }
-  }, [canUse, requestId]);
+
+    if (!found) {
+      setManager(null);
+      return;
+    }
+
+    const idRequestManager = toNumber(
+      found["idRequestManager"] ?? found["IdRequestManager"],
+    );
+
+    const firstName = toStringSafe(
+      found["firstName"] ?? found["FirstName"],
+    ).trim();
+
+    const lastName = toStringSafe(
+      found["lastName"] ?? found["LastName"],
+    ).trim();
+
+    const secondLastName = toStringSafe(
+      found["secondLastName"] ?? found["SecondLastName"],
+    ).trim();
+
+    const fullNameDirect = toStringSafe(
+      found["fullName"] ?? found["FullName"],
+    ).trim();
+
+    const fullName =
+      fullNameDirect ||
+      [firstName, lastName, secondLastName].filter(Boolean).join(" ").trim();
+
+    const administrativeUnit =
+      toStringSafe(
+        found["administrativeUnit"] ?? found["AdministrativeUnit"],
+      ).trim() || null;
+
+    const reqNum =
+      toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() ||
+      null;
+
+    const email =
+      toStringSafe(found["email"] ?? found["Email"]).trim() || null;
+
+    const phone =
+      toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
+
+    if (!idRequestManager) {
+      setManager(null);
+      return;
+    }
+
+    setManager({
+      idRequestManager,
+      fullName,
+      requestNumber: reqNum,
+      administrativeUnit,
+      email,
+      phone,
+    });
+  } catch {
+    setManager(null);
+  } finally {
+    setLoadingManager(false);
+  }
+}, [canUse, requestId, requestNumber]);
 
   const loadChecklist = useCallback(async () => {
     if (!canUse) return;
@@ -857,87 +870,87 @@ export function useExpedientData({
   }
 
   async function openManagerPanel() {
-    if (!canUse) return;
+  if (!canUse) return;
 
-    let units = administrativeUnits;
+  let units = administrativeUnits;
 
-    if (units.length === 0) {
-      setLoadingAdministrativeUnits(true);
-      try {
-        const res = (await requestJson(ADMIN_UNIT_API, {
-          method: "GET",
-          headers: authHeaders(),
-        })) as RequestResult;
+  if (units.length === 0) {
+    setLoadingAdministrativeUnits(true);
+    try {
+      const res = (await requestJson(ADMIN_UNIT_API, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
 
-        if (res.ok) {
-          const list = unwrapList(res.data);
+      if (res.ok) {
+        const list = unwrapList(res.data);
 
-          units = list
-            .map((raw): AdministrativeUnitOption | null => {
-              if (!isRecord(raw)) return null;
+        units = list
+          .map((raw): AdministrativeUnitOption | null => {
+            if (!isRecord(raw)) return null;
 
-              const idAdministrativeUnit = toNumber(
-                raw["idAdministrativeUnit"] ??
-                  raw["IdAdministrativeUnit"] ??
-                  raw["id"] ??
-                  raw["Id"],
-              );
+            const idAdministrativeUnit = toNumber(
+              raw["idAdministrativeUnit"] ??
+                raw["IdAdministrativeUnit"] ??
+                raw["id"] ??
+                raw["Id"],
+            );
 
-              const description = toStringSafe(
-                raw["description"] ??
-                  raw["Description"] ??
-                  raw["descripcion"] ??
-                  raw["Descripcion"],
-              ).trim();
+            const description = toStringSafe(
+              raw["description"] ??
+                raw["Description"] ??
+                raw["descripcion"] ??
+                raw["Descripcion"],
+            ).trim();
 
-              if (!idAdministrativeUnit || !description) return null;
+            if (!idAdministrativeUnit || !description) return null;
 
-              return { idAdministrativeUnit, description };
-            })
-            .filter((x): x is AdministrativeUnitOption => x !== null);
+            return { idAdministrativeUnit, description };
+          })
+          .filter((x): x is AdministrativeUnitOption => x !== null);
 
-          setAdministrativeUnits(units);
-        }
-      } catch {
-        units = [];
-      } finally {
-        setLoadingAdministrativeUnits(false);
+        setAdministrativeUnits(units);
       }
+    } catch {
+      units = [];
+    } finally {
+      setLoadingAdministrativeUnits(false);
     }
-
-    if (manager) {
-      const nameParts = splitFullName(manager.fullName);
-
-      const matchedUnit =
-        units.find(
-          (u) =>
-            u.description.trim().toLowerCase() ===
-            (manager.administrativeUnit ?? "").trim().toLowerCase(),
-        ) ?? null;
-
-      setManagerForm({
-        idRequestManager: manager.idRequestManager,
-        idAdministrativeUnit: matchedUnit?.idAdministrativeUnit ?? null,
-        firstName: nameParts.firstName,
-        lastName: nameParts.lastName,
-        secondLastName: nameParts.secondLastName,
-        email: manager.email ?? "",
-        phone: manager.phone ?? "",
-      });
-    } else {
-      setManagerForm({
-        idRequestManager: null,
-        idAdministrativeUnit: null,
-        firstName: "",
-        lastName: "",
-        secondLastName: "",
-        email: "",
-        phone: "",
-      });
-    }
-
-    setActivePanel("manager");
   }
+
+  if (manager) {
+    const nameParts = splitFullName(manager.fullName);
+
+    const matchedUnit =
+      units.find(
+        (u) =>
+          u.description.trim().toLowerCase() ===
+          (manager.administrativeUnit ?? "").trim().toLowerCase(),
+      ) ?? null;
+
+    setManagerForm({
+      idRequestManager: manager.idRequestManager,
+      idAdministrativeUnit: matchedUnit?.idAdministrativeUnit ?? null,
+      firstName: nameParts.firstName,
+      lastName: nameParts.lastName,
+      secondLastName: nameParts.secondLastName,
+      email: manager.email ?? "",
+      phone: manager.phone ?? "",
+    });
+  } else {
+    setManagerForm({
+      idRequestManager: null,
+      idAdministrativeUnit: null,
+      firstName: "",
+      lastName: "",
+      secondLastName: "",
+      email: "",
+      phone: "",
+    });
+  }
+
+  setActivePanel("manager");
+}
 
   async function openPolicyPanel() {
     if (!canUse) return;
