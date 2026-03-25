@@ -3253,3 +3253,9 @@
     width: 100%;
   }
 }
+
+.badgeInfo {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
