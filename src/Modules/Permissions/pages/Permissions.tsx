@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import  { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/Permissions.module.css";
 
 import Toast from "../../../Components/layout/Toast";
@@ -633,7 +633,7 @@ export default function PermissionsByRole() {
                         disabled={saving}
                         title="Quitar selección de rol y limpiar permisos"
                       >
-                        Limpiar
+                        Cancelar
                       </button>
                     </>
                   ) : (
@@ -642,15 +642,7 @@ export default function PermissionsByRole() {
                         Cancelar
                       </button>
 
-                      <button
-                        type="button"
-                        className={styles.btnGhost}
-                        onClick={requestClearAllSelection}
-                        disabled={saving}
-                        title="Quitar selección de rol y limpiar permisos"
-                      >
-                        Limpiar
-                      </button>
+                      
 
                       <button type="button" className={styles.btnSave} onClick={() => void onSave()} disabled={saving || !dirty}>
                         {saving ? "Guardando..." : "Guardar cambios"}

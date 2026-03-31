@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import styles from "../styles/acquisitionClassifications.module.css";
+import styles from "../styles/AcquisitionClassifications.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
