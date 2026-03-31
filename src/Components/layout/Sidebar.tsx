@@ -13,6 +13,7 @@ import {
 
 import LogoPresi from "../../assets/images/logoRGB.png";
 import { useAuth } from "../../context/useAuth";
+import NotificationBadge from "./NotificationBadge";
 
 const getUser = () => {
   const email = localStorage.getItem("userEmail") || "correo@ejemplo.com";
@@ -67,18 +68,33 @@ export default function Sidebar({
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
-          { label: "Unidades Administrativas", to: "/catalogos/unidades-administrativas" },
+          {
+            label: "Unidades Administrativas",
+            to: "/catalogos/unidades-administrativas",
+          },
           { label: "COG", to: "/catalogos/cog" },
-          { label: "Fondo de Financiamiento", to: "/catalogos/fondo-financiamiento" },
+          {
+            label: "Fondo de Financiamiento",
+            to: "/catalogos/fondo-financiamiento",
+          },
           { label: "Pólizas de Pago", to: "/catalogos/polizas" },
           { label: "Comunidades", to: "/catalogos/comunidades" },
           { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
           { label: "Proveedores", to: "/catalogos/proveedores" },
           { label: "PROG", to: "/catalogos/prog" },
           { label: "Proyectos", to: "/catalogos/proyectos" },
-          { label: "Clasificación de Adquisiciones", to: "/catalogos/clasificacion-adquisiciones" },
-          { label: "Tipos de Adquisición", to: "/catalogos/tipos-adquisicion" },
-          { label: "Tipos de Documento", to: "/catalogos/tipos-documento" },
+          {
+            label: "Clasificación de Adquisiciones",
+            to: "/catalogos/clasificacion-adquisiciones",
+          },
+          {
+            label: "Tipos de Adquisición",
+            to: "/catalogos/tipos-adquisicion",
+          },
+          {
+            label: "Tipos de Documento",
+            to: "/catalogos/tipos-documento",
+          },
         ],
       },
 
@@ -89,7 +105,10 @@ export default function Sidebar({
           { label: "Roles", to: "/catalogos/roles" },
           { label: "Permisos", to: "/catalogos/permisos" },
           { label: "Usuarios", to: "/usuarios/nuevo" },
-          { label: "Configuración del sistema", to: "/catalogos/configuracion-sistema" },
+          {
+            label: "Configuración del sistema",
+            to: "/catalogos/configuracion-sistema",
+          },
         ],
       },
     ],
@@ -108,20 +127,21 @@ export default function Sidebar({
           return canSee(item.to) ? item : null;
         }
 
-        const kids = item.children.filter((c) => canSee(c.to));
+        const kids = item.children.filter((child) => canSee(child.to));
         if (kids.length === 0) return null;
 
         return { ...item, children: kids };
       })
-      .filter((x): x is MenuItem => !!x);
+      .filter((item): item is MenuItem => !!item);
   }, [menu, allowedModules]);
 
   useEffect(() => {
     if (!isInCatalogsRoute) return;
 
-    const catalogsGroup = filteredMenu.find((m) => m.label === "Catálogos");
+    const catalogsGroup = filteredMenu.find((item) => item.label === "Catálogos");
     const hasCatalogs =
-      Array.isArray(catalogsGroup?.children) && catalogsGroup.children.length > 0;
+      Array.isArray(catalogsGroup?.children) &&
+      catalogsGroup.children.length > 0;
 
     const id = window.setTimeout(() => {
       setCatalogsManualOpen(hasCatalogs);
@@ -133,7 +153,9 @@ export default function Sidebar({
   useEffect(() => {
     if (!isInAdminRoute) return;
 
-    const adminGroup = filteredMenu.find((m) => m.label === "Administración");
+    const adminGroup = filteredMenu.find(
+      (item) => item.label === "Administración"
+    );
     const hasAdmin =
       Array.isArray(adminGroup?.children) && adminGroup.children.length > 0;
 
@@ -154,11 +176,11 @@ export default function Sidebar({
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
 
     if (label === "Catálogos") {
-      setCatalogsManualOpen((v) => !v);
+      setCatalogsManualOpen((value) => !value);
     }
 
     if (label === "Administración") {
-      setAdminManualOpen((v) => !v);
+      setAdminManualOpen((value) => !value);
     }
   };
 
@@ -227,7 +249,9 @@ export default function Sidebar({
                 >
                   <span className={styles.left}>
                     <span className={styles.icon}>{item.icon}</span>
-                    {!collapsed && <span className={styles.label}>{item.label}</span>}
+                    {!collapsed && (
+                      <span className={styles.label}>{item.label}</span>
+                    )}
                   </span>
 
                   {!collapsed && (
@@ -247,10 +271,10 @@ export default function Sidebar({
                       isGroupOpen(item.label) ? styles.submenuOpen : ""
                     }`}
                   >
-                    {item.children.map((c) => (
+                    {item.children.map((child) => (
                       <NavLink
-                        key={c.to}
-                        to={c.to}
+                        key={child.to}
+                        to={child.to}
                         onClick={() => onNavigate?.()}
                         className={({ isActive }) =>
                           isActive
@@ -258,7 +282,7 @@ export default function Sidebar({
                             : styles.subItem
                         }
                       >
-                        {c.label}
+                        {child.label}
                       </NavLink>
                     ))}
                   </div>
@@ -274,7 +298,12 @@ export default function Sidebar({
                 }
               >
                 <span className={styles.icon}>{item.icon}</span>
+
                 {!collapsed && <span className={styles.label}>{item.label}</span>}
+
+                {item.label === "Notificaciones" && (
+                  <NotificationBadge collapsed={collapsed} />
+                )}
               </NavLink>
             )
           )}

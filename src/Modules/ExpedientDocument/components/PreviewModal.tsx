@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/previewModal.module.css";
 import type { PreviewItem } from "../types/expedient.types";
 
 type Props = {
@@ -14,12 +14,15 @@ type Props = {
   deletingPreview: boolean;
   showRejectBox: boolean;
   setShowRejectBox: React.Dispatch<React.SetStateAction<boolean>>;
+  rejectComment: string;
+  setRejectComment: React.Dispatch<React.SetStateAction<string>>;
   closePreview: () => void;
   openUrl: (u: string) => void;
   goPrevPreview: () => void;
   goNextPreview: () => void;
   openDeleteModal: (item: PreviewItem) => void;
   onApprove: () => void;
+  onReject: () => void;
 };
 
 export default function PreviewModal({
@@ -32,21 +35,40 @@ export default function PreviewModal({
   setAutoPlay,
   reviewingDocument,
   deletingPreview,
+  showRejectBox,
   setShowRejectBox,
+  rejectComment,
+  setRejectComment,
   closePreview,
   openUrl,
   goPrevPreview,
   goNextPreview,
   openDeleteModal,
   onApprove,
+  onReject,
 }: Props) {
   if (!open || !currentPreview) return null;
 
   const isImagePreview = currentPreview.type === "image";
   const isPdfPreview = currentPreview.type === "pdf";
   const canMovePreview = previewItems.length > 1;
-  const hasReviewObservation = Boolean(currentPreview.reviewObservation?.trim());
-  
+  const hasReviewObservation = Boolean(
+    currentPreview.reviewObservation?.trim(),
+  );
+
+  const reviewStatus = (currentPreview.reviewStatus || "").toLowerCase();
+
+  const statusBadgeClass = reviewStatus.includes("deneg")
+    ? styles.badgeBad
+    : reviewStatus.includes("aprob")
+      ? styles.badgeOk
+      : styles.badgeNeutral;
+
+  const statusBlockClass = reviewStatus.includes("deneg")
+    ? styles.blockBad
+    : reviewStatus.includes("aprob")
+      ? styles.blockOk
+      : styles.blockNeutral;
 
   return (
     <div
@@ -108,7 +130,7 @@ export default function PreviewModal({
                 disabled={reviewingDocument || deletingPreview}
                 title="Denegar documento"
               >
-                Denegar documento
+                {showRejectBox ? "Ocultar denegación" : "Denegar documento"}
               </button>
             )}
 
@@ -282,7 +304,9 @@ export default function PreviewModal({
                     <div
                       key={`${item.id ?? "thumb"}-${item.url}-${idx}`}
                       className={`${styles.previewThumbCard} ${
-                        idx === previewIndex ? styles.previewThumbCardActive : ""
+                        idx === previewIndex
+                          ? styles.previewThumbCardActive
+                          : ""
                       }`}
                     >
                       <button
@@ -336,54 +360,43 @@ export default function PreviewModal({
             <aside className={styles.previewObservationPane}>
               <div className={styles.previewInfoBlock}>
                 <div className={styles.previewInfoLabel}>Estado</div>
-                <div>
-                  <span
-                    className={`${styles.statusPill} ${
-                      (currentPreview.reviewStatus || "")
-                        .toLowerCase()
-                        .includes("deneg")
-                        ? styles.badgeBad
-                        : (currentPreview.reviewStatus || "")
-                              .toLowerCase()
-                              .includes("aprob")
-                          ? styles.badgeOk
-                          : styles.badgeNeutral
-                    }`}
-                  >
+                <div
+                  className={`${styles.previewMetaCard} ${statusBlockClass}`}
+                >
+                  <span className={`${styles.statusPill} ${statusBadgeClass}`}>
                     {currentPreview.reviewStatus || "Pendiente"}
                   </span>
                 </div>
               </div>
 
               <div className={styles.previewInfoBlock}>
-                <div className={styles.previewInfoLabel}>Nombre del documento</div>
-                <div className={styles.previewMetaCard}>
-                  <div className={styles.previewMetaValue} title={currentPreview.name}>
+                <div className={styles.previewInfoLabel}>
+                  Nombre del documento
+                </div>
+                <div
+                  className={`${styles.previewMetaCard} ${statusBlockClass}`}
+                >
+                  <div
+                    className={styles.previewMetaValue}
+                    title={currentPreview.name}
+                  >
                     {currentPreview.name || "Sin nombre"}
                   </div>
                 </div>
               </div>
 
-              <div className={styles.previewInfoBlock}>
-                <div className={styles.previewInfoLabel}>Tipo de archivo</div>
-                <div className={styles.previewMetaCard}>
-                  <div className={styles.previewMetaValue}>
-                    {currentPreview.type === "image"
-                      ? "Imagen"
-                      : currentPreview.type === "pdf"
-                        ? "Documento PDF"
-                        : "Archivo"}
-                  </div>
-                </div>
-              </div>
+              
 
               <div className={styles.previewInfoBlock}>
                 <div className={styles.previewInfoLabel}>Observaciones</div>
 
-                <div className={styles.previewObservationCard}>
+                <div
+                  className={`${styles.previewObservationCard} ${statusBlockClass}`}
+                >
                   {hasReviewObservation ? (
                     <div>
-                      <strong>Observación:</strong> {currentPreview.reviewObservation}
+                      <strong>Observación:</strong>{" "}
+                      {currentPreview.reviewObservation}
                     </div>
                   ) : (
                     <div className={styles.previewObservationEmpty}>
@@ -392,6 +405,53 @@ export default function PreviewModal({
                   )}
                 </div>
               </div>
+
+              {currentPreview.id && showRejectBox && (
+                <div className={styles.previewInfoBlock}>
+                  <div className={styles.previewInfoLabel}>
+                    Denegar documento
+                  </div>
+
+                  <div className={`${styles.rejectBoxCard} ${styles.blockBad}`}>
+                    <textarea
+                      className={styles.rejectTextarea}
+                      value={rejectComment}
+                      onChange={(e) => setRejectComment(e.target.value)}
+                      placeholder="Escribe la razón por la que se deniega este documento..."
+                      disabled={reviewingDocument || deletingPreview}
+                    />
+
+                    <div className={styles.rejectActions}>
+                      <button
+                        type="button"
+                        className={styles.ghostBtn}
+                        onClick={() => {
+                          setShowRejectBox(false);
+                          setRejectComment("");
+                        }}
+                        disabled={reviewingDocument || deletingPreview}
+                      >
+                        Cancelar
+                      </button>
+
+                      <button
+                        type="button"
+                        className={styles.dangerBtn}
+                        onClick={onReject}
+                        disabled={
+                          reviewingDocument ||
+                          deletingPreview ||
+                          !rejectComment.trim()
+                        }
+                      >
+                        {reviewingDocument
+                          ? "Procesando..."
+                          : "Denegar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </aside>
           </div>
         </div>

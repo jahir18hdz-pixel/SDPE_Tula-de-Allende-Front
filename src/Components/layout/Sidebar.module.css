@@ -413,3 +413,10 @@
     --collapsed-gap: 14px; /* un poco más aire en 1080p */
   }
 }
+.item {
+  position: relative;
+}
+
+.itemBtn {
+  position: relative;
+}

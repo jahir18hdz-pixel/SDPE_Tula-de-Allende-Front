@@ -1,4 +1,4 @@
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/checklistTable.module.css";
 import type { ToastType } from "../../../Components/layout/Toast";
 import type { ChecklistRow } from "../types/expedient.types";
 

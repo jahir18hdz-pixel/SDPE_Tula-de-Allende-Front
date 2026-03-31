@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
-import { FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiSearch, FiTrash2, FiCalendar } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import NotificationToast from "../../../Components/layout/NotificationToast";
@@ -21,6 +21,8 @@ type ApiRow = {
   AcquisitionClassification?: string | null;
   requestDate?: string | null;
   RequestDate?: string | null;
+  completeMaximeDate?: string | null;
+  CompleteMaximeDate?: string | null;
   status?: string | null;
   Status?: string | null;
   policyNumber?: string | null;
@@ -40,8 +42,10 @@ type Row = {
   cfdi: string;
   adquisicion: string;
   fecha: string;
+  fechaLimite: string;
   estado: string;
   requestDateRaw?: string | null;
+  maxDateRaw?: string | null;
 };
 
 type PaymentPolicyPreviewRow = {
@@ -69,8 +73,30 @@ type NotificationSignalRPayload = {
   createdAt: string;
 };
 
+type EditDateTarget = {
+  idRequest: number;
+  folio: string;
+  fechaActual: string | null;
+};
+
 const API_BASE = "/api/AcquisitionRequest";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy";
+
+function getDaysUntil(dateValue?: string | null) {
+  if (!dateValue) return null;
+
+  const target = new Date(dateValue);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const limit = new Date(target);
+  limit.setHours(0, 0, 0, 0);
+
+  const diffMs = limit.getTime() - today.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
@@ -80,6 +106,16 @@ function formatDate(iso?: string | null) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+function toInputDate(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function normalizeText(v: unknown) {
@@ -166,6 +202,16 @@ function buildNotificationTitle(item: {
   return "Notificación";
 }
 
+function getWordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function truncateClassification(text: string, maxWords = 3) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -212,6 +258,15 @@ export default function Home() {
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  const [classificationModalText, setClassificationModalText] = useState<
+    string | null
+  >(null);
+
+  const [editDateModalOpen, setEditDateModalOpen] = useState(false);
+  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(null);
+  const [editDateValue, setEditDateValue] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -266,6 +321,9 @@ export default function Home() {
             "Sin clasificación";
 
           const requestDate = x.requestDate ?? x.RequestDate ?? null;
+          const completeMaximeDate =
+            x.completeMaximeDate ?? x.CompleteMaximeDate ?? null;
+
           const estado = (x.status ?? x.Status ?? "").trim() || "Sin estatus";
 
           return {
@@ -275,8 +333,10 @@ export default function Home() {
             cfdi,
             adquisicion,
             fecha: formatDate(requestDate),
+            fechaLimite: formatDate(completeMaximeDate),
             estado,
             requestDateRaw: requestDate,
+            maxDateRaw: completeMaximeDate,
           };
         })
         .filter((x) => x.idRequest > 0);
@@ -357,6 +417,65 @@ export default function Home() {
     setPreviewItem(null);
   }, []);
 
+  const closeEditDateModal = useCallback(() => {
+    if (savingDate) return;
+    setEditDateModalOpen(false);
+    setEditDateTarget(null);
+    setEditDateValue("");
+  }, [savingDate]);
+
+  const openEditDateModal = useCallback((row: Row) => {
+    setEditDateTarget({
+      idRequest: row.idRequest,
+      folio: row.folio,
+      fechaActual: row.maxDateRaw ?? null,
+    });
+    setEditDateValue(toInputDate(row.maxDateRaw));
+    setEditDateModalOpen(true);
+  }, []);
+
+  const onSaveMaxDate = useCallback(async () => {
+    if (!editDateTarget) return;
+
+    if (!editDateValue) {
+      showAppToast("Selecciona una fecha límite.", "error");
+      return;
+    }
+
+    setSavingDate(true);
+
+    try {
+      const newMaxDate = new Date(`${editDateValue}T00:00:00`).toISOString();
+
+      const res = (await requestJson(`${API_BASE}/update-max-date`, {
+        method: "PATCH",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          requestId: editDateTarget.idRequest,
+          newMaxDate,
+        }),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showAppToast(
+          res.error || "No se pudo actualizar la fecha límite.",
+          "error",
+        );
+        return;
+      }
+
+      showAppToast("Fecha límite actualizada correctamente.", "success");
+      closeEditDateModal();
+      await fetchData();
+    } catch {
+      showAppToast("Error inesperado al actualizar la fecha límite.", "error");
+    } finally {
+      setSavingDate(false);
+    }
+  }, [editDateTarget, editDateValue, closeEditDateModal, fetchData, showAppToast]);
+
   const openUrl = useCallback((u: string) => {
     const url = normalizeUrlMaybe(u);
     if (!url) return;
@@ -379,55 +498,46 @@ export default function Home() {
       setLoadingPreview(true);
 
       try {
-        const res = (await requestJson(
-          `${PAYMENT_POLICY_API}/policies?page=1&pageSize=200`,
-          {
-            method: "GET",
-            headers: authHeaders(),
-          },
-        )) as RequestResult;
+        const res = (await requestJson(PAYMENT_POLICY_API, {
+          method: "GET",
+          headers: authHeaders(),
+        })) as RequestResult;
 
         if (!res.ok) {
           showAppToast(
-            res.error || "No se pudieron consultar las pólizas.",
+            res.error || "No se pudo consultar la póliza seleccionada.",
             "error",
           );
           return;
         }
 
-        const list = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+        const items = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
 
-        const found =
-          list.find((x) => {
-            const currentCode = (x.policyCode ?? x.PolicyCode ?? "")
-              .trim()
-              .toLowerCase();
-            return currentCode === code.toLowerCase();
-          }) ?? null;
-
-        if (!found) {
-          showAppToast(`No se encontró la póliza ${code}.`, "error");
-          return;
-        }
+        const found = items.find((item) => {
+          const currentCode = (item.policyCode ?? item.PolicyCode ?? "").trim();
+          return normalizeText(currentCode) === normalizeText(code);
+        });
 
         const previewUrl = normalizeUrlMaybe(
-          found.previewUrl ?? found.PreviewUrl ?? "",
+          found?.previewUrl ?? found?.PreviewUrl ?? "",
         );
 
         if (!previewUrl) {
-          showAppToast("La póliza no tiene PreviewUrl disponible.", "error");
+          showAppToast(
+            "La póliza seleccionada no tiene archivo de vista previa.",
+            "error",
+          );
           return;
         }
 
-        const fileName = `${code}`;
         setPreviewItem({
           url: previewUrl,
-          name: fileName,
-          type: getPreviewType(previewUrl, fileName),
+          name: code,
+          type: getPreviewType(previewUrl, code),
         });
         setPreviewOpen(true);
       } catch {
-        showAppToast("Error inesperado al abrir la póliza.", "error");
+        showAppToast("Error inesperado al consultar la póliza.", "error");
       } finally {
         setLoadingPreview(false);
       }
@@ -448,15 +558,13 @@ export default function Home() {
     setDeletePassword("");
   }, [deleting]);
 
-  const confirmDelete = useCallback(async () => {
+  const onDeleteRequest = useCallback(async () => {
     if (!deleteTarget) return;
 
     const password = deletePassword.trim();
+
     if (!password) {
-      showAppToast(
-        "Ingresa la contraseña para confirmar la eliminación.",
-        "error",
-      );
+      showAppToast("Ingresa tu contraseña para eliminar.", "error");
       return;
     }
 
@@ -465,62 +573,84 @@ export default function Home() {
     try {
       const res = (await requestJson(`${API_BASE}/${deleteTarget.idRequest}`, {
         method: "DELETE",
-        headers: authHeaders(),
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify({
           password,
         }),
       })) as RequestResult;
 
       if (!res.ok) {
-        showAppToast(
-          res.error || "No se pudo eliminar la adquisición.",
-          "error",
-        );
+        showAppToast(res.error || "No se pudo eliminar la solicitud.", "error");
         return;
       }
 
-      showAppToast(
-        `La adquisición ${deleteTarget.folio} se eliminó correctamente.`,
-        "success",
-      );
-
+      showAppToast("Solicitud eliminada correctamente.", "success");
       closeDeleteModal();
       await fetchData();
     } catch {
-      showAppToast("Error inesperado al eliminar la adquisición.", "error");
+      showAppToast("Error inesperado al eliminar la solicitud.", "error");
     } finally {
       setDeleting(false);
     }
   }, [deletePassword, deleteTarget, closeDeleteModal, fetchData, showAppToast]);
 
   useEffect(() => {
-    if (!previewOpen && !deleteModalOpen) return;
+    if (
+      !previewOpen &&
+      !deleteModalOpen &&
+      !classificationModalText &&
+      !editDateModalOpen
+    ) {
+      return;
+    }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        if (deleteModalOpen) {
-          closeDeleteModal();
-          return;
-        }
+      if (e.key !== "Escape") return;
 
-        if (previewOpen) {
-          closePreview();
-        }
+      if (deleteModalOpen) {
+        closeDeleteModal();
+        return;
+      }
+
+      if (editDateModalOpen) {
+        closeEditDateModal();
+        return;
+      }
+
+      if (classificationModalText) {
+        setClassificationModalText(null);
+        return;
+      }
+
+      if (previewOpen) {
+        closePreview();
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [previewOpen, deleteModalOpen, closePreview, closeDeleteModal]);
+  }, [
+    previewOpen,
+    deleteModalOpen,
+    classificationModalText,
+    editDateModalOpen,
+    closeDeleteModal,
+    closeEditDateModal,
+    closePreview,
+  ]);
 
   const filtered = useMemo(() => {
-    const q = normalizeText(query);
     let list = [...rows];
 
     if (statusFilter !== "Todos") {
-      const wanted = normalizeText(statusFilter);
-      list = list.filter((r) => normalizeText(r.estado) === wanted);
+      list = list.filter(
+        (r) => normalizeText(r.estado) === normalizeText(statusFilter),
+      );
     }
+
+    const q = normalizeText(query);
 
     if (q) {
       list = list.filter((r) => {
@@ -532,6 +662,7 @@ export default function Home() {
           normalizeText(r.cfdi).includes(q) ||
           normalizeText(r.adquisicion).includes(q) ||
           normalizeText(r.fecha).includes(q) ||
+          normalizeText(r.fechaLimite).includes(q) ||
           normalizeText(real).includes(q)
         );
       });
@@ -581,7 +712,11 @@ export default function Home() {
     navigate(`/adquisiciones/${idRequest}/expediente`);
   }
 
-  const isAnyModalOpen = previewOpen || deleteModalOpen;
+  const isAnyModalOpen =
+    previewOpen ||
+    deleteModalOpen ||
+    !!classificationModalText ||
+    editDateModalOpen;
 
   return (
     <div
@@ -642,7 +777,7 @@ export default function Home() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por folio, póliza, CFDI, clasificación, estado…"
+              placeholder="Buscar por folio, póliza, CFDI, clasificación, estado, fecha límite…"
               aria-label="Buscar adquisición"
             />
           </div>
@@ -703,7 +838,7 @@ export default function Home() {
                   <th>Póliza</th>
                   <th>CFDI</th>
                   <th>Clasificación</th>
-                  <th>Fecha</th>
+                  <th>Fecha límite</th>
                   <th>Estado</th>
                   <th className={styles.thRight}>Acciones</th>
                 </tr>
@@ -736,6 +871,12 @@ export default function Home() {
 
                     const policyExists = hasPolicy(r.poliza);
                     const cfdiExists = hasCfdi(r.cfdi);
+                    const daysUntilLimit = getDaysUntil(r.maxDateRaw);
+
+                    const deadlineClass =
+                      daysUntilLimit !== null && daysUntilLimit <= 3
+                        ? styles.badgeDeadlineUrgent
+                        : styles.badgeDeadline;
 
                     return (
                       <tr key={r.idRequest}>
@@ -780,13 +921,39 @@ export default function Home() {
                           )}
                         </td>
 
-                        <td title={r.adquisicion}>
-                          <span className={styles.ellipsis}>
-                            {r.adquisicion}
-                          </span>
+                        <td>
+                          {getWordCount(r.adquisicion) > 3 ? (
+                            <button
+                              type="button"
+                              className={styles.classificationBtn}
+                              onClick={() =>
+                                setClassificationModalText(r.adquisicion)
+                              }
+                              title={r.adquisicion}
+                            >
+                              {truncateClassification(r.adquisicion, 3)}
+                            </button>
+                          ) : (
+                            <span
+                              title={r.adquisicion}
+                              className={styles.ellipsis}
+                            >
+                              {r.adquisicion}
+                            </span>
+                          )}
                         </td>
 
-                        <td className={styles.mono}>{r.fecha}</td>
+                        <td className={styles.statusCell}>
+                          <button
+                            type="button"
+                            className={`${styles.badge} ${deadlineClass} ${styles.deadlineButton}`}
+                            onClick={() => openEditDateModal(r)}
+                            title={`Editar fecha límite de ${r.folio}`}
+                          >
+                            
+                            <span>{r.fechaLimite}</span>
+                          </button>
+                        </td>
 
                         <td className={styles.statusCell}>
                           <span className={`${styles.badge} ${badgeClass}`}>
@@ -802,9 +969,9 @@ export default function Home() {
                               onClick={() =>
                                 goDetail(r.idRequest, r.adquisicion)
                               }
-                              title={`Abrir expediente de solicitud ${r.idRequest}`}
+                              title={`Abrir expediente de solicitud ${r.folio}`}
                             >
-                              Ver detalle
+                              Ver expediente
                             </button>
 
                             <button
@@ -827,24 +994,22 @@ export default function Home() {
           </div>
 
           <div className={styles.pagination}>
+            <span className={styles.pageInfo}>Página {pageNumber}</span>
+
             <button
               type="button"
               className={styles.secondaryBtn}
-              disabled={loading || pageNumber === 1}
               onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber <= 1 || loading}
             >
               Anterior
             </button>
 
-            <div className={styles.pageInfo}>
-              Página <b>{pageNumber}</b>
-            </div>
-
             <button
               type="button"
               className={styles.secondaryBtn}
-              disabled={loading || !hasNext}
               onClick={() => setPageNumber((p) => p + 1)}
+              disabled={!hasNext || loading}
             >
               Siguiente
             </button>
@@ -852,12 +1017,42 @@ export default function Home() {
         </div>
       </div>
 
+      {classificationModalText && (
+        <div
+          className={styles.classificationOverlay}
+          onClick={() => setClassificationModalText(null)}
+        >
+          <div
+            className={styles.classificationModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.classificationModalHeader}>
+              <div className={styles.classificationModalTitle}>
+                Clasificación completa
+              </div>
+
+              <button
+                type="button"
+                className={styles.classificationCloseBtn}
+                onClick={() => setClassificationModalText(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className={styles.classificationModalBody}>
+              {classificationModalText}
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewOpen && previewItem && (
         <div
           className={styles.previewOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Previsualización de póliza"
+          aria-label="Vista previa de póliza"
           onClick={closePreview}
         >
           <div
@@ -866,7 +1061,7 @@ export default function Home() {
           >
             <div className={styles.previewHeader}>
               <div className={styles.previewHeaderInfo}>
-                <div className={styles.previewTitle}>Previsualización</div>
+                <div className={styles.previewTitle}>Vista previa</div>
                 <div className={styles.previewName} title={previewItem.name}>
                   {previewItem.name}
                 </div>
@@ -875,33 +1070,23 @@ export default function Home() {
               <div className={styles.previewActions}>
                 <button
                   type="button"
-                  className={styles.primaryBtn}
-                  onClick={() => openUrl(previewItem.url)}
-                >
-                  Abrir aparte
-                </button>
-
-                <button
-                  type="button"
                   className={styles.ghostBtn}
                   onClick={closePreview}
                 >
                   Cerrar
                 </button>
+
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  onClick={() => openUrl(previewItem.url)}
+                >
+                  Abrir aparte
+                </button>
               </div>
             </div>
 
             <div className={styles.previewBody}>
-              {previewItem.type === "pdf" && (
-                <div className={styles.previewPdfWrap}>
-                  <iframe
-                    src={`${previewItem.url}#view=FitH`}
-                    title={previewItem.name}
-                    className={styles.previewFrame}
-                  />
-                </div>
-              )}
-
               {previewItem.type === "image" && (
                 <div className={styles.previewImageStage}>
                   <img
@@ -912,10 +1097,20 @@ export default function Home() {
                 </div>
               )}
 
+              {previewItem.type === "pdf" && (
+                <div className={styles.previewPdfWrap}>
+                  <iframe
+                    src={`${previewItem.url}#view=FitH`}
+                    title={previewItem.name}
+                    className={styles.previewFrame}
+                  />
+                </div>
+              )}
+
               {previewItem.type === "other" && (
                 <div className={styles.previewFallback}>
                   <div className={styles.previewFallbackTitle}>
-                    No se puede previsualizar este archivo aquí.
+                    No se puede previsualizar este tipo de archivo aquí.
                   </div>
                   <div className={styles.previewFallbackText}>
                     Puedes abrirlo en otra pestaña para verlo completo.
@@ -930,6 +1125,86 @@ export default function Home() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editDateModalOpen && editDateTarget && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar fecha límite"
+          onClick={closeEditDateModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <FiCalendar size={22} />
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>
+                  Editar fecha límite
+                </div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Modifica la fecha máxima de entrega de la adquisición.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Solicitud</div>
+                <div className={styles.deleteFileName}>
+                  {editDateTarget.folio}
+                </div>
+              </div>
+
+              <div className={styles.deleteFormField}>
+                <label className={styles.deleteFieldLabel}>Fecha límite</label>
+                <input
+                  type="date"
+                  className={styles.deleteInput}
+                  value={editDateValue}
+                  onChange={(e) => setEditDateValue(e.target.value)}
+                  disabled={savingDate}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !savingDate) {
+                      void onSaveMaxDate();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Fecha actual: {formatDate(editDateTarget.fechaActual)}
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeEditDateModal}
+                disabled={savingDate}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => void onSaveMaxDate()}
+                disabled={savingDate || !editDateValue}
+              >
+                {savingDate ? "Guardando..." : "Guardar fecha"}
+              </button>
             </div>
           </div>
         </div>
@@ -971,29 +1246,19 @@ export default function Home() {
                   Confirmar eliminación
                 </div>
                 <div className={styles.deleteConfirmSubtitle}>
-                  Esta acción eliminará la adquisición seleccionada.
+                  Esta acción eliminará la solicitud seleccionada.
                 </div>
               </div>
             </div>
 
             <div className={styles.deleteConfirmBody}>
               <div className={styles.deleteFileCard}>
-                <div className={styles.deleteFileLabel}>Folio</div>
+                <div className={styles.deleteFileLabel}>Solicitud</div>
                 <div
                   className={styles.deleteFileName}
-                  title={deleteTarget.folio}
+                  title={`${deleteTarget.folio} - ${deleteTarget.adquisicion}`}
                 >
-                  {deleteTarget.folio}
-                </div>
-              </div>
-
-              <div className={styles.deleteFileCard}>
-                <div className={styles.deleteFileLabel}>Clasificación</div>
-                <div
-                  className={styles.deleteFileName}
-                  title={deleteTarget.adquisicion}
-                >
-                  {deleteTarget.adquisicion}
+                  {deleteTarget.folio} - {deleteTarget.adquisicion}
                 </div>
               </div>
 
@@ -1008,12 +1273,8 @@ export default function Home() {
                   disabled={deleting}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (
-                      e.key === "Enter" &&
-                      !deleting &&
-                      deletePassword.trim()
-                    ) {
-                      void confirmDelete();
+                    if (e.key === "Enter" && !deleting) {
+                      void onDeleteRequest();
                     }
                   }}
                 />
@@ -1037,10 +1298,10 @@ export default function Home() {
               <button
                 type="button"
                 className={styles.deleteConfirmBtn}
-                onClick={() => void confirmDelete()}
+                onClick={() => void onDeleteRequest()}
                 disabled={deleting || !deletePassword.trim()}
               >
-                {deleting ? "Eliminando..." : "Eliminar adquisición"}
+                {deleting ? "Eliminando..." : "Eliminar solicitud"}
               </button>
             </div>
           </div>

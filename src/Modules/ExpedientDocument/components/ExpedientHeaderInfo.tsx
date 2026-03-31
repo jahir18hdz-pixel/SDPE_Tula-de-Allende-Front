@@ -1,4 +1,4 @@
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/ChecklistDeDocumentos.module.css";
 import type { ManagerInfo } from "../types/expedient.types";
 
 type Props = {
@@ -34,70 +34,55 @@ export default function ExpedientHeaderInfo({
   onOpenChecklist,
   getManagerDisplayName,
 }: Props) {
+  const managerText = loadingManager
+    ? "Cargando..."
+    : manager?.email || "Sin responsable";
+
+  const policyText = policyNumber?.trim() || "Sin póliza";
+  const cfdiText = cfdi?.trim() || "Sin CFDI";
+
   return (
     <div className={styles.cardNoteInline}>
       <div className={styles.inlineInfoGroup}>
         <div className={styles.managerBox}>
-          <span className={styles.managerInlineLabel}>Responsable:</span>
-
-          <span
-            className={styles.managerHeaderName}
-            title={getManagerDisplayName(manager)}
-          >
-            <strong>
-              {loadingManager
-                ? "Cargando..."
-                : manager?.email || "Sin responsable"}
-            </strong>
-          </span>
+          <span className={styles.managerInlineLabel}>Responsable</span>
 
           <button
             type="button"
-            className={styles.managerActionBtn}
+            className={styles.managerHeaderName}
+            title={getManagerDisplayName(manager)}
             onClick={onOpenManager}
-            disabled={!canUse || savingManager}
+            disabled={!canUse || savingManager || loadingManager}
           >
-            {manager ? "Editar responsable" : "Asignar responsable"}
+            <strong>{managerText}</strong>
           </button>
         </div>
 
         <div className={styles.policyBox}>
-          <span className={styles.policyInlineLabel}>Póliza:</span>
-
-          <span
-            className={styles.policyHeaderName}
-            title={policyNumber?.trim() || "Sin póliza"}
-          >
-            {policyNumber?.trim() || "Sin póliza"}
-          </span>
+          <span className={styles.policyInlineLabel}>Póliza</span>
 
           <button
             type="button"
-            className={styles.policyActionBtn}
+            className={styles.policyHeaderName}
+            title={policyText}
             onClick={onOpenPolicy}
             disabled={!canUse || savingPolicy}
           >
-            {policyNumber?.trim() ? "Editar póliza" : "Agregar póliza"}
+            {policyText}
           </button>
         </div>
 
         <div className={styles.cfdiBox}>
-          <span className={styles.cfdiInlineLabel}>CFDI:</span>
-
-          <span
-            className={styles.cfdiHeaderName}
-            title={cfdi?.trim() || "Sin CFDI"}
-          >
-            {cfdi?.trim() || "Sin CFDI"}
-          </span>
+          <span className={styles.cfdiInlineLabel}>CFDI</span>
 
           <button
             type="button"
-            className={styles.cfdiActionBtn}
+            className={styles.cfdiHeaderName}
+            title={cfdiText}
             onClick={onOpenCfdi}
             disabled={!canUse || savingCfdi}
           >
-            {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
+            {cfdiText}
           </button>
         </div>
 

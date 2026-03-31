@@ -1,0 +1,845 @@
+:root {
+  --textSoft: rgba(17, 24, 39, 0.72);
+  --guinda2: #65001f;
+  --gold: #b68a2a;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================
+   OVERLAY
+========================= */
+.previewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(4px);
+  animation: previewFadeIn 180ms ease;
+}
+
+@keyframes previewFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* =========================
+   MODAL
+========================= */
+.previewModal {
+  width: min(96vw, 1380px);
+  height: min(92vh, 920px);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 248, 250, 0.98)
+  );
+  border: 1px solid rgba(230, 230, 234, 0.95);
+  border-radius: 22px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.16),
+    0 10px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: previewModalIn 220ms ease;
+}
+
+@keyframes previewModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =========================
+   HEADER
+========================= */
+.previewHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(230, 230, 234, 0.9);
+  background: linear-gradient(
+    90deg,
+    rgba(75, 0, 22, 0.06),
+    rgba(182, 138, 42, 0.08)
+  );
+}
+
+.previewHeaderInfo {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.previewTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: #111827;
+  line-height: 1.1;
+}
+
+.previewName {
+  font-size: 13px;
+  color: var(--textSoft);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* =========================
+   ACTIONS
+========================= */
+.previewActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.ghostBtn,
+.primaryBtn,
+.saveBtn,
+.dangerBtn,
+.iconDangerBtn,
+.carouselNavInline {
+  min-height: 38px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.15px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.ghostBtn {
+  border-color: rgba(66, 71, 81, 0.35);
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+}
+
+.ghostBtn:hover:not(:disabled) {
+  border-color: rgba(107, 114, 128, 0.72);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.primaryBtn {
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.92);
+  border-color: rgba(37, 99, 235, 0.98);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.saveBtn {
+  border-color: rgba(22, 163, 74, 0.65);
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.92);
+  border-color: rgba(22, 163, 74, 0.98);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.dangerBtn {
+  border-color: rgba(220, 38, 38, 0.65);
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.92);
+  border-color: rgba(220, 38, 38, 0.98);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.iconDangerBtn {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+}
+
+.iconDangerBtn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.55);
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.ghostBtn:active,
+.primaryBtn:active,
+.saveBtn:active,
+.dangerBtn:active,
+.iconDangerBtn:active,
+.carouselNavInline:active {
+  transform: scale(0.97);
+}
+
+.ghostBtn:disabled,
+.primaryBtn:disabled,
+.saveBtn:disabled,
+.dangerBtn:disabled,
+.iconDangerBtn:disabled,
+.carouselNavInline:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================
+   BODY
+========================= */
+.previewBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.previewBodySplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* =========================
+   VIEWER
+========================= */
+.previewViewerPane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 30%),
+    linear-gradient(180deg, #0f172a, #111827);
+}
+
+.previewCarouselWrap,
+.previewPdfWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.previewImageStage,
+.previewPdfStage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+
+.previewFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+/* =========================
+   CAROUSEL NAV
+========================= */
+.carouselNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(17, 24, 39, 0.56);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.carouselNav:hover {
+  background: rgba(17, 24, 39, 0.82);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+.carouselNav:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.carouselPrev {
+  left: 14px;
+}
+
+.carouselNext {
+  right: 14px;
+}
+
+.carouselCounter {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.62);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  backdrop-filter: blur(6px);
+}
+
+/* =========================
+   FALLBACK
+========================= */
+.previewFallback {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 28px;
+  text-align: center;
+  color: #fff;
+}
+
+.previewFallbackTitle {
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.previewFallbackText {
+  max-width: 520px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.5;
+}
+
+.previewFallbackNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.carouselNavInline {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.carouselNavInline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+/* =========================
+   THUMBS
+========================= */
+.previewThumbs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.previewThumbs::-webkit-scrollbar {
+  height: 8px;
+}
+
+.previewThumbs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.previewThumbs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+}
+
+.previewThumbCard {
+  position: relative;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  transition: transform 120ms ease;
+}
+
+.previewThumbCard:hover {
+  transform: translateY(-1px);
+}
+
+.previewThumbCardActive {
+  box-shadow: 0 0 0 2px rgba(182, 138, 42, 0.9);
+}
+
+.previewThumbBtn {
+  width: 90px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  display: block;
+}
+
+.previewThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.previewThumbFile {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.04)
+  );
+}
+
+.previewThumbFileIcon {
+  min-width: 34px;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewThumbFileName {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.previewThumbDelete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.95);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.previewThumbDelete:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.98);
+  transform: scale(1.05);
+}
+
+.previewThumbDelete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   OBSERVATION PANE
+========================= */
+.previewObservationPane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 248, 250, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  border-left: 1px solid rgba(230, 230, 234, 0.9);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 0, 22, 0.35) rgba(0, 0, 0, 0.05);
+}
+
+.previewObservationPane::-webkit-scrollbar {
+  width: 8px;
+}
+
+.previewObservationPane::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+}
+
+.previewObservationPane::-webkit-scrollbar-thumb {
+  background: rgba(75, 0, 22, 0.35);
+  border-radius: 999px;
+}
+
+.previewObservationPane::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 0, 22, 0.55);
+}
+
+.previewInfoBlock {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.previewInfoLabel {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.25px;
+  text-transform: uppercase;
+  color: rgba(17, 24, 39, 0.72);
+}
+
+.previewMetaCard,
+.previewObservationCard {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1.8px solid rgba(230, 230, 234, 0.95);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 248, 250, 0.98)
+  );
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.previewMetaCard:hover,
+.previewObservationCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+}
+
+.previewMetaValue {
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.previewObservationCard {
+  font-size: 13px;
+  color: #111827;
+  line-height: 1.55;
+}
+
+.previewObservationEmpty {
+  color: rgba(17, 24, 39, 0.6);
+}
+
+/* =========================
+   STATUS
+========================= */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  white-space: nowrap;
+  border: 2px solid rgba(66, 71, 81, 0.36);
+  background: rgba(107, 114, 128, 0.1);
+  color: #111827;
+}
+
+.badgeOk {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #065524;
+}
+
+.badgeBad {
+  background: #fce7f3;
+  color: #9d174d;
+  border-color: #90043c;
+}
+
+.badgeNeutral {
+  background: #e5e7eb;
+  color: #475569;
+  border-color: #94a3b8;
+}
+
+/* =========================
+   BLOQUES SEGÚN ESTADO
+========================= */
+.blockOk {
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 163, 74, 0.05),
+    rgba(255, 255, 255, 0.98)
+  );
+}
+
+.blockBad {
+  border-color: rgba(220, 38, 38, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(220, 38, 38, 0.05),
+    rgba(255, 255, 255, 0.98)
+  );
+}
+
+.blockNeutral {
+  border-color: rgba(148, 163, 184, 0.5) !important;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.05),
+    rgba(255, 255, 255, 0.98)
+  );
+}
+
+/* =========================
+   REJECT BOX
+========================= */
+.rejectBoxCard {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1.8px solid rgba(220, 38, 38, 0.35);
+  background: linear-gradient(
+    180deg,
+    rgba(220, 38, 38, 0.05),
+    rgba(255, 255, 255, 0.98)
+  );
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+  display: grid;
+  gap: 12px;
+}
+
+.rejectTextarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(220, 38, 38, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+  color: #111827;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+
+.rejectTextarea:focus {
+  border-color: rgba(220, 38, 38, 0.52);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+  background: #fff;
+}
+
+.rejectTextarea:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: rgba(249, 250, 251, 0.96);
+}
+
+.rejectTextarea::placeholder {
+  color: rgba(17, 24, 39, 0.45);
+}
+
+.rejectActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 1100px) {
+  .previewModal {
+    width: min(98vw, 1280px);
+    height: min(94vh, 920px);
+  }
+
+  .previewBodySplit {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+
+@media (max-width: 900px) {
+  .previewBodySplit {
+    grid-template-columns: 1fr;
+  }
+
+  .previewObservationPane {
+    border-left: none;
+    border-top: 1px solid rgba(230, 230, 234, 0.9);
+    max-height: 240px;
+  }
+}
+
+@media (max-width: 720px) {
+  .previewOverlay {
+    padding: 10px;
+  }
+
+  .previewModal {
+    width: 100%;
+    height: min(96vh, 980px);
+    border-radius: 16px;
+  }
+
+  .previewHeader {
+    padding: 14px;
+  }
+
+  .previewActions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .previewActions > button {
+    flex: 1 1 auto;
+  }
+
+  .carouselPrev {
+    left: 8px;
+  }
+
+  .carouselNext {
+    right: 8px;
+  }
+
+  .carouselCounter {
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .previewThumbBtn {
+    width: 78px;
+    height: 58px;
+  }
+
+  .previewObservationPane {
+    padding: 14px;
+  }
+
+  .rejectActions {
+    flex-direction: column;
+  }
+
+  .rejectActions > button {
+    width: 100%;
+  }
+
+  .rejectTextarea {
+    min-height: 96px;
+  }
+}

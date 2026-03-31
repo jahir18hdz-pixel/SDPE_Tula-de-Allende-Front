@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../styles/AcquisitionRequest.module.css";
 
@@ -143,11 +149,22 @@ function toStringSafe(v: unknown): string {
   return "";
 }
 
-type NormalizeOpts = { idKeys?: readonly string[]; nameKeys?: readonly string[] };
+type NormalizeOpts = {
+  idKeys?: readonly string[];
+  nameKeys?: readonly string[];
+};
 
-function normalizeCatalog(payload: unknown, opts?: NormalizeOpts): CatalogItem[] {
+function normalizeCatalog(
+  payload: unknown,
+  opts?: NormalizeOpts,
+): CatalogItem[] {
   const defaultIdKeys: readonly string[] = ["id", "Id"];
-  const defaultNameKeys: readonly string[] = ["name", "Name", "description", "Description"];
+  const defaultNameKeys: readonly string[] = [
+    "name",
+    "Name",
+    "description",
+    "Description",
+  ];
 
   const idKeys = opts?.idKeys?.length ? opts.idKeys : defaultIdKeys;
   const nameKeys = opts?.nameKeys?.length ? opts.nameKeys : defaultNameKeys;
@@ -156,7 +173,14 @@ function normalizeCatalog(payload: unknown, opts?: NormalizeOpts): CatalogItem[]
 
   if (Array.isArray(payload)) list = payload;
   else if (isRecord(payload)) {
-    const maybeItems = getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]);
+    const maybeItems = getValue(payload, [
+      "items",
+      "Items",
+      "data",
+      "Data",
+      "result",
+      "Result",
+    ]);
     list = asArray(maybeItems);
   }
 
@@ -240,7 +264,7 @@ function hasCreateChanges(form: CreateForm): boolean {
         d.quantity.trim() !== "" ||
         d.unitMeasure.trim() !== "" ||
         d.description.trim() !== "" ||
-        d.unitAmount.trim() !== ""
+        d.unitAmount.trim() !== "",
     )
   );
 }
@@ -276,12 +300,16 @@ export default function AcquisitionRequest() {
 
   const [loadingCats, setLoadingCats] = useState(false);
 
-  const [administrativeUnits, setAdministrativeUnits] = useState<CatalogItem[]>([]);
+  const [administrativeUnits, setAdministrativeUnits] = useState<CatalogItem[]>(
+    [],
+  );
   const [projects, setProjects] = useState<CatalogItem[]>([]);
   const [acquisitionTypes, setAcquisitionTypes] = useState<CatalogItem[]>([]);
   const [suppliers, setSuppliers] = useState<CatalogItem[]>([]);
   const [fundingSources, setFundingSources] = useState<CatalogItem[]>([]);
-  const [acqClassifications, setAcqClassifications] = useState<CatalogItem[]>([]);
+  const [acqClassifications, setAcqClassifications] = useState<CatalogItem[]>(
+    [],
+  );
   const [programs, setPrograms] = useState<CatalogItem[]>([]);
   const [communities, setCommunities] = useState<CatalogItem[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<CatalogItem[]>([]);
@@ -320,7 +348,16 @@ export default function AcquisitionRequest() {
     if (isManagerDirty) return true;
     if (isDocsDirty) return true;
     return false;
-  }, [saving, savingManager, docsSaving, docsLoading, step, isCreateDirty, isManagerDirty, isDocsDirty]);
+  }, [
+    saving,
+    savingManager,
+    docsSaving,
+    docsLoading,
+    step,
+    isCreateDirty,
+    isManagerDirty,
+    isDocsDirty,
+  ]);
 
   const resetAll = useCallback(() => {
     setStep("create");
@@ -338,7 +375,10 @@ export default function AcquisitionRequest() {
       const now = Date.now();
       if (now - lastOutsideToastRef.current < 1200) return;
       lastOutsideToastRef.current = now;
-      showToast("error", "Debes terminar o cancelar el registro actual antes de salir.");
+      showToast(
+        "error",
+        "Debes terminar o cancelar el registro actual antes de salir.",
+      );
     };
 
     const blockOutsideInteraction = (event: Event) => {
@@ -351,7 +391,10 @@ export default function AcquisitionRequest() {
       event.preventDefault();
       event.stopPropagation();
 
-      if ("stopImmediatePropagation" in event && typeof event.stopImmediatePropagation === "function") {
+      if (
+        "stopImmediatePropagation" in event &&
+        typeof event.stopImmediatePropagation === "function"
+      ) {
         event.stopImmediatePropagation();
       }
 
@@ -363,7 +406,11 @@ export default function AcquisitionRequest() {
     document.addEventListener("touchstart", blockOutsideInteraction, true);
 
     return () => {
-      document.removeEventListener("pointerdown", blockOutsideInteraction, true);
+      document.removeEventListener(
+        "pointerdown",
+        blockOutsideInteraction,
+        true,
+      );
       document.removeEventListener("click", blockOutsideInteraction, true);
       document.removeEventListener("touchstart", blockOutsideInteraction, true);
     };
@@ -384,12 +431,19 @@ export default function AcquisitionRequest() {
   }, [workflowLocked]);
 
   const loadCatalogGeneric = useCallback(
-    async (url: string, label: string, opts?: NormalizeOpts): Promise<CatalogItem[]> => {
-      const result = await requestJson(url, { method: "GET", headers: authHeaders() });
+    async (
+      url: string,
+      label: string,
+      opts?: NormalizeOpts,
+    ): Promise<CatalogItem[]> => {
+      const result = await requestJson(url, {
+        method: "GET",
+        headers: authHeaders(),
+      });
       if (!result.ok) throw new Error(`${label}: ${result.error}`);
       return normalizeCatalog(result.data, opts);
     },
-    []
+    [],
   );
 
   const loadProjects = useCallback(async (): Promise<CatalogItem[]> => {
@@ -416,22 +470,44 @@ export default function AcquisitionRequest() {
     const list: unknown[] = Array.isArray(payload)
       ? payload
       : isRecord(payload)
-        ? asArray(getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]))
+        ? asArray(
+            getValue(payload, [
+              "items",
+              "Items",
+              "data",
+              "Data",
+              "result",
+              "Result",
+            ]),
+          )
         : [];
 
     return list
       .map((raw): CatalogItem | null => {
         if (!isRecord(raw)) return null;
 
-        const id = toNumber(getValue(raw, ["idBeneficiary", "IdBeneficiary", "id", "Id"]));
+        const id = toNumber(
+          getValue(raw, ["idBeneficiary", "IdBeneficiary", "id", "Id"]),
+        );
         if (!id || id <= 0) return null;
 
-        const firstName = toStringSafe(getValue(raw, ["firstName", "FirstName"])).trim();
-        const paternal = toStringSafe(getValue(raw, ["paternalLastName", "PaternalLastName"])).trim();
-        const maternal = toStringSafe(getValue(raw, ["maternalLastName", "MaternalLastName"])).trim();
-        const community = toStringSafe(getValue(raw, ["communityName", "CommunityName"])).trim();
+        const firstName = toStringSafe(
+          getValue(raw, ["firstName", "FirstName"]),
+        ).trim();
+        const paternal = toStringSafe(
+          getValue(raw, ["paternalLastName", "PaternalLastName"]),
+        ).trim();
+        const maternal = toStringSafe(
+          getValue(raw, ["maternalLastName", "MaternalLastName"]),
+        ).trim();
+        const community = toStringSafe(
+          getValue(raw, ["communityName", "CommunityName"]),
+        ).trim();
 
-        const full = [firstName, paternal, maternal].filter(Boolean).join(" ").trim();
+        const full = [firstName, paternal, maternal]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
         const label = community ? `${full} — ${community}` : full;
 
         if (!label) return null;
@@ -450,50 +526,119 @@ export default function AcquisitionRequest() {
         {
           key: "administrativeUnits",
           run: () =>
-            loadCatalogGeneric(CATALOG_ENDPOINTS.administrativeUnits, "Unidades administrativas", {
-              idKeys: ["idAdministrativeUnit", "IdAdministrativeUnit", "id", "Id"],
-              nameKeys: ["description", "Description", "name", "Name"],
-            }),
+            loadCatalogGeneric(
+              CATALOG_ENDPOINTS.administrativeUnits,
+              "Unidades administrativas",
+              {
+                idKeys: [
+                  "idAdministrativeUnit",
+                  "IdAdministrativeUnit",
+                  "id",
+                  "Id",
+                ],
+                nameKeys: ["description", "Description", "name", "Name"],
+              },
+            ),
         },
         { key: "projects", run: () => loadProjects() },
         {
           key: "acquisitionTypes",
           run: () =>
-            loadCatalogGeneric(CATALOG_ENDPOINTS.acquisitionTypes, "Tipos de adquisición", {
-              idKeys: ["idAcquisitionType", "IdAcquisitionType", "id", "Id"],
-              nameKeys: ["description", "Description", "name", "Name", "typeName", "TypeName"],
-            }),
+            loadCatalogGeneric(
+              CATALOG_ENDPOINTS.acquisitionTypes,
+              "Tipos de adquisición",
+              {
+                idKeys: ["idAcquisitionType", "IdAcquisitionType", "id", "Id"],
+                nameKeys: [
+                  "description",
+                  "Description",
+                  "name",
+                  "Name",
+                  "typeName",
+                  "TypeName",
+                ],
+              },
+            ),
         },
         {
           key: "suppliers",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.suppliers, "Proveedores", {
               idKeys: ["idSupplier", "IdSupplier", "id", "Id"],
-              nameKeys: ["supplierName", "SupplierName", "businessName", "BusinessName", "name", "Name", "description"],
+              nameKeys: [
+                "supplierName",
+                "SupplierName",
+                "businessName",
+                "BusinessName",
+                "name",
+                "Name",
+                "description",
+              ],
             }),
         },
         {
           key: "fundingSources",
           run: () =>
-            loadCatalogGeneric(CATALOG_ENDPOINTS.fundingSources, "Fuentes de financiamiento", {
-              idKeys: ["idFundingSource", "IdFundingSource", "id", "Id"],
-              nameKeys: ["description", "Description", "name", "Name", "sourceName", "SourceName"],
-            }),
+            loadCatalogGeneric(
+              CATALOG_ENDPOINTS.fundingSources,
+              "Fuentes de financiamiento",
+              {
+                idKeys: ["idFundingSource", "IdFundingSource", "id", "Id"],
+                nameKeys: [
+                  "description",
+                  "Description",
+                  "name",
+                  "Name",
+                  "sourceName",
+                  "SourceName",
+                ],
+              },
+            ),
         },
         {
           key: "acqClassifications",
           run: () =>
-            loadCatalogGeneric(CATALOG_ENDPOINTS.acquisitionClassifications, "Clasificación de adquisición", {
-              idKeys: ["idAcquisitionClassification", "IdAcquisitionClassification", "id", "Id"],
-              nameKeys: ["description", "Description", "classificationName", "ClassificationName", "name", "Name"],
-            }),
+            loadCatalogGeneric(
+              CATALOG_ENDPOINTS.acquisitionClassifications,
+              "Clasificación de adquisición",
+              {
+                idKeys: [
+                  "idAcquisitionClassification",
+                  "IdAcquisitionClassification",
+                  "id",
+                  "Id",
+                ],
+                nameKeys: [
+                  "description",
+                  "Description",
+                  "classificationName",
+                  "ClassificationName",
+                  "name",
+                  "Name",
+                ],
+              },
+            ),
         },
         {
           key: "programs",
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.programs, "Programas", {
-              idKeys: ["idProgram", "IdProgram", "id", "Id", "idProg", "IdProg"],
-              nameKeys: ["description", "Description", "programName", "ProgramName", "name", "Name"],
+              idKeys: [
+                "idProgram",
+                "IdProgram",
+                "id",
+                "Id",
+                "idProg",
+                "IdProg",
+              ],
+              nameKeys: [
+                "description",
+                "Description",
+                "programName",
+                "ProgramName",
+                "name",
+                "Name",
+              ],
             }),
         },
         {
@@ -501,7 +646,14 @@ export default function AcquisitionRequest() {
           run: () =>
             loadCatalogGeneric(CATALOG_ENDPOINTS.communities, "Comunidades", {
               idKeys: ["idCommunity", "IdCommunity", "id", "Id"],
-              nameKeys: ["communityName", "CommunityName", "description", "Description", "name", "Name"],
+              nameKeys: [
+                "communityName",
+                "CommunityName",
+                "description",
+                "Description",
+                "name",
+                "Name",
+              ],
             }),
         },
         { key: "beneficiaries", run: () => loadBeneficiaries() },
@@ -521,7 +673,10 @@ export default function AcquisitionRequest() {
       results.forEach((r, i) => {
         const t = tasks[i];
         if (r.status !== "fulfilled") {
-          showToast("error", r.reason instanceof Error ? r.reason.message : String(r.reason));
+          showToast(
+            "error",
+            r.reason instanceof Error ? r.reason.message : String(r.reason),
+          );
           return;
         }
 
@@ -572,7 +727,9 @@ export default function AcquisitionRequest() {
   function updateDetail(index: number, patch: Partial<CreateDetail>) {
     setCreate((prev) => ({
       ...prev,
-      details: prev.details.map((d, i) => (i === index ? { ...d, ...patch } : d)),
+      details: prev.details.map((d, i) =>
+        i === index ? { ...d, ...patch } : d,
+      ),
     }));
   }
 
@@ -605,7 +762,8 @@ export default function AcquisitionRequest() {
     if (!date) return "La fecha de solicitud es obligatoria.";
     if (!just) return "La justificación es obligatoria.";
     if (just.length < 5) return "La justificación es demasiado corta.";
-    if (!create.idAcquisitionClassification) return "Selecciona la clasificación de adquisición.";
+    if (!create.idAcquisitionClassification)
+      return "Selecciona la clasificación de adquisición.";
 
     if (!create.details.length) return "Debes agregar al menos un detalle.";
 
@@ -616,14 +774,18 @@ export default function AcquisitionRequest() {
       if (!d.idCog) return `Selecciona el COG del detalle ${row}.`;
 
       const quantity = toPositiveNumber(d.quantity);
-      if (!quantity) return `La cantidad del detalle ${row} debe ser mayor a 0.`;
+      if (!quantity)
+        return `La cantidad del detalle ${row} debe ser mayor a 0.`;
 
-      if (!d.unitMeasure.trim()) return `La unidad de medida del detalle ${row} es obligatoria.`;
+      if (!d.unitMeasure.trim())
+        return `La unidad de medida del detalle ${row} es obligatoria.`;
 
-      if (!d.description.trim()) return `La descripción del detalle ${row} es obligatoria.`;
+      if (!d.description.trim())
+        return `La descripción del detalle ${row} es obligatoria.`;
 
       const unitAmount = toPositiveNumber(d.unitAmount);
-      if (!unitAmount) return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
+      if (!unitAmount)
+        return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
     }
 
     return "";
@@ -676,7 +838,10 @@ export default function AcquisitionRequest() {
 
       const idRequest = extractIdRequest(result.data);
       if (!idRequest) {
-        showToast("error", "Se registró la solicitud, pero no se pudo leer el idRequest del servidor.");
+        showToast(
+          "error",
+          "Se registró la solicitud, pero no se pudo leer el idRequest del servidor.",
+        );
         return;
       }
 
@@ -715,7 +880,16 @@ export default function AcquisitionRequest() {
       const arr: unknown[] = Array.isArray(payload)
         ? payload
         : isRecord(payload)
-          ? asArray(getValue(payload, ["items", "Items", "data", "Data", "result", "Result"]))
+          ? asArray(
+              getValue(payload, [
+                "items",
+                "Items",
+                "data",
+                "Data",
+                "result",
+                "Result",
+              ]),
+            )
           : [];
 
       const mapped: DocState[] = arr
@@ -723,16 +897,33 @@ export default function AcquisitionRequest() {
           if (!isRecord(raw)) return null;
 
           const id = toNumber(
-            getValue(raw, ["documentTypeId", "DocumentTypeId", "idDocumentType", "IdDocumentType"])
+            getValue(raw, [
+              "documentTypeId",
+              "DocumentTypeId",
+              "idDocumentType",
+              "IdDocumentType",
+            ]),
           );
           if (!id || id <= 0) return null;
 
           const name = toStringSafe(
-            getValue(raw, ["documentName", "DocumentName", "name", "Name", "description", "Description"])
+            getValue(raw, [
+              "documentName",
+              "DocumentName",
+              "name",
+              "Name",
+              "description",
+              "Description",
+            ]),
           ).trim();
           if (!name) return null;
 
-          const reqRaw = getValue(raw, ["isRequired", "IsRequired", "requiredByRule", "RequiredByRule"]);
+          const reqRaw = getValue(raw, [
+            "isRequired",
+            "IsRequired",
+            "requiredByRule",
+            "RequiredByRule",
+          ]);
           const requiredByRule = typeof reqRaw === "boolean" ? reqRaw : true;
 
           return {
@@ -760,8 +951,10 @@ export default function AcquisitionRequest() {
 
   function validateManager(): string {
     if (!createdIdRequest) return "No hay idRequest.";
-    if (!manager.idAdministrativeUnit) return "Selecciona unidad administrativa del responsable.";
-    if (!manager.firstName.trim()) return "El nombre del responsable es obligatorio.";
+    if (!manager.idAdministrativeUnit)
+      return "Selecciona unidad administrativa del responsable.";
+    if (!manager.firstName.trim())
+      return "El nombre del responsable es obligatorio.";
     if (!manager.lastName.trim()) return "El apellido paterno es obligatorio.";
     return "";
   }
@@ -803,7 +996,9 @@ export default function AcquisitionRequest() {
     if (!createdIdRequest) return "No hay idRequest.";
     if (!managerSaved) return "Primero guarda el responsable.";
 
-    const bad = docs.find((d) => !Number.isFinite(d.idDocumentType) || d.idDocumentType <= 0);
+    const bad = docs.find(
+      (d) => !Number.isFinite(d.idDocumentType) || d.idDocumentType <= 0,
+    );
     if (bad) return `Documento con Id inválido: ${bad.name}`;
 
     return "";
@@ -835,6 +1030,7 @@ export default function AcquisitionRequest() {
 
       showToast("success", "Checklist guardado correctamente.");
       resetAll();
+      navigate("/home");
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -857,12 +1053,14 @@ export default function AcquisitionRequest() {
 
   const headerHint = useMemo(() => {
     if (loadingCats) return "Cargando catálogos...";
-    if (step === "postCreate") return "Ahora registra el responsable y define los documentos que no aplican.";
+    if (step === "postCreate")
+      return "Ahora registra el responsable y define los documentos que no aplican.";
     return "Completa los campos, agrega al menos un detalle y guarda la solicitud.";
   }, [loadingCats, step]);
 
   const titleRight = useMemo(() => {
-    if (step === "postCreate" && createdIdRequest) return `ID Solicitud: ${createdIdRequest}`;
+    if (step === "postCreate" && createdIdRequest)
+      return `ID Solicitud: ${createdIdRequest}`;
     return "";
   }, [step, createdIdRequest]);
 
@@ -884,12 +1082,6 @@ export default function AcquisitionRequest() {
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Registro de adquisición</h1>
             <p className={styles.sub}>{headerHint}</p>
-
-            {workflowLocked && (
-              <div className={styles.lockHint}>
-                Hay un registro en proceso. No podrás salir desde el sidebar ni hacer clic fuera de esta vista hasta terminar o cancelar aquí.
-              </div>
-            )}
           </div>
 
           <div className={styles.headerActions}>
@@ -906,11 +1098,17 @@ export default function AcquisitionRequest() {
             <button
               className={styles.btnGhost}
               type="button"
-              onClick={step === "create" ? () => setCreate(initialCreate) : resetAll}
+              onClick={
+                step === "create" ? () => setCreate(initialCreate) : resetAll
+              }
               disabled={step === "create" ? createDisabled : postDisabled}
-              title={step === "create" ? "Cancelar captura" : "Cancelar post-registro"}
+              title={
+                step === "create"
+                  ? "Cancelar captura"
+                  : "Cancelar post-registro"
+              }
             >
-              Cancelar
+              Borrar datos
             </button>
           </div>
         </div>
@@ -918,7 +1116,9 @@ export default function AcquisitionRequest() {
 
       <section className={styles.card}>
         <div className={styles.cardHeader}>
-          <p className={styles.cardTitle}>{step === "create" ? "Nueva solicitud" : "Post-registro"}</p>
+          <p className={styles.cardTitle}>
+            {step === "create" ? "Nueva solicitud" : "Post-registro"}
+          </p>
           {!!titleRight && <span className={styles.badge}>{titleRight}</span>}
         </div>
 
@@ -939,7 +1139,12 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={create.requestNumber}
-                      onChange={(e) => setCreate((p) => ({ ...p, requestNumber: e.target.value }))}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          requestNumber: e.target.value,
+                        }))
+                      }
                       disabled={createDisabled}
                       placeholder="Ej. ADQ-2026-001"
                     />
@@ -952,7 +1157,12 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.requestDate}
-                        onChange={(e) => setCreate((p) => ({ ...p, requestDate: e.target.value }))}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            requestDate: e.target.value,
+                          }))
+                        }
                         disabled={createDisabled}
                       />
                       <button
@@ -973,14 +1183,21 @@ export default function AcquisitionRequest() {
                   <textarea
                     className={styles.floatingTextareaArea}
                     value={create.justification}
-                    onChange={(e) => setCreate((p) => ({ ...p, justification: e.target.value }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({
+                        ...p,
+                        justification: e.target.value,
+                      }))
+                    }
                     disabled={createDisabled}
                     placeholder="Describe por qué se requiere esta adquisición..."
                     rows={4}
                   />
                 </FloatingFieldArea>
 
-                <div className={styles.hint}>Tip: incluye objetivo, urgencia y beneficiarios.</div>
+                <div className={styles.hint}>
+                  Tip: incluye objetivo, urgencia y beneficiarios.
+                </div>
 
                 <div className={styles.doubleRow}>
                   <FloatingField label="Fecha de autorización">
@@ -990,7 +1207,12 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.authorizationDate}
-                        onChange={(e) => setCreate((p) => ({ ...p, authorizationDate: e.target.value }))}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            authorizationDate: e.target.value,
+                          }))
+                        }
                         disabled={createDisabled}
                       />
                       <button
@@ -1013,7 +1235,12 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.completeMaximeDate}
-                        onChange={(e) => setCreate((p) => ({ ...p, completeMaximeDate: e.target.value }))}
+                        onChange={(e) =>
+                          setCreate((p) => ({
+                            ...p,
+                            completeMaximeDate: e.target.value,
+                          }))
+                        }
                         disabled={createDisabled}
                       />
                       <button
@@ -1034,7 +1261,9 @@ export default function AcquisitionRequest() {
                   <input
                     className={styles.floatingInput}
                     value={create.cfdi}
-                    onChange={(e) => setCreate((p) => ({ ...p, cfdi: e.target.value }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, cfdi: e.target.value }))
+                    }
                     disabled={createDisabled}
                     placeholder="Ej. UUID, folio o referencia CFDI"
                   />
@@ -1044,7 +1273,9 @@ export default function AcquisitionRequest() {
                   <input
                     className={styles.floatingInput}
                     value={create.observations}
-                    onChange={(e) => setCreate((p) => ({ ...p, observations: e.target.value }))}
+                    onChange={(e) =>
+                      setCreate((p) => ({ ...p, observations: e.target.value }))
+                    }
                     disabled={createDisabled}
                     placeholder="Notas adicionales (opcional)"
                   />
@@ -1058,7 +1289,12 @@ export default function AcquisitionRequest() {
                       className={styles.floatingSelect}
                       value={create.idAdministrativeUnit ?? ""}
                       onChange={(e) =>
-                        setCreate((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                        setCreate((p) => ({
+                          ...p,
+                          idAdministrativeUnit: toNullableNumber(
+                            e.target.value,
+                          ),
+                        }))
                       }
                       disabled={createDisabled}
                     >
@@ -1075,7 +1311,12 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idProject ?? ""}
-                      onChange={(e) => setCreate((p) => ({ ...p, idProject: toNullableNumber(e.target.value) }))}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          idProject: toNullableNumber(e.target.value),
+                        }))
+                      }
                       disabled={createDisabled}
                     >
                       <option value="">Selecciona...</option>
@@ -1092,7 +1333,10 @@ export default function AcquisitionRequest() {
                       className={styles.floatingSelect}
                       value={create.idAcquisitionType ?? ""}
                       onChange={(e) =>
-                        setCreate((p) => ({ ...p, idAcquisitionType: toNullableNumber(e.target.value) }))
+                        setCreate((p) => ({
+                          ...p,
+                          idAcquisitionType: toNullableNumber(e.target.value),
+                        }))
                       }
                       disabled={createDisabled}
                     >
@@ -1109,7 +1353,12 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idSupplier ?? ""}
-                      onChange={(e) => setCreate((p) => ({ ...p, idSupplier: toNullableNumber(e.target.value) }))}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          idSupplier: toNullableNumber(e.target.value),
+                        }))
+                      }
                       disabled={createDisabled}
                     >
                       <option value="">Selecciona...</option>
@@ -1126,7 +1375,10 @@ export default function AcquisitionRequest() {
                       className={styles.floatingSelect}
                       value={create.idFundingSource ?? ""}
                       onChange={(e) =>
-                        setCreate((p) => ({ ...p, idFundingSource: toNullableNumber(e.target.value) }))
+                        setCreate((p) => ({
+                          ...p,
+                          idFundingSource: toNullableNumber(e.target.value),
+                        }))
                       }
                       disabled={createDisabled}
                     >
@@ -1146,7 +1398,9 @@ export default function AcquisitionRequest() {
                       onChange={(e) =>
                         setCreate((p) => ({
                           ...p,
-                          idAcquisitionClassification: toNullableNumber(e.target.value),
+                          idAcquisitionClassification: toNullableNumber(
+                            e.target.value,
+                          ),
                         }))
                       }
                       disabled={createDisabled}
@@ -1164,7 +1418,12 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idProgram ?? ""}
-                      onChange={(e) => setCreate((p) => ({ ...p, idProgram: toNullableNumber(e.target.value) }))}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          idProgram: toNullableNumber(e.target.value),
+                        }))
+                      }
                       disabled={createDisabled}
                     >
                       <option value="">Selecciona...</option>
@@ -1180,7 +1439,12 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idCommunity ?? ""}
-                      onChange={(e) => setCreate((p) => ({ ...p, idCommunity: toNullableNumber(e.target.value) }))}
+                      onChange={(e) =>
+                        setCreate((p) => ({
+                          ...p,
+                          idCommunity: toNullableNumber(e.target.value),
+                        }))
+                      }
                       disabled={createDisabled}
                     >
                       <option value="">Selecciona...</option>
@@ -1197,7 +1461,10 @@ export default function AcquisitionRequest() {
                       className={styles.floatingSelect}
                       value={create.idBeneficiary ?? ""}
                       onChange={(e) =>
-                        setCreate((p) => ({ ...p, idBeneficiary: toNullableNumber(e.target.value) }))
+                        setCreate((p) => ({
+                          ...p,
+                          idBeneficiary: toNullableNumber(e.target.value),
+                        }))
                       }
                       disabled={createDisabled}
                     >
@@ -1211,17 +1478,22 @@ export default function AcquisitionRequest() {
                   </FloatingField>
                 </div>
 
-                <div className={styles.sectionTitle}>Detalles de la solicitud</div>
+                <div className={styles.sectionTitle}>
+                  Detalles de la solicitud
+                </div>
 
                 <div className={styles.docsHint}>
-                  Debes capturar al menos un detalle para poder guardar la solicitud.
+                  Debes capturar al menos un detalle para poder guardar la
+                  solicitud.
                 </div>
 
                 <div className={styles.docsWrap}>
                   {create.details.map((detail, index) => (
                     <div key={index} className={styles.docRow}>
                       <div className={styles.docLeft}>
-                        <div className={styles.sectionTitle}>Detalle {index + 1}</div>
+                        <div className={styles.sectionTitle}>
+                          Detalle {index + 1}
+                        </div>
 
                         <div className={styles.grid3}>
                           <FloatingField label="COG" required>
@@ -1229,7 +1501,9 @@ export default function AcquisitionRequest() {
                               className={styles.floatingSelect}
                               value={detail.idCog ?? ""}
                               onChange={(e) =>
-                                updateDetail(index, { idCog: toNullableNumber(e.target.value) })
+                                updateDetail(index, {
+                                  idCog: toNullableNumber(e.target.value),
+                                })
                               }
                               disabled={createDisabled}
                             >
@@ -1246,7 +1520,11 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.quantity}
-                              onChange={(e) => updateDetail(index, { quantity: e.target.value })}
+                              onChange={(e) =>
+                                updateDetail(index, {
+                                  quantity: e.target.value,
+                                })
+                              }
                               disabled={createDisabled}
                               placeholder="Ej. 2"
                               inputMode="numeric"
@@ -1257,7 +1535,11 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.unitMeasure}
-                              onChange={(e) => updateDetail(index, { unitMeasure: e.target.value })}
+                              onChange={(e) =>
+                                updateDetail(index, {
+                                  unitMeasure: e.target.value,
+                                })
+                              }
                               disabled={createDisabled}
                               placeholder="Ej. Pieza"
                             />
@@ -1269,7 +1551,11 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.description}
-                              onChange={(e) => updateDetail(index, { description: e.target.value })}
+                              onChange={(e) =>
+                                updateDetail(index, {
+                                  description: e.target.value,
+                                })
+                              }
                               disabled={createDisabled}
                               placeholder="Describe el concepto"
                             />
@@ -1279,7 +1565,11 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.unitAmount}
-                              onChange={(e) => updateDetail(index, { unitAmount: e.target.value })}
+                              onChange={(e) =>
+                                updateDetail(index, {
+                                  unitAmount: e.target.value,
+                                })
+                              }
                               disabled={createDisabled}
                               placeholder="Ej. 1500"
                               inputMode="decimal"
@@ -1312,7 +1602,11 @@ export default function AcquisitionRequest() {
                     Agregar detalle
                   </button>
 
-                  <button type="submit" className={styles.btnSave} disabled={createDisabled}>
+                  <button
+                    type="submit"
+                    className={styles.btnSave}
+                    disabled={createDisabled}
+                  >
                     {saving ? "Guardando..." : "Guardar"}
                   </button>
                 </div>
@@ -1331,7 +1625,12 @@ export default function AcquisitionRequest() {
                       className={styles.floatingSelect}
                       value={manager.idAdministrativeUnit ?? ""}
                       onChange={(e) =>
-                        setManager((p) => ({ ...p, idAdministrativeUnit: toNullableNumber(e.target.value) }))
+                        setManager((p) => ({
+                          ...p,
+                          idAdministrativeUnit: toNullableNumber(
+                            e.target.value,
+                          ),
+                        }))
                       }
                       disabled={postDisabled}
                     >
@@ -1348,7 +1647,9 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={manager.firstName}
-                      onChange={(e) => setManager((p) => ({ ...p, firstName: e.target.value }))}
+                      onChange={(e) =>
+                        setManager((p) => ({ ...p, firstName: e.target.value }))
+                      }
                       disabled={postDisabled}
                       placeholder="Ej. Juan"
                     />
@@ -1358,7 +1659,9 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={manager.lastName}
-                      onChange={(e) => setManager((p) => ({ ...p, lastName: e.target.value }))}
+                      onChange={(e) =>
+                        setManager((p) => ({ ...p, lastName: e.target.value }))
+                      }
                       disabled={postDisabled}
                       placeholder="Ej. Pérez"
                     />
@@ -1368,7 +1671,12 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={manager.secondLastName}
-                      onChange={(e) => setManager((p) => ({ ...p, secondLastName: e.target.value }))}
+                      onChange={(e) =>
+                        setManager((p) => ({
+                          ...p,
+                          secondLastName: e.target.value,
+                        }))
+                      }
                       disabled={postDisabled}
                       placeholder="Ej. López"
                     />
@@ -1378,7 +1686,9 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={manager.email}
-                      onChange={(e) => setManager((p) => ({ ...p, email: e.target.value }))}
+                      onChange={(e) =>
+                        setManager((p) => ({ ...p, email: e.target.value }))
+                      }
                       disabled={postDisabled}
                       placeholder="correo@dominio.com"
                     />
@@ -1388,7 +1698,9 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={manager.phone}
-                      onChange={(e) => setManager((p) => ({ ...p, phone: e.target.value }))}
+                      onChange={(e) =>
+                        setManager((p) => ({ ...p, phone: e.target.value }))
+                      }
                       disabled={postDisabled}
                       placeholder="Ej. 7711234567"
                     />
@@ -1402,21 +1714,35 @@ export default function AcquisitionRequest() {
                     onClick={() => void onSaveManager()}
                     disabled={postDisabled}
                   >
-                    {savingManager ? "Guardando..." : managerSaved ? "Responsable guardado" : "Guardar responsable"}
+                    {savingManager
+                      ? "Guardando..."
+                      : managerSaved
+                        ? "Responsable guardado"
+                        : "Guardar responsable"}
                   </button>
                 </div>
 
-                <div className={styles.sectionTitle}>Documentos por clasificación</div>
+                <div className={styles.sectionTitle}>
+                  Documentos por clasificación
+                </div>
 
                 {!managerSaved && (
-                  <div className={styles.docsHint}>Primero guarda el responsable para habilitar el checklist.</div>
+                  <div className={styles.docsHint}>
+                    Primero guarda el responsable para habilitar el checklist.
+                  </div>
                 )}
 
                 <div className={styles.docsWrap}>
-                  {docsLoading && <div className={styles.docsHint}>Cargando documentos...</div>}
+                  {docsLoading && (
+                    <div className={styles.docsHint}>
+                      Cargando documentos...
+                    </div>
+                  )}
 
                   {!docsLoading && docs.length === 0 && (
-                    <div className={styles.docsHint}>No hay documentos para esta clasificación.</div>
+                    <div className={styles.docsHint}>
+                      No hay documentos para esta clasificación.
+                    </div>
                   )}
 
                   {docs.map((d) => (
@@ -1431,8 +1757,8 @@ export default function AcquisitionRequest() {
                                 prev.map((x) =>
                                   x.idDocumentType === d.idDocumentType
                                     ? { ...x, applies: e.target.checked }
-                                    : x
-                                )
+                                    : x,
+                                ),
                               )
                             }
                             disabled={postDisabled || !managerSaved}
@@ -1511,11 +1837,40 @@ function FloatingFieldArea({
 
 function CalendarIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M8 2v3M16 2v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M3 9h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 13h3M8 17h3M14 13h2.5M14 17h2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M8 2v3M16 2v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3 9h18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="17"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 13h3M8 17h3M14 13h2.5M14 17h2.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

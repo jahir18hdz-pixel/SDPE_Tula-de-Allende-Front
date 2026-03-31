@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/cfdi.module.css";
 import type { CfdiFormState } from "../types/expedient.types";
 
 type Props = {

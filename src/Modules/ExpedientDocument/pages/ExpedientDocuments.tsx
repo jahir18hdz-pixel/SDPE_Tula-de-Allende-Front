@@ -1,7 +1,10 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+
 import styles from "../styles/ExpedientDocuments.module.css";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
+
 import ChecklistTable from "../components/ChecklistTable";
 import UploadPanel from "../components/UploadPanel";
 import ManagerPanel from "../components/ManagerPanel";
@@ -9,10 +12,9 @@ import PolicyPanel from "../components/PolicyPanel";
 import CfdiPanel from "../components/CfdiPanel";
 import ChecklistEditorPanel from "../components/ChecklistEditorPanel";
 import PreviewModal from "../components/PreviewModal";
-import RejectDocumentModal from "../components/RejectDocumentModal";
 import DeleteDocumentModal from "../components/DeleteDocumentModal";
 import ExpedientHeaderInfo from "../components/ExpedientHeaderInfo";
-import { useCallback, useMemo, useState } from "react";
+
 import { useExpedientData } from "../hooks/useExpedientData";
 
 export default function ExpedientDocuments() {
@@ -24,6 +26,7 @@ export default function ExpedientDocuments() {
       params.requestId ??
       params.requestID ??
       "") as string;
+
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [params]);
@@ -35,12 +38,10 @@ export default function ExpedientDocuments() {
   const [toastMsg, setToastMsg] = useState("");
 
   const showToast = useCallback((type: ToastType, msg: string) => {
-  setToastType(type);
-  setToastMsg(msg);
-  setToastOpen(true);
-}, []);
-
-
+    setToastType(type);
+    setToastMsg(msg);
+    setToastOpen(true);
+  }, []);
 
   const {
     fileInputRef,
@@ -140,6 +141,67 @@ export default function ExpedientDocuments() {
     canUse,
     showToast,
   });
+
+  const handleClosePreview = useCallback(() => {
+    setShowRejectBox(false);
+    setRejectObservations("");
+    closePreview();
+  }, [closePreview, setShowRejectBox, setRejectObservations]);
+
+  const handleApproveCurrent = useCallback(() => {
+    if (!currentPreview) return;
+
+    void onReviewPreviewDocument(
+      currentPreview,
+      DOCUMENT_STATUS_APPROVED,
+    );
+  }, [
+    currentPreview,
+    onReviewPreviewDocument,
+    DOCUMENT_STATUS_APPROVED,
+  ]);
+
+  const handleRejectCurrent = useCallback(() => {
+    if (!currentPreview) return;
+
+    if (!rejectObservations.trim()) {
+      showToast("error", "Escribe una observación para denegar el documento.");
+      return;
+    }
+
+    void onReviewPreviewDocument(
+      currentPreview,
+      DOCUMENT_STATUS_REJECTED,
+      rejectObservations,
+    );
+  }, [
+    currentPreview,
+    rejectObservations,
+    onReviewPreviewDocument,
+    DOCUMENT_STATUS_REJECTED,
+    showToast,
+  ]);
+
+  const handleDeleteCurrent = useCallback(async () => {
+  if (!deleteTarget) return;
+
+  try {
+    await onDeletePreviewDocumentByItem(deleteTarget, deletePassword);
+
+    setDeletePassword("");
+    closeDeleteModal();
+    handleClosePreview();
+  } catch (error) {
+    console.error("Error al eliminar documento:", error);
+  }
+}, [
+  deleteTarget,
+  deletePassword,
+  onDeletePreviewDocumentByItem,
+  setDeletePassword,
+  closeDeleteModal,
+  handleClosePreview,
+]);
 
   return (
     <div className={`${styles.page} ${previewOpen ? styles.pageLocked : ""}`}>
@@ -363,38 +425,15 @@ export default function ExpedientDocuments() {
         deletingPreview={deletingPreview}
         showRejectBox={showRejectBox}
         setShowRejectBox={setShowRejectBox}
-        closePreview={closePreview}
+        rejectComment={rejectObservations}
+        setRejectComment={setRejectObservations}
+        closePreview={handleClosePreview}
         openUrl={openUrl}
         goPrevPreview={goPrevPreview}
         goNextPreview={goNextPreview}
         openDeleteModal={openDeleteModal}
-        onApprove={() =>
-          currentPreview &&
-          void onReviewPreviewDocument(
-            currentPreview,
-            DOCUMENT_STATUS_APPROVED,
-          )
-        }
-      />
-
-      <RejectDocumentModal
-        open={previewOpen && showRejectBox}
-        currentPreview={currentPreview}
-        rejectObservations={rejectObservations}
-        setRejectObservations={setRejectObservations}
-        reviewingDocument={reviewingDocument}
-        onClose={() => {
-          setShowRejectBox(false);
-          setRejectObservations("");
-        }}
-        onConfirm={() =>
-          currentPreview &&
-          void onReviewPreviewDocument(
-            currentPreview,
-            DOCUMENT_STATUS_REJECTED,
-            rejectObservations,
-          )
-        }
+        onApprove={handleApproveCurrent}
+        onReject={handleRejectCurrent}
       />
 
       <DeleteDocumentModal
@@ -404,13 +443,7 @@ export default function ExpedientDocuments() {
         setDeletePassword={setDeletePassword}
         deletingPreview={deletingPreview}
         onClose={closeDeleteModal}
-        onConfirm={() =>
-          deleteTarget &&
-          void onDeletePreviewDocumentByItem(
-            deleteTarget,
-            deletePassword,
-          )
-        }
+        onConfirm={handleDeleteCurrent}
       />
     </div>
   );

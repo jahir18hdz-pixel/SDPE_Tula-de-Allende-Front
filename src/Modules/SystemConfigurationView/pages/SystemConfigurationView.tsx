@@ -211,7 +211,6 @@ const SystemConfigurationView: React.FC = () => {
       setInitialForm(savedForm);
 
       showToast("Configuración guardada correctamente.", "success");
-
       await loadConfiguration();
     } catch (error) {
       console.error("Error saving configuration:", error);
@@ -223,37 +222,29 @@ const SystemConfigurationView: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <button
-            type="button"
-            className={styles.backButton}
-            onClick={() => navigate(-1)}
-            disabled={loading || saving}
-          >
-            ← Volver
-          </button>
+      <div className={styles.mainContent}>
+        <section className={styles.hero}>
+          <div className={styles.header}>
+            <div className={styles.headerLeft}>
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={() => navigate(-1)}
+                disabled={loading || saving}
+              >
+                ← Volver
+              </button>
 
-          <div className={styles.headerContent}>
-            <h1 className={styles.title}>Configuración del sistema</h1>
-            <p className={styles.subtitle}>
-              Administra el envío de correos automáticos y define desde qué fecha
-              estarán habilitadas las notificaciones del sistema.
-            </p>
-          </div>
-        </div>
-
-        <form className={styles.card} onSubmit={handleSubmit}>
-          <div className={styles.cardHeader}>
-            <div>
-              <h2 className={styles.sectionTitle}>Notificaciones por correo</h2>
-              <p className={styles.sectionText}>
-                Configura si el sistema enviará correos automáticos y establece
-                la fecha de inicio para las notificaciones.
-              </p>
+              <div className={styles.headerContent}>
+                <h1 className={styles.title}>Configuración del sistema</h1>
+                <p className={styles.subtitle}>
+                  Administra el envío de correos automáticos y define desde qué
+                  fecha estarán habilitadas las notificaciones del sistema.
+                </p>
+              </div>
             </div>
 
-            <div className={styles.statusBadgeWrap}>
+            <div className={styles.headerBadgeWrap}>
               <span
                 className={`${styles.statusBadge} ${
                   form.emailsEnabled
@@ -268,8 +259,48 @@ const SystemConfigurationView: React.FC = () => {
             </div>
           </div>
 
+          <div className={styles.kpiGrid}>
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Estado actual</span>
+              <strong className={styles.kpiValue}>
+                {form.emailsEnabled ? "Activo" : "Inactivo"}
+              </strong>
+              <span className={styles.kpiHint}>Envío automático de correos</span>
+            </div>
+
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Fecha configurada</span>
+              <strong className={styles.kpiValueSmall}>
+                {form.emailsEnabled && form.notificationStartDate
+                  ? formatDateLabel(form.notificationStartDate)
+                  : "No aplica"}
+              </strong>
+              <span className={styles.kpiHint}>Inicio de notificaciones</span>
+            </div>
+
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>Cambios pendientes</span>
+              <strong className={styles.kpiValue}>
+                {hasChanges ? "Sí" : "No"}
+              </strong>
+              <span className={styles.kpiHint}>Comparado con la configuración guardada</span>
+            </div>
+          </div>
+        </section>
+
+        <form className={styles.card} onSubmit={handleSubmit}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.sectionTitle}>Notificaciones por correo</h2>
+              <p className={styles.sectionText}>
+                Configura si el sistema enviará correos automáticos y establece
+                la fecha de inicio para las notificaciones.
+              </p>
+            </div>
+          </div>
+
           <div className={styles.section}>
-            <div className={styles.fieldGroup}>
+            <div className={styles.switchCard}>
               <div className={styles.switchRow}>
                 <div className={styles.switchText}>
                   <span className={styles.label}>Habilitar envío de correos</span>
@@ -338,6 +369,13 @@ const SystemConfigurationView: React.FC = () => {
                       : "No aplica"}
                   </span>
                 </div>
+
+                <div className={styles.infoItem}>
+                  <span className={styles.infoItemTitle}>Cambios sin guardar:</span>
+                  <span className={styles.infoItemValue}>
+                    {hasChanges ? "Sí, hay cambios pendientes" : "No hay cambios"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -369,8 +407,8 @@ const SystemConfigurationView: React.FC = () => {
               {loading
                 ? "Cargando..."
                 : saving
-                ? "Guardando..."
-                : "Guardar configuración"}
+                  ? "Guardando..."
+                  : "Guardar configuración"}
             </button>
           </div>
         </form>

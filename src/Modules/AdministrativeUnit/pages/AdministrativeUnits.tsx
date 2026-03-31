@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "../styles/administrativeUnits.module.css";
 
 import Toast from "../../../Components/layout/Toast";

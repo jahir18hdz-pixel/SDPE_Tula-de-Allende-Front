@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/managerPanel.module.css";
 import type {
   AdministrativeUnitOption,
   ManagerFormState,

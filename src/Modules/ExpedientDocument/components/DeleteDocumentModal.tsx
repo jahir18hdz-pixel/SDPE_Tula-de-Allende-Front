@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/deleteDocument.module.css";
 import type { PreviewItem } from "../types/expedient.types";
 
 type Props = {
@@ -36,7 +36,7 @@ export default function DeleteDocumentModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.deleteConfirmHeader}>
-          <div className={styles.deleteConfirmIcon}>🗑️</div>
+         <div className={styles.deleteConfirmIcon}>×</div>
 
           <div className={styles.deleteConfirmHeaderText}>
             <div className={styles.deleteConfirmTitle}>

@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/uploadPanel.module.css";
 import type { UploadRow,  } from "../types/expedient.types";
 import { bytesToHuman } from "../utils/expedient.utils";
 

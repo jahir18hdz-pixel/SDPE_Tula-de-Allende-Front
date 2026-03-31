@@ -1,5 +1,5 @@
 import React from "react";
-import styles from "../styles/ExpedientDocuments.module.css";
+import styles from "../styles/checklist.module.css";
 import type { ChecklistExceptionRow } from "../types/expedient.types";
 
 type Props = {
