@@ -11,6 +11,7 @@ import styles from "../styles/AcquisitionRequest.module.css";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import { requestJson, authHeaders } from "../../../services/api";
+import AcquisitionRequestPostCreate from "../components/AcquisitionRequestPostCreate";
 
 type CatalogItem = { id: number; name: string };
 
@@ -45,30 +46,9 @@ type CreateForm = {
   details: CreateDetail[];
 };
 
-type ManagerForm = {
-  idAdministrativeUnit: number | null;
-  firstName: string;
-  lastName: string;
-  secondLastName: string;
-  email: string;
-  phone: string;
-};
-
-type DocState = {
-  idDocumentType: number;
-  name: string;
-  requiredByRule: boolean;
-  applies: boolean;
-};
-
 type Step = "create" | "postCreate";
 
 const API_BASE = "/api/AcquisitionRequest";
-const MANAGER_API = "/api/RequestManager";
-const DOC_EXCEPTION_TOGGLE = "/api/RequestDocumentException/toggle";
-
-const DOCS_ENDPOINT = (idAcqClass: number) =>
-  `/api/ClasificationDocumentType/by-classification/${idAcqClass}`;
 
 const CATALOG_ENDPOINTS = {
   administrativeUnits: "/api/AdministrativeUnit",
@@ -112,15 +92,6 @@ const initialCreate: CreateForm = {
   idBeneficiary: null,
 
   details: [emptyDetail()],
-};
-
-const initialManager: ManagerForm = {
-  idAdministrativeUnit: null,
-  firstName: "",
-  lastName: "",
-  secondLastName: "",
-  email: "",
-  phone: "",
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -269,21 +240,6 @@ function hasCreateChanges(form: CreateForm): boolean {
   );
 }
 
-function hasManagerChanges(form: ManagerForm): boolean {
-  return (
-    form.idAdministrativeUnit !== null ||
-    form.firstName.trim() !== "" ||
-    form.lastName.trim() !== "" ||
-    form.secondLastName.trim() !== "" ||
-    form.email.trim() !== "" ||
-    form.phone.trim() !== ""
-  );
-}
-
-function hasDocsChanges(docs: DocState[]): boolean {
-  return docs.length > 0;
-}
-
 export default function AcquisitionRequest() {
   const navigate = useNavigate();
   const pageRef = useRef<HTMLDivElement | null>(null);
@@ -293,10 +249,6 @@ export default function AcquisitionRequest() {
 
   const [saving, setSaving] = useState(false);
   const [create, setCreate] = useState<CreateForm>(initialCreate);
-
-  const [savingManager, setSavingManager] = useState(false);
-  const [manager, setManager] = useState<ManagerForm>(initialManager);
-  const [managerSaved, setManagerSaved] = useState(false);
 
   const [loadingCats, setLoadingCats] = useState(false);
 
@@ -315,10 +267,6 @@ export default function AcquisitionRequest() {
   const [beneficiaries, setBeneficiaries] = useState<CatalogItem[]>([]);
   const [cogs, setCogs] = useState<CatalogItem[]>([]);
 
-  const [docsLoading, setDocsLoading] = useState(false);
-  const [docsSaving, setDocsSaving] = useState(false);
-  const [docs, setDocs] = useState<DocState[]>([]);
-
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
   const [toastMsg, setToastMsg] = useState("");
@@ -335,37 +283,18 @@ export default function AcquisitionRequest() {
   const lastOutsideToastRef = useRef(0);
 
   const createDisabled = saving || loadingCats;
-  const postDisabled = savingManager || docsSaving || docsLoading;
-
   const isCreateDirty = useMemo(() => hasCreateChanges(create), [create]);
-  const isManagerDirty = useMemo(() => hasManagerChanges(manager), [manager]);
-  const isDocsDirty = useMemo(() => hasDocsChanges(docs), [docs]);
 
   const workflowLocked = useMemo(() => {
-    if (saving || savingManager || docsSaving || docsLoading) return true;
-    if (step === "postCreate") return true;
-    if (isCreateDirty) return true;
-    if (isManagerDirty) return true;
-    if (isDocsDirty) return true;
+    if (saving || loadingCats) return true;
+    if (step === "create" && isCreateDirty) return true;
     return false;
-  }, [
-    saving,
-    savingManager,
-    docsSaving,
-    docsLoading,
-    step,
-    isCreateDirty,
-    isManagerDirty,
-    isDocsDirty,
-  ]);
+  }, [saving, loadingCats, step, isCreateDirty]);
 
   const resetAll = useCallback(() => {
     setStep("create");
     setCreatedIdRequest(null);
     setCreate(initialCreate);
-    setManager(initialManager);
-    setDocs([]);
-    setManagerSaved(false);
   }, []);
 
   useEffect(() => {
@@ -419,9 +348,9 @@ export default function AcquisitionRequest() {
   useEffect(() => {
     if (!workflowLocked) return;
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -847,194 +776,11 @@ export default function AcquisitionRequest() {
 
       setCreatedIdRequest(idRequest);
       setStep("postCreate");
-      setManagerSaved(false);
-
-      setManager((p) => ({
-        ...p,
-        idAdministrativeUnit: create.idAdministrativeUnit ?? null,
-      }));
-
       showToast("success", `Solicitud registrada. Folio interno: ${idRequest}`);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
+    } catch (error: unknown) {
+      showToast("error", toErrorMessage(error));
     } finally {
       setSaving(false);
-    }
-  }
-
-  const classificationId = create.idAcquisitionClassification;
-
-  const loadDocsByClassification = useCallback(async () => {
-    if (!classificationId) return;
-
-    setDocsLoading(true);
-    try {
-      const res = await requestJson(DOCS_ENDPOINT(classificationId), {
-        method: "GET",
-        headers: authHeaders(),
-      });
-
-      if (!res.ok) throw new Error(res.error);
-
-      const payload = res.data;
-      const arr: unknown[] = Array.isArray(payload)
-        ? payload
-        : isRecord(payload)
-          ? asArray(
-              getValue(payload, [
-                "items",
-                "Items",
-                "data",
-                "Data",
-                "result",
-                "Result",
-              ]),
-            )
-          : [];
-
-      const mapped: DocState[] = arr
-        .map((raw): DocState | null => {
-          if (!isRecord(raw)) return null;
-
-          const id = toNumber(
-            getValue(raw, [
-              "documentTypeId",
-              "DocumentTypeId",
-              "idDocumentType",
-              "IdDocumentType",
-            ]),
-          );
-          if (!id || id <= 0) return null;
-
-          const name = toStringSafe(
-            getValue(raw, [
-              "documentName",
-              "DocumentName",
-              "name",
-              "Name",
-              "description",
-              "Description",
-            ]),
-          ).trim();
-          if (!name) return null;
-
-          const reqRaw = getValue(raw, [
-            "isRequired",
-            "IsRequired",
-            "requiredByRule",
-            "RequiredByRule",
-          ]);
-          const requiredByRule = typeof reqRaw === "boolean" ? reqRaw : true;
-
-          return {
-            idDocumentType: id,
-            name,
-            requiredByRule,
-            applies: true,
-          };
-        })
-        .filter((x): x is DocState => x !== null);
-
-      setDocs(mapped);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-      setDocs([]);
-    } finally {
-      setDocsLoading(false);
-    }
-  }, [classificationId, showToast]);
-
-  useEffect(() => {
-    if (step !== "postCreate") return;
-    void loadDocsByClassification();
-  }, [step, loadDocsByClassification]);
-
-  function validateManager(): string {
-    if (!createdIdRequest) return "No hay idRequest.";
-    if (!manager.idAdministrativeUnit)
-      return "Selecciona unidad administrativa del responsable.";
-    if (!manager.firstName.trim())
-      return "El nombre del responsable es obligatorio.";
-    if (!manager.lastName.trim()) return "El apellido paterno es obligatorio.";
-    return "";
-  }
-
-  async function onSaveManager() {
-    const msg = validateManager();
-    if (msg) return showToast("error", msg);
-
-    setSavingManager(true);
-    try {
-      const payload = {
-        idRequest: createdIdRequest,
-        idAdministrativeUnit: manager.idAdministrativeUnit,
-        firstName: manager.firstName.trim(),
-        lastName: manager.lastName.trim(),
-        secondLastName: manager.secondLastName.trim() || null,
-        email: manager.email.trim() || null,
-        phone: manager.phone.trim() || null,
-      };
-
-      const res = await requestJson(MANAGER_API, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) return showToast("error", res.error);
-
-      setManagerSaved(true);
-      showToast("success", "Responsable registrado.");
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSavingManager(false);
-    }
-  }
-
-  function validateDocs(): string {
-    if (!createdIdRequest) return "No hay idRequest.";
-    if (!managerSaved) return "Primero guarda el responsable.";
-
-    const bad = docs.find(
-      (d) => !Number.isFinite(d.idDocumentType) || d.idDocumentType <= 0,
-    );
-    if (bad) return `Documento con Id inválido: ${bad.name}`;
-
-    return "";
-  }
-
-  async function onSaveDocsChecklist() {
-    const msg = validateDocs();
-    if (msg) return showToast("error", msg);
-    if (!createdIdRequest) return;
-
-    setDocsSaving(true);
-    try {
-      const payload = {
-        idRequest: createdIdRequest,
-        documents: docs.map((d) => ({
-          idDocumentType: d.idDocumentType,
-          doesNotApply: !d.applies,
-          justification: "",
-        })),
-      };
-
-      const res = await requestJson(DOC_EXCEPTION_TOGGLE, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) return showToast("error", res.error);
-
-      showToast("success", "Checklist guardado correctamente.");
-      resetAll();
-      navigate("/home");
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setDocsSaving(false);
     }
   }
 
@@ -1052,16 +798,16 @@ export default function AcquisitionRequest() {
   }
 
   const headerHint = useMemo(() => {
-    if (loadingCats) return "Cargando catálogos...";
+    if (loadingCats) return "Cargando catálogos y preparando el formulario.";
     if (step === "postCreate")
-      return "Ahora registra el responsable y define los documentos que no aplican.";
-    return "Completa los campos, agrega al menos un detalle y guarda la solicitud.";
+      return "Completa el responsable y define qué documentos no aplican para esta solicitud.";
+    return "Captura la información general, relaciones y al menos un detalle para registrar la solicitud.";
   }, [loadingCats, step]);
 
   const titleRight = useMemo(() => {
     if (step === "postCreate" && createdIdRequest)
       return `ID Solicitud: ${createdIdRequest}`;
-    return "";
+    return "Alta de solicitud";
   }, [step, createdIdRequest]);
 
   return (
@@ -1089,7 +835,7 @@ export default function AcquisitionRequest() {
               className={styles.btnBack}
               type="button"
               onClick={() => navigate("/home")}
-              disabled={workflowLocked || saving || savingManager || docsSaving}
+              disabled={workflowLocked || saving}
               title="Regresar al home"
             >
               Volver al inicio
@@ -1098,15 +844,9 @@ export default function AcquisitionRequest() {
             <button
               className={styles.btnGhost}
               type="button"
-              onClick={
-                step === "create" ? () => setCreate(initialCreate) : resetAll
-              }
-              disabled={step === "create" ? createDisabled : postDisabled}
-              title={
-                step === "create"
-                  ? "Cancelar captura"
-                  : "Cancelar post-registro"
-              }
+              onClick={resetAll}
+              disabled={createDisabled}
+              title="Borrar captura"
             >
               Borrar datos
             </button>
@@ -1119,15 +859,15 @@ export default function AcquisitionRequest() {
           <p className={styles.cardTitle}>
             {step === "create" ? "Nueva solicitud" : "Post-registro"}
           </p>
-          {!!titleRight && <span className={styles.badge}>{titleRight}</span>}
+          <span className={styles.badge}>{titleRight}</span>
         </div>
 
         <div className={styles.panelBody}>
           {step === "create" && (
             <form
               className={styles.form}
-              onSubmit={(e) => {
-                e.preventDefault();
+              onSubmit={(event) => {
+                event.preventDefault();
                 void onCreate();
               }}
             >
@@ -1139,10 +879,10 @@ export default function AcquisitionRequest() {
                     <input
                       className={styles.floatingInput}
                       value={create.requestNumber}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          requestNumber: e.target.value,
+                          requestNumber: event.target.value,
                         }))
                       }
                       disabled={createDisabled}
@@ -1157,10 +897,10 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.requestDate}
-                        onChange={(e) =>
+                        onChange={(event) =>
                           setCreate((p) => ({
                             ...p,
-                            requestDate: e.target.value,
+                            requestDate: event.target.value,
                           }))
                         }
                         disabled={createDisabled}
@@ -1183,10 +923,10 @@ export default function AcquisitionRequest() {
                   <textarea
                     className={styles.floatingTextareaArea}
                     value={create.justification}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setCreate((p) => ({
                         ...p,
-                        justification: e.target.value,
+                        justification: event.target.value,
                       }))
                     }
                     disabled={createDisabled}
@@ -1207,10 +947,10 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.authorizationDate}
-                        onChange={(e) =>
+                        onChange={(event) =>
                           setCreate((p) => ({
                             ...p,
-                            authorizationDate: e.target.value,
+                            authorizationDate: event.target.value,
                           }))
                         }
                         disabled={createDisabled}
@@ -1235,10 +975,10 @@ export default function AcquisitionRequest() {
                         className={`${styles.floatingInput} ${styles.dateInput}`}
                         type="date"
                         value={create.completeMaximeDate}
-                        onChange={(e) =>
+                        onChange={(event) =>
                           setCreate((p) => ({
                             ...p,
-                            completeMaximeDate: e.target.value,
+                            completeMaximeDate: event.target.value,
                           }))
                         }
                         disabled={createDisabled}
@@ -1261,8 +1001,8 @@ export default function AcquisitionRequest() {
                   <input
                     className={styles.floatingInput}
                     value={create.cfdi}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, cfdi: e.target.value }))
+                    onChange={(event) =>
+                      setCreate((p) => ({ ...p, cfdi: event.target.value }))
                     }
                     disabled={createDisabled}
                     placeholder="Ej. UUID, folio o referencia CFDI"
@@ -1273,8 +1013,11 @@ export default function AcquisitionRequest() {
                   <input
                     className={styles.floatingInput}
                     value={create.observations}
-                    onChange={(e) =>
-                      setCreate((p) => ({ ...p, observations: e.target.value }))
+                    onChange={(event) =>
+                      setCreate((p) => ({
+                        ...p,
+                        observations: event.target.value,
+                      }))
                     }
                     disabled={createDisabled}
                     placeholder="Notas adicionales (opcional)"
@@ -1288,11 +1031,11 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idAdministrativeUnit ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
                           idAdministrativeUnit: toNullableNumber(
-                            e.target.value,
+                            event.target.value,
                           ),
                         }))
                       }
@@ -1311,10 +1054,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idProject ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idProject: toNullableNumber(e.target.value),
+                          idProject: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1332,10 +1075,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idAcquisitionType ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idAcquisitionType: toNullableNumber(e.target.value),
+                          idAcquisitionType: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1353,10 +1096,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idSupplier ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idSupplier: toNullableNumber(e.target.value),
+                          idSupplier: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1374,10 +1117,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idFundingSource ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idFundingSource: toNullableNumber(e.target.value),
+                          idFundingSource: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1395,11 +1138,11 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idAcquisitionClassification ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
                           idAcquisitionClassification: toNullableNumber(
-                            e.target.value,
+                            event.target.value,
                           ),
                         }))
                       }
@@ -1418,10 +1161,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idProgram ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idProgram: toNullableNumber(e.target.value),
+                          idProgram: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1439,10 +1182,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idCommunity ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idCommunity: toNullableNumber(e.target.value),
+                          idCommunity: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1460,10 +1203,10 @@ export default function AcquisitionRequest() {
                     <select
                       className={styles.floatingSelect}
                       value={create.idBeneficiary ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idBeneficiary: toNullableNumber(e.target.value),
+                          idBeneficiary: toNullableNumber(event.target.value),
                         }))
                       }
                       disabled={createDisabled}
@@ -1500,9 +1243,9 @@ export default function AcquisitionRequest() {
                             <select
                               className={styles.floatingSelect}
                               value={detail.idCog ?? ""}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updateDetail(index, {
-                                  idCog: toNullableNumber(e.target.value),
+                                  idCog: toNullableNumber(event.target.value),
                                 })
                               }
                               disabled={createDisabled}
@@ -1520,9 +1263,9 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.quantity}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updateDetail(index, {
-                                  quantity: e.target.value,
+                                  quantity: event.target.value,
                                 })
                               }
                               disabled={createDisabled}
@@ -1535,9 +1278,9 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.unitMeasure}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updateDetail(index, {
-                                  unitMeasure: e.target.value,
+                                  unitMeasure: event.target.value,
                                 })
                               }
                               disabled={createDisabled}
@@ -1551,9 +1294,9 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.description}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updateDetail(index, {
-                                  description: e.target.value,
+                                  description: event.target.value,
                                 })
                               }
                               disabled={createDisabled}
@@ -1565,9 +1308,9 @@ export default function AcquisitionRequest() {
                             <input
                               className={styles.floatingInput}
                               value={detail.unitAmount}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updateDetail(index, {
-                                  unitAmount: e.target.value,
+                                  unitAmount: event.target.value,
                                 })
                               }
                               disabled={createDisabled}
@@ -1614,182 +1357,18 @@ export default function AcquisitionRequest() {
             </form>
           )}
 
-          {step === "postCreate" && (
-            <div className={styles.form}>
-              <div className={styles.detailCard}>
-                <div className={styles.sectionTitle}>Responsable</div>
-
-                <div className={styles.grid3}>
-                  <FloatingField label="Unidad administrativa" required>
-                    <select
-                      className={styles.floatingSelect}
-                      value={manager.idAdministrativeUnit ?? ""}
-                      onChange={(e) =>
-                        setManager((p) => ({
-                          ...p,
-                          idAdministrativeUnit: toNullableNumber(
-                            e.target.value,
-                          ),
-                        }))
-                      }
-                      disabled={postDisabled}
-                    >
-                      <option value="">Selecciona...</option>
-                      {administrativeUnits.map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                    </select>
-                  </FloatingField>
-
-                  <FloatingField label="Nombre(s)" required>
-                    <input
-                      className={styles.floatingInput}
-                      value={manager.firstName}
-                      onChange={(e) =>
-                        setManager((p) => ({ ...p, firstName: e.target.value }))
-                      }
-                      disabled={postDisabled}
-                      placeholder="Ej. Juan"
-                    />
-                  </FloatingField>
-
-                  <FloatingField label="Apellido paterno" required>
-                    <input
-                      className={styles.floatingInput}
-                      value={manager.lastName}
-                      onChange={(e) =>
-                        setManager((p) => ({ ...p, lastName: e.target.value }))
-                      }
-                      disabled={postDisabled}
-                      placeholder="Ej. Pérez"
-                    />
-                  </FloatingField>
-
-                  <FloatingField label="Apellido materno">
-                    <input
-                      className={styles.floatingInput}
-                      value={manager.secondLastName}
-                      onChange={(e) =>
-                        setManager((p) => ({
-                          ...p,
-                          secondLastName: e.target.value,
-                        }))
-                      }
-                      disabled={postDisabled}
-                      placeholder="Ej. López"
-                    />
-                  </FloatingField>
-
-                  <FloatingField label="Email">
-                    <input
-                      className={styles.floatingInput}
-                      value={manager.email}
-                      onChange={(e) =>
-                        setManager((p) => ({ ...p, email: e.target.value }))
-                      }
-                      disabled={postDisabled}
-                      placeholder="correo@dominio.com"
-                    />
-                  </FloatingField>
-
-                  <FloatingField label="Teléfono">
-                    <input
-                      className={styles.floatingInput}
-                      value={manager.phone}
-                      onChange={(e) =>
-                        setManager((p) => ({ ...p, phone: e.target.value }))
-                      }
-                      disabled={postDisabled}
-                      placeholder="Ej. 7711234567"
-                    />
-                  </FloatingField>
-                </div>
-
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    onClick={() => void onSaveManager()}
-                    disabled={postDisabled}
-                  >
-                    {savingManager
-                      ? "Guardando..."
-                      : managerSaved
-                        ? "Responsable guardado"
-                        : "Guardar responsable"}
-                  </button>
-                </div>
-
-                <div className={styles.sectionTitle}>
-                  Documentos por clasificación
-                </div>
-
-                {!managerSaved && (
-                  <div className={styles.docsHint}>
-                    Primero guarda el responsable para habilitar el checklist.
-                  </div>
-                )}
-
-                <div className={styles.docsWrap}>
-                  {docsLoading && (
-                    <div className={styles.docsHint}>
-                      Cargando documentos...
-                    </div>
-                  )}
-
-                  {!docsLoading && docs.length === 0 && (
-                    <div className={styles.docsHint}>
-                      No hay documentos para esta clasificación.
-                    </div>
-                  )}
-
-                  {docs.map((d) => (
-                    <div key={d.idDocumentType} className={styles.docRow}>
-                      <div className={styles.docLeft}>
-                        <label className={styles.docName}>
-                          <input
-                            type="checkbox"
-                            checked={d.applies}
-                            onChange={(e) =>
-                              setDocs((prev) =>
-                                prev.map((x) =>
-                                  x.idDocumentType === d.idDocumentType
-                                    ? { ...x, applies: e.target.checked }
-                                    : x,
-                                ),
-                              )
-                            }
-                            disabled={postDisabled || !managerSaved}
-                          />
-                          <span>{d.name}</span>
-                        </label>
-
-                        <div className={styles.docMini}>
-                          {d.applies
-                            ? d.requiredByRule
-                              ? "Aplica / Obligatorio por clasificación"
-                              : "Aplica / Opcional por clasificación"
-                            : "No aplica para esta solicitud"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.btnSave}
-                    onClick={() => void onSaveDocsChecklist()}
-                    disabled={postDisabled || !managerSaved}
-                  >
-                    {docsSaving ? "Guardando..." : "Guardar checklist"}
-                  </button>
-                </div>
-              </div>
-            </div>
+          {step === "postCreate" && createdIdRequest && (
+            <AcquisitionRequestPostCreate
+              idRequest={createdIdRequest}
+              classificationId={create.idAcquisitionClassification}
+              administrativeUnits={administrativeUnits}
+              initialAdministrativeUnitId={create.idAdministrativeUnit}
+              showToast={showToast}
+              onSuccess={() => {
+                resetAll();
+                navigate("/home");
+              }}
+            />
           )}
         </div>
       </section>

@@ -481,16 +481,35 @@ export function useExpedientData({
   }, [canUse, loadChecklist]);
 
   const stats = useMemo(() => {
-    const required = checklist.filter(
-      (x) => x.requiredByRule && !x.noApplies,
-    ).length;
-    const uploadedOk = checklist.filter((x) => x.uploaded).length;
-    const requiredUploaded = checklist.filter(
-      (x) => x.requiredByRule && !x.noApplies && x.uploaded,
-    ).length;
-    const missingRequired = Math.max(0, required - requiredUploaded);
-    return { required, uploadedOk, requiredUploaded, missingRequired };
-  }, [checklist]);
+  const required = checklist.filter(
+    (x) => x.requiredByRule && !x.noApplies,
+  ).length;
+
+  const uploadedOk = checklist.filter((x) => x.uploaded).length;
+
+  const requiredUploaded = checklist.filter(
+    (x) => x.requiredByRule && !x.noApplies && x.uploaded,
+  ).length;
+
+  const missingRequired = Math.max(0, required - requiredUploaded);
+
+  // 👇 NUEVO: contar observados
+  const observed = checklist.filter((x) =>
+    x.files?.some(
+      (f) =>
+        (f.status || "").toLowerCase().includes("observado") ||
+        (f.status || "").toLowerCase().includes("rechazado"),
+    ),
+  ).length;
+
+  return {
+    required,
+    uploadedOk,
+    requiredUploaded,
+    missingRequired,
+    observed, // 👈 agregado
+  };
+}, [checklist]);
 
   const filteredChecklist = useMemo(() => {
     const q = searchText.trim().toLowerCase();

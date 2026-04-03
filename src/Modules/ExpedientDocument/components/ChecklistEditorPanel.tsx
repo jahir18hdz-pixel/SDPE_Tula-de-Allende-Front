@@ -21,8 +21,6 @@ export default function ChecklistEditorPanel({
   onClose,
   onSave,
 }: Props) {
-  if (!open) return null;
-
   return (
     <div
       className={`${styles.uploadOverlay} ${

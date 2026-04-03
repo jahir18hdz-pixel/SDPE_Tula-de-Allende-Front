@@ -151,15 +151,8 @@ export default function ExpedientDocuments() {
   const handleApproveCurrent = useCallback(() => {
     if (!currentPreview) return;
 
-    void onReviewPreviewDocument(
-      currentPreview,
-      DOCUMENT_STATUS_APPROVED,
-    );
-  }, [
-    currentPreview,
-    onReviewPreviewDocument,
-    DOCUMENT_STATUS_APPROVED,
-  ]);
+    void onReviewPreviewDocument(currentPreview, DOCUMENT_STATUS_APPROVED);
+  }, [currentPreview, onReviewPreviewDocument, DOCUMENT_STATUS_APPROVED]);
 
   const handleRejectCurrent = useCallback(() => {
     if (!currentPreview) return;
@@ -183,25 +176,25 @@ export default function ExpedientDocuments() {
   ]);
 
   const handleDeleteCurrent = useCallback(async () => {
-  if (!deleteTarget) return;
+    if (!deleteTarget) return;
 
-  try {
-    await onDeletePreviewDocumentByItem(deleteTarget, deletePassword);
+    try {
+      await onDeletePreviewDocumentByItem(deleteTarget, deletePassword);
 
-    setDeletePassword("");
-    closeDeleteModal();
-    handleClosePreview();
-  } catch (error) {
-    console.error("Error al eliminar documento:", error);
-  }
-}, [
-  deleteTarget,
-  deletePassword,
-  onDeletePreviewDocumentByItem,
-  setDeletePassword,
-  closeDeleteModal,
-  handleClosePreview,
-]);
+      setDeletePassword("");
+      closeDeleteModal();
+      handleClosePreview();
+    } catch (error) {
+      console.error("Error al eliminar documento:", error);
+    }
+  }, [
+    deleteTarget,
+    deletePassword,
+    onDeletePreviewDocumentByItem,
+    setDeletePassword,
+    closeDeleteModal,
+    handleClosePreview,
+  ]);
 
   return (
     <div className={`${styles.page} ${previewOpen ? styles.pageLocked : ""}`}>
@@ -218,68 +211,78 @@ export default function ExpedientDocuments() {
           previewOpen ? styles.mainContentBlurred : ""
         }`}
       >
-        <div className={styles.topActionsBar}>
-          <button
-            type="button"
-            className={styles.btnBack}
-            onClick={() => navigate(-1)}
-            title="Regresar"
-            aria-label="Regresar"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M15 18l-6-6 6-6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span>Regresar</span>
-          </button>
+        <div className={styles.topbar}>
+          <div className={styles.topbarLeft}>
+            <h1 className={styles.title}>Expediente de documentos</h1>
+            <p className={styles.subtitle}>
+              Consulta, administra y revisa los archivos de la solicitud.
+            </p>
+          </div>
 
-          <div className={styles.topActionsRight}>
-            <div className={styles.searchCompactInline}>
-              <input
-                className={styles.input}
-                placeholder="Buscar documento..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
+          <div className={styles.kpis}>
+            <div className={`${styles.kpiChip} ${styles.kpiOk}`}>
+              <span className={styles.kpiLabel}>Cargados</span>
+              <span className={styles.kpiValue}>{stats.uploadedOk}</span>
+            </div>
+
+            <div className={`${styles.kpiChip} ${styles.kpiBad}`}>
+              <span className={styles.kpiLabel}>Faltan</span>
+              <span className={styles.kpiValue}>{stats.missingRequired}</span>
+            </div>
+
+            <div className={`${styles.kpiObserved} ${styles.kpiObserved}`}>
+              <span className={styles.kpiLabel}>Observados</span>
+              <span className={styles.kpiValue}>{stats.observed}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.toolbar}>
+          <div className={styles.search}>
+            <input
+              placeholder="Buscar documento..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              disabled={!canUse}
+            />
+          </div>
+
+          <div className={styles.controls}>
+            {searchText.trim() !== "" && (
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={() => setSearchText("")}
                 disabled={!canUse}
-              />
+              >
+                Limpiar
+              </button>
+            )}
 
-              {searchText.trim() !== "" && (
-                <button
-                  type="button"
-                  className={styles.ghostBtn}
-                  onClick={() => setSearchText("")}
-                >
-                  Limpiar
-                </button>
-              )}
-            </div>
-
-            <div className={styles.headerStatsInline}>
-              <div className={styles.statsBoxOk}>
-                <span className={styles.statsInlineLabel}>Cargados:</span>
-                <span className={styles.statsHeaderValue}>
-                  {stats.uploadedOk}
-                </span>
-              </div>
-
-              <div className={styles.statsBoxBad}>
-                <span className={styles.statsInlineLabel}>Faltan:</span>
-                <span className={styles.statsHeaderValue}>
-                  {stats.missingRequired}
-                </span>
-              </div>
-            </div>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={() => navigate(-1)}
+              title="Regresar"
+              aria-label="Regresar"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M15 18l-6-6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Regresar</span>
+            </button>
 
             <button
               type="button"

@@ -70,6 +70,36 @@ export default function PreviewModal({
       ? styles.blockOk
       : styles.blockNeutral;
 
+  const handlePrevPreview = () => {
+    setAutoPlay(false);
+    setShowRejectBox(false);
+    setRejectComment("");
+    goPrevPreview();
+  };
+
+  const handleNextPreview = () => {
+    setAutoPlay(false);
+    setShowRejectBox(false);
+    setRejectComment("");
+    goNextPreview();
+  };
+
+  const handleSelectPreview = (idx: number) => {
+    setAutoPlay(false);
+    setShowRejectBox(false);
+    setRejectComment("");
+    setPreviewIndex(idx);
+  };
+
+  const handleToggleRejectBox = () => {
+    setAutoPlay(false);
+    setShowRejectBox((prev) => {
+      const next = !prev;
+      if (!next) setRejectComment("");
+      return next;
+    });
+  };
+
   return (
     <div
       className={styles.previewOverlay}
@@ -126,7 +156,7 @@ export default function PreviewModal({
                 id="btn-denegar-documento"
                 type="button"
                 className={styles.dangerBtn}
-                onClick={() => setShowRejectBox((prev) => !prev)}
+                onClick={handleToggleRejectBox}
                 disabled={reviewingDocument || deletingPreview}
                 title="Denegar documento"
               >
@@ -175,10 +205,7 @@ export default function PreviewModal({
                         <button
                           type="button"
                           className={`${styles.carouselNav} ${styles.carouselPrev}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goPrevPreview();
-                          }}
+                          onClick={handlePrevPreview}
                           aria-label="Archivo anterior"
                         >
                           ‹
@@ -187,10 +214,7 @@ export default function PreviewModal({
                         <button
                           type="button"
                           className={`${styles.carouselNav} ${styles.carouselNext}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goNextPreview();
-                          }}
+                          onClick={handleNextPreview}
                           aria-label="Archivo siguiente"
                         >
                           ›
@@ -215,10 +239,7 @@ export default function PreviewModal({
                         <button
                           type="button"
                           className={`${styles.carouselNav} ${styles.carouselPrev}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goPrevPreview();
-                          }}
+                          onClick={handlePrevPreview}
                           aria-label="Archivo anterior"
                         >
                           ‹
@@ -227,10 +248,7 @@ export default function PreviewModal({
                         <button
                           type="button"
                           className={`${styles.carouselNav} ${styles.carouselNext}`}
-                          onClick={() => {
-                            setAutoPlay(false);
-                            goNextPreview();
-                          }}
+                          onClick={handleNextPreview}
                           aria-label="Archivo siguiente"
                         >
                           ›
@@ -267,10 +285,7 @@ export default function PreviewModal({
                       <button
                         type="button"
                         className={styles.carouselNavInline}
-                        onClick={() => {
-                          setAutoPlay(false);
-                          goPrevPreview();
-                        }}
+                        onClick={handlePrevPreview}
                       >
                         Anterior
                       </button>
@@ -278,10 +293,7 @@ export default function PreviewModal({
                       <button
                         type="button"
                         className={styles.carouselNavInline}
-                        onClick={() => {
-                          setAutoPlay(false);
-                          goNextPreview();
-                        }}
+                        onClick={handleNextPreview}
                       >
                         Siguiente
                       </button>
@@ -312,10 +324,7 @@ export default function PreviewModal({
                       <button
                         type="button"
                         className={styles.previewThumbBtn}
-                        onClick={() => {
-                          setAutoPlay(false);
-                          setPreviewIndex(idx);
-                        }}
+                        onClick={() => handleSelectPreview(idx)}
                         title={item.name}
                       >
                         {item.type === "image" ? (
@@ -385,8 +394,6 @@ export default function PreviewModal({
                 </div>
               </div>
 
-              
-
               <div className={styles.previewInfoBlock}>
                 <div className={styles.previewInfoLabel}>Observaciones</div>
 
@@ -444,9 +451,7 @@ export default function PreviewModal({
                           !rejectComment.trim()
                         }
                       >
-                        {reviewingDocument
-                          ? "Procesando..."
-                          : "Denegar"}
+                        {reviewingDocument ? "Procesando..." : "Denegar"}
                       </button>
                     </div>
                   </div>

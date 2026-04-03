@@ -14,8 +14,6 @@
 
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
   --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
-  --radiusCard: 16px;
-  --radiusSoft: 12px;
 }
 
 /* =========================
@@ -30,9 +28,9 @@
   flex-direction: column;
   padding: 18px;
   background:
-    radial-gradient(1100px 520px at 25% -10%, rgba(182, 138, 42, 0.1), transparent 60%),
-    radial-gradient(900px 520px at 95% 0%, rgba(75, 0, 22, 0.1), transparent 60%),
-    var(--bg);
+    radial-gradient(1100px 520px at 25% -10%, rgba(182, 138, 42, 0.08), transparent 60%),
+    radial-gradient(900px 520px at 95% 0%, rgba(75, 0, 22, 0.08), transparent 60%),
+    #f6f7fb;
 }
 
 .pageLocked {
@@ -40,36 +38,47 @@
 }
 
 .header {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   flex: 0 0 auto;
 }
 
 .headerTop {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: end;
+  align-items: center;
   gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgba(91, 18, 36, 0.16), transparent 80%),
+    radial-gradient(900px 420px at 60% -10%, rgba(91, 18, 36, 0.18), transparent 80%),
+    #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .headerText {
   min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
+  line-height: 1.1;
   font-weight: 900;
-  letter-spacing: 0.2px;
-  color: var(--guinda2);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  letter-spacing: -0.03em;
+  color: #0f172a;
 }
 
 .sub {
-  margin: 6px 0 0;
-  color: #000;
-  font-size: 14px;
-  opacity: 0.75;
-  font-weight: 400;
+  margin: 0;
+  color: rgba(15, 23, 42, 0.65);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
 }
 
 .headerActions {
@@ -121,6 +130,17 @@
   color: #000;
 }
 
+.badge {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(182, 138, 42, 0.35);
+  background: rgba(182, 138, 42, 0.12);
+  color: rgba(75, 0, 22, 0.92);
+}
+
 .panelBody {
   padding: 16px;
   display: flex;
@@ -129,6 +149,27 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 0, 22, 0.35) rgba(0, 0, 0, 0.05);
+}
+
+.panelBody::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.panelBody::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+}
+
+.panelBody::-webkit-scrollbar-thumb {
+  background: rgba(75, 0, 22, 0.35);
+  border-radius: 999px;
+}
+
+.panelBody::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 0, 22, 0.55);
 }
 
 /* =========================
@@ -415,9 +456,7 @@
 
 .btnGhost,
 .btnSave,
-.btnPrimary,
-.btnBack,
-.btnWarning {
+.btnBack {
   height: 44px;
   padding: 0 16px;
   border-radius: 12px;
@@ -438,19 +477,6 @@
   border: none;
   font-family: inherit;
   white-space: nowrap;
-}
-
-.btnPrimary {
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--guinda2), var(--guinda));
-  box-shadow: var(--shadowSoft);
-  padding: 0 18px;
-}
-
-.btnPrimary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-  background: linear-gradient(135deg, var(--guinda), var(--guinda2));
 }
 
 .btnGhost {
@@ -488,28 +514,6 @@
   box-shadow: 0 12px 20px rgba(101, 0, 31, 0.14);
 }
 
-.btnWarning {
-  border: 1px solid rgba(182, 138, 42, 0.48);
-  background: linear-gradient(
-    180deg,
-    rgba(182, 138, 42, 0.16),
-    rgba(182, 138, 42, 0.26)
-  );
-  color: #5b3b00;
-  box-shadow: 0 8px 16px rgba(182, 138, 42, 0.12);
-}
-
-.btnWarning:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(182, 138, 42, 0.72);
-  background: linear-gradient(
-    180deg,
-    rgba(182, 138, 42, 0.28),
-    rgba(182, 138, 42, 0.4)
-  );
-  box-shadow: 0 12px 22px rgba(182, 138, 42, 0.18);
-}
-
 .btnSave {
   border: 1px solid rgba(22, 163, 74, 0.95);
   background: rgba(22, 163, 74, 0.14);
@@ -524,11 +528,9 @@
   box-shadow: var(--shadow);
 }
 
-.btnPrimary:disabled,
 .btnGhost:disabled,
 .btnSave:disabled,
-.btnBack:disabled,
-.btnWarning:disabled {
+.btnBack:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
@@ -536,21 +538,7 @@
 }
 
 /* =========================
-   BADGE
-========================= */
-.badge {
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(182, 138, 42, 0.35);
-  background: rgba(182, 138, 42, 0.12);
-  color: rgba(75, 0, 22, 0.92);
-}
-
-/* =========================
-   DOCS + DETALLES
+   DETALLES
 ========================= */
 .docsWrap {
   display: flex;
@@ -592,71 +580,20 @@
   width: 100%;
 }
 
-.docName {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 900;
-  color: #111827;
-}
-
-.docName input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--gold);
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.docMini {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-/* Hace que el titulo "Detalle X" se vea más compacto dentro del card */
 .docLeft .sectionTitle {
   margin-top: 0;
   margin-bottom: 2px;
 }
 
-/* Más aire entre campos dentro de cada detalle */
 .docLeft .grid3,
 .docLeft .doubleRow {
   gap: 16px;
 }
 
-/* Botones dentro del detalle */
 .docLeft .actions {
   justify-content: flex-end;
   padding-top: 2px;
   margin-top: 0;
-}
-
-/* =========================
-   SCROLLBAR
-========================= */
-.panelBody {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(75, 0, 22, 0.35) rgba(0, 0, 0, 0.05);
-}
-
-.panelBody::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.panelBody::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 999px;
-}
-
-.panelBody::-webkit-scrollbar-thumb {
-  background: rgba(75, 0, 22, 0.35);
-  border-radius: 999px;
-}
-
-.panelBody::-webkit-scrollbar-thumb:hover {
-  background: rgba(75, 0, 22, 0.55);
 }
 
 /* =========================
@@ -674,10 +611,8 @@
     gap: 10px;
   }
 
-  .btnPrimary,
   .btnGhost,
-  .btnBack,
-  .btnWarning {
+  .btnBack {
     width: 100%;
   }
 

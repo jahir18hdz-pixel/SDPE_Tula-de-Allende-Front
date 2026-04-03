@@ -517,34 +517,7 @@ export default function SupplierPage() {
     }
   }
 
-  async function onToggleStatus(next: boolean) {
-    if (!selected) return showToast("error", "Selecciona un proveedor.");
-    const rfc = getRfc(selected);
-    if (!rfc) return showToast("error", "No se pudo resolver el RFC.");
-
-    setSaving(true);
-    try {
-      const result = await requestJson(
-        `${API_BASE}/by-rfc/${encodeURIComponent(rfc)}/status`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(next),
-        },
-      );
-
-      if (!result.ok) return showToast("error", result.error);
-
-      showToast(
-        "success",
-        `Proveedor ${next ? "activado" : "desactivado"} correctamente`,
-      );
-      await loadPage(page, rfc);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
+  
 
   async function onSearchByRfc() {
     const q = normalizeRfc(search);
@@ -685,24 +658,7 @@ export default function SupplierPage() {
           </div>
 
           <div className={styles.headerActions}>
-            <button
-              className={styles.btnGhost}
-              type="button"
-              onClick={() => {
-                const q = normalizeRfc(search);
-                if (q.length === 12 || q.length === 13) void onSearchByRfc();
-                else {
-                  showToast(
-                    "error",
-                    "Para buscar exacto, escribe un RFC de 12 o 13 caracteres y presiona Enter.",
-                  );
-                }
-              }}
-              disabled={formDisabled || asTrim(search) === ""}
-              title="Buscar por RFC exacto"
-            >
-              Buscar RFC
-            </button>
+            
 
             <button
               className={styles.btnGhost}
@@ -1008,15 +964,7 @@ export default function SupplierPage() {
                     Editar
                   </button>
 
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => onToggleStatus(!(getActive(selected) ?? false))}
-                    disabled={formDisabled}
-                    title="Activar/Desactivar por RFC (PATCH)"
-                  >
-                    {(getActive(selected) ?? false) ? "Desactivar" : "Activar"}
-                  </button>
+                  
                 </div>
               </div>
             )}

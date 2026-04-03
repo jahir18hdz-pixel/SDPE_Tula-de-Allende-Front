@@ -6,6 +6,7 @@ import { FiSearch, FiTrash2, FiCalendar } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import NotificationToast from "../../../Components/layout/NotificationToast";
+import CfdiPanel from "../../ExpedientDocument/components/CfdiPanel";
 import {
   BASE_URL,
   readToken,
@@ -79,8 +80,19 @@ type EditDateTarget = {
   fechaActual: string | null;
 };
 
+type CfdiFormState = {
+  cfdi: string;
+};
+
+type CfdiTarget = {
+  idRequest: number;
+  folio: string;
+  cfdiActual: string;
+};
+
 const API_BASE = "/api/AcquisitionRequest";
-const PAYMENT_POLICY_API = "/api/PaymentPolicy";
+const PAYMENT_POLICY_API = "/api/PaymentPolicy/policies";
+const UPDATE_CFDI_API = `${API_BASE}/update-cfdi`;
 
 function getDaysUntil(dateValue?: string | null) {
   if (!dateValue) return null;
@@ -157,7 +169,7 @@ function hasCfdi(value: string) {
 function getExtensionFromSource(source: string) {
   const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
   const parts = clean.split(".");
-  return parts.length > 1 ? parts.pop() ?? "" : "";
+  return parts.length > 1 ? (parts.pop() ?? "") : "";
 }
 
 function getPreviewType(
@@ -249,6 +261,7 @@ export default function Home() {
     message: "",
     requestId: null,
   });
+  
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
@@ -264,9 +277,16 @@ export default function Home() {
   >(null);
 
   const [editDateModalOpen, setEditDateModalOpen] = useState(false);
-  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(null);
+  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(
+    null,
+  );
   const [editDateValue, setEditDateValue] = useState("");
   const [savingDate, setSavingDate] = useState(false);
+
+  const [cfdiPanelOpen, setCfdiPanelOpen] = useState(false);
+  const [cfdiTarget, setCfdiTarget] = useState<CfdiTarget | null>(null);
+  const [cfdiForm, setCfdiForm] = useState<CfdiFormState>({ cfdi: "" });
+  const [savingCfdi, setSavingCfdi] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -434,6 +454,27 @@ export default function Home() {
     setEditDateModalOpen(true);
   }, []);
 
+  const openCfdiPanel = useCallback((row: Row) => {
+    setCfdiTarget({
+      idRequest: row.idRequest,
+      folio: row.folio,
+      cfdiActual: row.cfdi,
+    });
+
+    setCfdiForm({
+      cfdi: hasCfdi(row.cfdi) ? row.cfdi : "",
+    });
+
+    setCfdiPanelOpen(true);
+  }, []);
+
+  const closeCfdiPanel = useCallback(() => {
+    if (savingCfdi) return;
+    setCfdiPanelOpen(false);
+    setCfdiTarget(null);
+    setCfdiForm({ cfdi: "" });
+  }, [savingCfdi]);
+
   const onSaveMaxDate = useCallback(async () => {
     if (!editDateTarget) return;
 
@@ -474,7 +515,52 @@ export default function Home() {
     } finally {
       setSavingDate(false);
     }
-  }, [editDateTarget, editDateValue, closeEditDateModal, fetchData, showAppToast]);
+  }, [
+    editDateTarget,
+    editDateValue,
+    closeEditDateModal,
+    fetchData,
+    showAppToast,
+  ]);
+
+  const onSaveCfdi = useCallback(async () => {
+    if (!cfdiTarget) return;
+
+    const cfdiValue = cfdiForm.cfdi.trim();
+
+    setSavingCfdi(true);
+
+    try {
+      const res = (await requestJson(UPDATE_CFDI_API, {
+        method: "PATCH",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          requestId: cfdiTarget.idRequest,
+          cfdi: cfdiValue,
+        }),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showAppToast(res.error || "No se pudo actualizar el CFDI.", "error");
+        return;
+      }
+
+      showAppToast(
+        cfdiValue
+          ? "CFDI actualizado correctamente."
+          : "CFDI eliminado correctamente.",
+        "success",
+      );
+      closeCfdiPanel();
+      await fetchData();
+    } catch {
+      showAppToast("Error inesperado al actualizar el CFDI.", "error");
+    } finally {
+      setSavingCfdi(false);
+    }
+  }, [cfdiTarget, cfdiForm, closeCfdiPanel, fetchData, showAppToast]);
 
   const openUrl = useCallback((u: string) => {
     const url = normalizeUrlMaybe(u);
@@ -601,7 +687,8 @@ export default function Home() {
       !previewOpen &&
       !deleteModalOpen &&
       !classificationModalText &&
-      !editDateModalOpen
+      !editDateModalOpen &&
+      !cfdiPanelOpen
     ) {
       return;
     }
@@ -616,6 +703,11 @@ export default function Home() {
 
       if (editDateModalOpen) {
         closeEditDateModal();
+        return;
+      }
+
+      if (cfdiPanelOpen) {
+        closeCfdiPanel();
         return;
       }
 
@@ -636,8 +728,10 @@ export default function Home() {
     deleteModalOpen,
     classificationModalText,
     editDateModalOpen,
+    cfdiPanelOpen,
     closeDeleteModal,
     closeEditDateModal,
+    closeCfdiPanel,
     closePreview,
   ]);
 
@@ -689,12 +783,29 @@ export default function Home() {
   }, [rows, query, statusFilter]);
 
   const kpiTotal = filtered.length;
-  const kpiCompleto = filtered.filter(
-    (r) => normalizeText(r.estado) === "completo",
-  ).length;
-  const kpiIncompleto = filtered.filter(
-    (r) => normalizeText(r.estado) === "incompleto",
-  ).length;
+
+const kpiCompleto = filtered.filter(
+  (r) => normalizeText(r.estado) === "completo",
+).length;
+
+const kpiIncompleto = filtered.filter(
+  (r) => normalizeText(r.estado) === "incompleto",
+).length;
+
+const kpiObservados = filtered.filter((r) => {
+  const estado = normalizeText(r.estado);
+  return estado.includes("observado");
+}).length;
+
+const kpiRevision = filtered.filter((r) => {
+  const estado = normalizeText(r.estado);
+  return (
+    estado.includes("revision") ||
+    estado.includes("revisión") ||
+    estado.includes("en revision") ||
+    estado.includes("en revisión")
+  );
+}).length;
 
   function goRegister() {
     navigate("/adquisiciones/registrar");
@@ -716,7 +827,8 @@ export default function Home() {
     previewOpen ||
     deleteModalOpen ||
     !!classificationModalText ||
-    editDateModalOpen;
+    editDateModalOpen ||
+    cfdiPanelOpen;
 
   return (
     <div
@@ -736,7 +848,9 @@ export default function Home() {
         onClose={closeNotificationToast}
         onView={() => {
           if (notificationToast.requestId) {
-            navigate(`/adquisiciones/${notificationToast.requestId}/expediente`);
+            navigate(
+              `/adquisiciones/${notificationToast.requestId}/expediente`,
+            );
             closeNotificationToast();
           }
         }}
@@ -760,13 +874,25 @@ export default function Home() {
               <span className={styles.kpiLabel}>Total</span>
               <span className={styles.kpiValue}>{kpiTotal}</span>
             </div>
+
             <div className={`${styles.kpiChip} ${styles.kpiOk}`}>
               <span className={styles.kpiLabel}>Completo</span>
               <span className={styles.kpiValue}>{kpiCompleto}</span>
             </div>
+
             <div className={`${styles.kpiChip} ${styles.kpiBad}`}>
               <span className={styles.kpiLabel}>Incompleto</span>
               <span className={styles.kpiValue}>{kpiIncompleto}</span>
+            </div>
+
+            <div className={`${styles.kpiObserved} ${styles.kpiObserved}`}>
+              <span className={styles.kpiLabel}>Observados</span>
+              <span className={styles.kpiValue}>{kpiObservados}</span>
+            </div>
+
+            <div className={`${styles.kpiReview} ${styles.kpiReview}`}>
+              <span className={styles.kpiLabel}>En revisión</span>
+              <span className={styles.kpiValue}>{kpiRevision}</span>
             </div>
           </div>
         </div>
@@ -904,21 +1030,22 @@ export default function Home() {
                         </td>
 
                         <td>
-                          {cfdiExists ? (
-                            <span
-                              className={`${styles.policyBadge} ${styles.policyBadgeOk}`}
-                              title={r.cfdi}
-                            >
-                              {r.cfdi}
-                            </span>
-                          ) : (
-                            <span
-                              className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
-                              title="Sin CFDI asignado"
-                            >
-                              Sin CFDI
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            className={`${styles.policyBadge} ${
+                              cfdiExists
+                                ? styles.policyBadgeOk
+                                : styles.policyBadgeEmpty
+                            } ${styles.policyBadgeButton}`}
+                            title={
+                              cfdiExists
+                                ? `Editar CFDI ${r.cfdi}`
+                                : "Agregar CFDI"
+                            }
+                            onClick={() => openCfdiPanel(r)}
+                          >
+                            {cfdiExists ? r.cfdi : "Sin CFDI"}
+                          </button>
                         </td>
 
                         <td>
@@ -950,7 +1077,6 @@ export default function Home() {
                             onClick={() => openEditDateModal(r)}
                             title={`Editar fecha límite de ${r.folio}`}
                           >
-                            
                             <span>{r.fechaLimite}</span>
                           </button>
                         </td>
@@ -1167,19 +1293,17 @@ export default function Home() {
 
               <div className={styles.deleteFormField}>
                 <label className={styles.deleteFieldLabel}>Fecha límite</label>
-                <input
-                  type="date"
-                  className={styles.deleteInput}
-                  value={editDateValue}
-                  onChange={(e) => setEditDateValue(e.target.value)}
-                  disabled={savingDate}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !savingDate) {
-                      void onSaveMaxDate();
-                    }
-                  }}
-                />
+                <div className={styles.dateWrapper}>
+                  <input
+                    type="date"
+                    className={styles.deleteInput}
+                    value={editDateValue}
+                    onChange={(e) => setEditDateValue(e.target.value)}
+                    disabled={savingDate}
+                  />
+
+                  <FiCalendar className={styles.dateCustomIcon} />
+                </div>
               </div>
 
               <div className={styles.deleteWarningBox}>
@@ -1209,6 +1333,16 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <CfdiPanel
+        open={cfdiPanelOpen}
+        savingCfdi={savingCfdi}
+        cfdi={cfdiTarget?.cfdiActual ?? ""}
+        cfdiForm={cfdiForm}
+        setCfdiForm={setCfdiForm}
+        onClose={closeCfdiPanel}
+        onSave={() => void onSaveCfdi()}
+      />
 
       {deleteModalOpen && deleteTarget && (
         <div

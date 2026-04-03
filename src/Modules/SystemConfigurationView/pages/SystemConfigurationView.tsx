@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../styles/SystemConfigurationView.module.css";
 
@@ -69,8 +75,27 @@ const resolveDate = (data: SystemConfigurationStatusDto): string | null => {
   return data.date ?? data.Date ?? null;
 };
 
+type DatePickerInput = HTMLInputElement & {
+  showPicker?: () => void;
+};
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M7 2V5M17 2V5M3 9H21M5 5H19C20.1046 5 21 5.89543 21 7V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V7C3 5.89543 3.89543 5 5 5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 const SystemConfigurationView: React.FC = () => {
   const navigate = useNavigate();
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const [form, setForm] = useState<FormState>({
     emailsEnabled: false,
@@ -94,7 +119,10 @@ const SystemConfigurationView: React.FC = () => {
     setToastType(type);
     setToastOpen(true);
   };
-
+  const handleReset = () => {
+    setForm(initialForm);
+    showToast("Cambios descartados.", "success");
+  };
   const hasChanges = useMemo(() => {
     return (
       form.emailsEnabled !== initialForm.emailsEnabled ||
@@ -106,6 +134,12 @@ const SystemConfigurationView: React.FC = () => {
     if (!form.emailsEnabled) return true;
     return form.notificationStartDate.trim().length > 0;
   }, [form]);
+
+  const currentStatusText = form.emailsEnabled ? "Activo" : "Inactivo";
+  const currentDateText =
+    form.emailsEnabled && form.notificationStartDate
+      ? formatDateLabel(form.notificationStartDate)
+      : "No aplica";
 
   const loadConfiguration = useCallback(async () => {
     setLoading(true);
@@ -161,8 +195,17 @@ const SystemConfigurationView: React.FC = () => {
     }));
   };
 
-  const handleReset = () => {
-    setForm(initialForm);
+  const openDatePicker = () => {
+    const input = dateInputRef.current as DatePickerInput | null;
+    if (!input || input.disabled) return;
+
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,7 +214,7 @@ const SystemConfigurationView: React.FC = () => {
     if (!canSave) {
       showToast(
         "Debes seleccionar una fecha de inicio si los correos están habilitados.",
-        "error"
+        "error",
       );
       return;
     }
@@ -225,159 +268,206 @@ const SystemConfigurationView: React.FC = () => {
       <div className={styles.mainContent}>
         <section className={styles.hero}>
           <div className={styles.header}>
-            <div className={styles.headerLeft}>
+            <div className={styles.headerText}>
+              <h1 className={styles.title}>Configuración del sistema</h1>
+              <p className={styles.subtitle}>
+                Administra el envío de correos automáticos y define desde qué
+                fecha estarán habilitadas las notificaciones del sistema.
+              </p>
+            </div>
+
+            <div className={styles.headerActions}>
               <button
                 type="button"
-                className={styles.backButton}
+                className={styles.secondaryButton}
                 onClick={() => navigate(-1)}
                 disabled={loading || saving}
               >
-                ← Volver
+                Volver
               </button>
 
-              <div className={styles.headerContent}>
-                <h1 className={styles.title}>Configuración del sistema</h1>
-                <p className={styles.subtitle}>
-                  Administra el envío de correos automáticos y define desde qué
-                  fecha estarán habilitadas las notificaciones del sistema.
-                </p>
-              </div>
-            </div>
-
-            <div className={styles.headerBadgeWrap}>
-              <span
-                className={`${styles.statusBadge} ${
-                  form.emailsEnabled
-                    ? styles.statusEnabled
-                    : styles.statusDisabled
-                }`}
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={loadConfiguration}
+                disabled={loading || saving}
               >
-                {form.emailsEnabled
-                  ? "Correos habilitados"
-                  : "Correos deshabilitados"}
-              </span>
-            </div>
-          </div>
-
-          <div className={styles.kpiGrid}>
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Estado actual</span>
-              <strong className={styles.kpiValue}>
-                {form.emailsEnabled ? "Activo" : "Inactivo"}
-              </strong>
-              <span className={styles.kpiHint}>Envío automático de correos</span>
-            </div>
-
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Fecha configurada</span>
-              <strong className={styles.kpiValueSmall}>
-                {form.emailsEnabled && form.notificationStartDate
-                  ? formatDateLabel(form.notificationStartDate)
-                  : "No aplica"}
-              </strong>
-              <span className={styles.kpiHint}>Inicio de notificaciones</span>
-            </div>
-
-            <div className={styles.kpiCard}>
-              <span className={styles.kpiLabel}>Cambios pendientes</span>
-              <strong className={styles.kpiValue}>
-                {hasChanges ? "Sí" : "No"}
-              </strong>
-              <span className={styles.kpiHint}>Comparado con la configuración guardada</span>
+                {loading ? "Actualizando..." : "Actualizar"}
+              </button>
             </div>
           </div>
         </section>
 
-        <form className={styles.card} onSubmit={handleSubmit}>
-          <div className={styles.cardHeader}>
-            <div>
-              <h2 className={styles.sectionTitle}>Notificaciones por correo</h2>
-              <p className={styles.sectionText}>
-                Configura si el sistema enviará correos automáticos y establece
-                la fecha de inicio para las notificaciones.
-              </p>
-            </div>
+        <section className={styles.toolbar}>
+          <div className={styles.filters}>
+            <span className={styles.filterChip}>
+              Estado
+              <span className={styles.filterCount}>{currentStatusText}</span>
+            </span>
+
+            <span className={styles.filterChip}>
+              Fecha
+              <span className={styles.filterCount}>{currentDateText}</span>
+            </span>
+
+            <span
+              className={`${styles.filterChip} ${
+                hasChanges ? styles.filterChipWarn : ""
+              }`}
+            >
+              Cambios
+              <span className={styles.filterCount}>
+                {hasChanges ? "Pendientes" : "Sin cambios"}
+              </span>
+            </span>
           </div>
 
-          <div className={styles.section}>
-            <div className={styles.switchCard}>
-              <div className={styles.switchRow}>
-                <div className={styles.switchText}>
-                  <span className={styles.label}>Habilitar envío de correos</span>
-                  <p className={styles.helpText}>
-                    Activa esta opción para permitir que el sistema envíe
-                    notificaciones automáticas por correo.
+          <div className={styles.toolbarActions}>
+            <span
+              className={`${styles.statusBadge} ${
+                form.emailsEnabled
+                  ? styles.statusEnabled
+                  : styles.statusDisabled
+              }`}
+            >
+              {form.emailsEnabled
+                ? "Correos habilitados"
+                : "Correos deshabilitados"}
+            </span>
+          </div>
+        </section>
+
+        <form className={styles.content} onSubmit={handleSubmit}>
+          <div className={styles.contentGrid}>
+            <section className={styles.leftColumn}>
+              <div className={styles.configCard}>
+                <div className={styles.blockHeader}>
+                  <span className={styles.blockEyebrow}>
+                    Configuración general
+                  </span>
+                </div>
+
+                <div className={styles.switchRow}>
+                  <div className={styles.switchText}>
+                    <span className={styles.label}>Habilitar correos</span>
+                    <p className={styles.helpText}>
+                      Cuando esta opción está activa, el sistema podrá enviar
+                      notificaciones automáticas por correo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`${styles.switch} ${
+                      form.emailsEnabled ? styles.switchActive : ""
+                    }`}
+                    onClick={handleToggleEmails}
+                    aria-pressed={form.emailsEnabled}
+                    aria-label={
+                      form.emailsEnabled
+                        ? "Deshabilitar envío de correos"
+                        : "Habilitar envío de correos"
+                    }
+                    disabled={loading || saving}
+                  >
+                    <span className={styles.switchThumb} />
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.configCard}>
+                <div className={styles.blockHeader}>
+                  <span className={styles.blockEyebrow}>Programación</span>
+                  <h2 className={styles.blockTitle}>
+                    Fecha de inicio de notificaciones
+                  </h2>
+                  <p className={styles.blockDescription}>
+                    Selecciona desde qué fecha comenzará el envío automático de
+                    correos.
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  className={`${styles.switch} ${
-                    form.emailsEnabled ? styles.switchActive : ""
-                  }`}
-                  onClick={handleToggleEmails}
-                  aria-pressed={form.emailsEnabled}
-                  aria-label={
-                    form.emailsEnabled
-                      ? "Deshabilitar envío de correos"
-                      : "Habilitar envío de correos"
-                  }
-                  disabled={loading || saving}
-                >
-                  <span className={styles.switchThumb} />
-                </button>
-              </div>
-            </div>
+                <div className={styles.fieldGroup}>
+                  <label
+                    htmlFor="notificationStartDate"
+                    className={styles.label}
+                  >
+                    Fecha
+                  </label>
 
-            <div className={styles.grid}>
-              <div className={styles.fieldGroup}>
-                <label htmlFor="notificationStartDate" className={styles.label}>
-                  Fecha de inicio de notificaciones
-                </label>
+                  <div className={styles.dateWrap}>
+                    <input
+                      ref={dateInputRef}
+                      id="notificationStartDate"
+                      type="date"
+                      className={`${styles.input} ${styles.dateInput}`}
+                      value={form.notificationStartDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      disabled={!form.emailsEnabled || loading || saving}
+                    />
 
-                <input
-                  id="notificationStartDate"
-                  type="date"
-                  className={styles.input}
-                  value={form.notificationStartDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  disabled={!form.emailsEnabled || loading || saving}
-                />
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={openDatePicker}
+                      disabled={!form.emailsEnabled || loading || saving}
+                      aria-label="Abrir calendario"
+                      title="Seleccionar fecha"
+                    >
+                      <CalendarIcon />
+                    </button>
+                  </div>
 
-                <p className={styles.helpText}>
-                  {form.emailsEnabled
-                    ? "Selecciona la fecha desde la cual comenzarán a enviarse las notificaciones."
-                    : "Activa primero el envío de correos para habilitar este campo."}
-                </p>
-              </div>
-
-              <div className={styles.infoPanel}>
-                <span className={styles.infoLabel}>Resumen actual</span>
-
-                <div className={styles.infoItem}>
-                  <span className={styles.infoItemTitle}>Estado:</span>
-                  <span className={styles.infoItemValue}>
-                    {form.emailsEnabled ? "Activo" : "Inactivo"}
-                  </span>
-                </div>
-
-                <div className={styles.infoItem}>
-                  <span className={styles.infoItemTitle}>Fecha configurada:</span>
-                  <span className={styles.infoItemValue}>
-                    {form.emailsEnabled && form.notificationStartDate
-                      ? formatDateLabel(form.notificationStartDate)
-                      : "No aplica"}
-                  </span>
-                </div>
-
-                <div className={styles.infoItem}>
-                  <span className={styles.infoItemTitle}>Cambios sin guardar:</span>
-                  <span className={styles.infoItemValue}>
-                    {hasChanges ? "Sí, hay cambios pendientes" : "No hay cambios"}
-                  </span>
+                  <p className={styles.helpText}>
+                    {form.emailsEnabled
+                      ? "Selecciona la fecha desde la cual comenzarán a enviarse las notificaciones."
+                      : "Activa primero el envío de correos para habilitar este campo."}
+                  </p>
                 </div>
               </div>
-            </div>
+            </section>
+
+            <aside className={styles.rightColumn}>
+              <div className={styles.summaryCard}>
+                <div className={styles.blockHeader}>
+                  <span className={styles.blockEyebrow}>Resumen</span>
+                  <h2 className={styles.blockTitle}>Estado actual</h2>
+                  <p className={styles.blockDescription}>
+                    Vista rápida de la configuración actual del sistema.
+                  </p>
+                </div>
+
+                <div className={styles.summaryList}>
+                  <div className={styles.summaryItem}>
+                    <span className={styles.summaryItemLabel}>
+                      Envío de correos
+                    </span>
+                    <span className={styles.summaryItemValue}>
+                      {currentStatusText}
+                    </span>
+                  </div>
+
+                  <div className={styles.summaryItem}>
+                    <span className={styles.summaryItemLabel}>
+                      Fecha configurada
+                    </span>
+                    <span className={styles.summaryItemValue}>
+                      {currentDateText}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.summaryFooter}>
+                  <span
+                    className={`${styles.miniStatus} ${
+                      hasChanges ? styles.miniStatusWarn : styles.miniStatusOk
+                    }`}
+                  >
+                    {hasChanges ? "Hay cambios sin guardar" : "Todo guardado"}
+                  </span>
+                </div>
+              </div>
+            </aside>
           </div>
 
           <div className={styles.actions}>
@@ -386,15 +476,6 @@ const SystemConfigurationView: React.FC = () => {
               className={styles.secondaryButton}
               onClick={handleReset}
               disabled={loading || saving || !hasChanges}
-            >
-              Restablecer
-            </button>
-
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => navigate(-1)}
-              disabled={loading || saving}
             >
               Cancelar
             </button>

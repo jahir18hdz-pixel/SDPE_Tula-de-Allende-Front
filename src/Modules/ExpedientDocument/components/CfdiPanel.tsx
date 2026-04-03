@@ -21,8 +21,6 @@ export default function CfdiPanel({
   onClose,
   onSave,
 }: Props) {
-  if (!open) return null;
-
   return (
     <div
       className={`${styles.uploadOverlay} ${
