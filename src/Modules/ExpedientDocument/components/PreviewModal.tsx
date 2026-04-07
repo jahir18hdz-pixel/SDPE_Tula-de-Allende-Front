@@ -23,6 +23,9 @@ type Props = {
   openDeleteModal: (item: PreviewItem) => void;
   onApprove: () => void;
   onReject: () => void;
+  canApproveDocuments: boolean;
+  canRejectDocuments: boolean;
+  canDeleteDocuments: boolean;
 };
 
 export default function PreviewModal({
@@ -46,6 +49,9 @@ export default function PreviewModal({
   openDeleteModal,
   onApprove,
   onReject,
+  canApproveDocuments,
+  canRejectDocuments,
+  canDeleteDocuments,
 }: Props) {
   if (!open || !currentPreview) return null;
 
@@ -138,7 +144,7 @@ export default function PreviewModal({
               Abrir aparte
             </button>
 
-            {currentPreview.id && (
+            {currentPreview.id && canApproveDocuments && (
               <button
                 id="btn-aprobar-documento"
                 type="button"
@@ -151,7 +157,7 @@ export default function PreviewModal({
               </button>
             )}
 
-            {currentPreview.id && (
+            {currentPreview.id && canRejectDocuments && (
               <button
                 id="btn-denegar-documento"
                 type="button"
@@ -164,7 +170,7 @@ export default function PreviewModal({
               </button>
             )}
 
-            {currentPreview.id && (
+            {currentPreview.id && canDeleteDocuments && (
               <button
                 type="button"
                 className={styles.iconDangerBtn}
@@ -348,7 +354,7 @@ export default function PreviewModal({
                         )}
                       </button>
 
-                      {item.id && (
+                      {item.id && canDeleteDocuments && (
                         <button
                           type="button"
                           className={styles.previewThumbDelete}
@@ -369,9 +375,7 @@ export default function PreviewModal({
             <aside className={styles.previewObservationPane}>
               <div className={styles.previewInfoBlock}>
                 <div className={styles.previewInfoLabel}>Estado</div>
-                <div
-                  className={`${styles.previewMetaCard} ${statusBlockClass}`}
-                >
+                <div className={`${styles.previewMetaCard} ${statusBlockClass}`}>
                   <span className={`${styles.statusPill} ${statusBadgeClass}`}>
                     {currentPreview.reviewStatus || "Pendiente"}
                   </span>
@@ -382,9 +386,7 @@ export default function PreviewModal({
                 <div className={styles.previewInfoLabel}>
                   Nombre del documento
                 </div>
-                <div
-                  className={`${styles.previewMetaCard} ${statusBlockClass}`}
-                >
+                <div className={`${styles.previewMetaCard} ${statusBlockClass}`}>
                   <div
                     className={styles.previewMetaValue}
                     title={currentPreview.name}
@@ -413,7 +415,7 @@ export default function PreviewModal({
                 </div>
               </div>
 
-              {currentPreview.id && showRejectBox && (
+              {currentPreview.id && showRejectBox && canRejectDocuments && (
                 <div className={styles.previewInfoBlock}>
                   <div className={styles.previewInfoLabel}>
                     Denegar documento

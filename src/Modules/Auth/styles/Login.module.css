@@ -313,3 +313,8 @@
 .backLink:hover {
   color: #333;
 }
+.actionsContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}

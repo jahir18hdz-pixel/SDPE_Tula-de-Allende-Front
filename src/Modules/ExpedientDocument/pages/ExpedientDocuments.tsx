@@ -16,6 +16,65 @@ import DeleteDocumentModal from "../components/DeleteDocumentModal";
 import ExpedientHeaderInfo from "../components/ExpedientHeaderInfo";
 
 import { useExpedientData } from "../hooks/useExpedientData";
+import type { PreviewItem } from "../types/expedient.types";
+
+type PermissionGroupDto = {
+  Module?: string;
+  Action?: string[] | string;
+  module?: string;
+  action?: string[] | string;
+};
+
+type LoginResponseWithPerms = {
+  Permissions?: PermissionGroupDto[];
+  permissions?: PermissionGroupDto[];
+};
+
+function normalizeActions(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim().toUpperCase());
+  }
+
+  if (typeof value === "string") {
+    return [value.trim().toUpperCase()];
+  }
+
+  return [];
+}
+
+function getPermissionsFromStorage(): PermissionGroupDto[] {
+  try {
+    const rawAuth = localStorage.getItem("auth");
+    if (!rawAuth) return [];
+
+    const parsed: unknown = JSON.parse(rawAuth);
+    const auth = parsed as LoginResponseWithPerms;
+
+    const permissions = auth.Permissions ?? auth.permissions ?? [];
+    return Array.isArray(permissions) ? permissions : [];
+  } catch (error) {
+    console.error("Error al leer permisos desde localStorage:", error);
+    return [];
+  }
+}
+
+function hasModuleAction(modulePath: string, requiredAction: string): boolean {
+  const permissions = getPermissionsFromStorage();
+  const normalizedRequiredAction = requiredAction.trim().toUpperCase();
+
+  return permissions.some((permission) => {
+    const currentModule = String(
+      permission.Module ?? permission.module ?? "",
+    ).trim();
+
+    const actions = normalizeActions(permission.Action ?? permission.action);
+
+    return (
+      currentModule === modulePath &&
+      actions.includes(normalizedRequiredAction)
+    );
+  });
+}
 
 export default function ExpedientDocuments() {
   const navigate = useNavigate();
@@ -41,6 +100,24 @@ export default function ExpedientDocuments() {
     setToastType(type);
     setToastMsg(msg);
     setToastOpen(true);
+  }, []);
+
+  const permissionModule = "/expedientes/documentos";
+
+  const canUploadFiles = useMemo(() => {
+    return hasModuleAction(permissionModule, "UPLOAD");
+  }, []);
+
+  const canApproveDocuments = useMemo(() => {
+    return hasModuleAction(permissionModule, "APPROVE");
+  }, []);
+
+  const canRejectDocuments = useMemo(() => {
+    return hasModuleAction(permissionModule, "REJECT");
+  }, []);
+
+  const canDeleteDocuments = useMemo(() => {
+    return hasModuleAction(permissionModule, "DELETE");
   }, []);
 
   const {
@@ -151,11 +228,27 @@ export default function ExpedientDocuments() {
   const handleApproveCurrent = useCallback(() => {
     if (!currentPreview) return;
 
+    if (!canApproveDocuments) {
+      showToast("error", "No cuentas con permiso para aprobar documentos.");
+      return;
+    }
+
     void onReviewPreviewDocument(currentPreview, DOCUMENT_STATUS_APPROVED);
-  }, [currentPreview, onReviewPreviewDocument, DOCUMENT_STATUS_APPROVED]);
+  }, [
+    currentPreview,
+    canApproveDocuments,
+    onReviewPreviewDocument,
+    DOCUMENT_STATUS_APPROVED,
+    showToast,
+  ]);
 
   const handleRejectCurrent = useCallback(() => {
     if (!currentPreview) return;
+
+    if (!canRejectDocuments) {
+      showToast("error", "No cuentas con permiso para denegar documentos.");
+      return;
+    }
 
     if (!rejectObservations.trim()) {
       showToast("error", "Escribe una observación para denegar el documento.");
@@ -169,6 +262,7 @@ export default function ExpedientDocuments() {
     );
   }, [
     currentPreview,
+    canRejectDocuments,
     rejectObservations,
     onReviewPreviewDocument,
     DOCUMENT_STATUS_REJECTED,
@@ -177,6 +271,11 @@ export default function ExpedientDocuments() {
 
   const handleDeleteCurrent = useCallback(async () => {
     if (!deleteTarget) return;
+
+    if (!canDeleteDocuments) {
+      showToast("error", "No cuentas con permiso para eliminar documentos.");
+      return;
+    }
 
     try {
       await onDeletePreviewDocumentByItem(deleteTarget, deletePassword);
@@ -190,11 +289,34 @@ export default function ExpedientDocuments() {
   }, [
     deleteTarget,
     deletePassword,
+    canDeleteDocuments,
     onDeletePreviewDocumentByItem,
     setDeletePassword,
     closeDeleteModal,
     handleClosePreview,
+    showToast,
   ]);
+
+  const handleOpenUploadPanel = useCallback(() => {
+    if (!canUploadFiles) {
+      showToast("error", "No cuentas con permiso para agregar archivos.");
+      return;
+    }
+
+    setShowUploadPanel(true);
+  }, [canUploadFiles, setShowUploadPanel, showToast]);
+
+  const handleOpenDeleteModal = useCallback(
+    (item: PreviewItem) => {
+      if (!canDeleteDocuments) {
+        showToast("error", "No cuentas con permiso para eliminar documentos.");
+        return;
+      }
+
+      openDeleteModal(item);
+    },
+    [canDeleteDocuments, openDeleteModal, showToast],
+  );
 
   return (
     <div className={`${styles.page} ${previewOpen ? styles.pageLocked : ""}`}>
@@ -284,14 +406,16 @@ export default function ExpedientDocuments() {
               <span>Regresar</span>
             </button>
 
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setShowUploadPanel(true)}
-              disabled={!canUse || uploading}
-            >
-              Agregar archivos
-            </button>
+            {canUploadFiles && (
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={handleOpenUploadPanel}
+                disabled={!canUse || uploading}
+              >
+                Agregar archivos
+              </button>
+            )}
           </div>
         </div>
 
@@ -326,6 +450,15 @@ export default function ExpedientDocuments() {
               type="file"
               multiple
               onChange={(e) => {
+                if (!canUploadFiles) {
+                  showToast(
+                    "error",
+                    "No cuentas con permiso para agregar archivos.",
+                  );
+                  e.currentTarget.value = "";
+                  return;
+                }
+
                 if (e.target.files && e.target.files.length > 0) {
                   const arr = Array.from(e.target.files);
 
@@ -359,20 +492,22 @@ export default function ExpedientDocuments() {
         </div>
       </div>
 
-      <UploadPanel
-        open={showUploadPanel}
-        canUse={canUse}
-        uploading={uploading}
-        uploads={uploads}
-        checklistOptions={checklistOptions}
-        onClose={() => setShowUploadPanel(false)}
-        onPickFiles={onPickFiles}
-        onRemoveUpload={onRemoveUpload}
-        onBindFromChecklist={onBindFromChecklist}
-        setUploads={setUploads}
-        onUploadMassive={() => void onUploadMassive()}
-        dropHandlers={dropHandlers}
-      />
+      {canUploadFiles && (
+        <UploadPanel
+          open={showUploadPanel}
+          canUse={canUse}
+          uploading={uploading}
+          uploads={uploads}
+          checklistOptions={checklistOptions}
+          onClose={() => setShowUploadPanel(false)}
+          onPickFiles={onPickFiles}
+          onRemoveUpload={onRemoveUpload}
+          onBindFromChecklist={onBindFromChecklist}
+          setUploads={setUploads}
+          onUploadMassive={() => void onUploadMassive()}
+          dropHandlers={dropHandlers}
+        />
+      )}
 
       <ManagerPanel
         open={activePanel === "manager"}
@@ -434,9 +569,12 @@ export default function ExpedientDocuments() {
         openUrl={openUrl}
         goPrevPreview={goPrevPreview}
         goNextPreview={goNextPreview}
-        openDeleteModal={openDeleteModal}
+        openDeleteModal={handleOpenDeleteModal}
         onApprove={handleApproveCurrent}
         onReject={handleRejectCurrent}
+        canApproveDocuments={canApproveDocuments}
+        canRejectDocuments={canRejectDocuments}
+        canDeleteDocuments={canDeleteDocuments}
       />
 
       <DeleteDocumentModal

@@ -81,6 +81,29 @@ function toNullableNumber(s: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function toNullableString(value: string): string | null {
+  const clean = value.trim();
+  return clean ? clean : null;
+}
+
+function capitalizeFirst(value: string): string {
+  const text = value.replace(/^\s+/, "");
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function normalizeNameInput(value: string): string {
+  return capitalizeFirst(value);
+}
+
+function sanitizePhoneInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
@@ -201,11 +224,14 @@ export default function AcquisitionRequestPostCreate({
   }, [loadDocsByClassification]);
 
   function validateManager(): string {
-    if (!manager.idAdministrativeUnit)
-      return "Selecciona unidad administrativa del responsable.";
-    if (!manager.firstName.trim())
-      return "El nombre del responsable es obligatorio.";
-    if (!manager.lastName.trim()) return "El apellido paterno es obligatorio.";
+    if (!manager.email.trim()) return "El correo electrónico es obligatorio.";
+    if (!isValidEmail(manager.email))
+      return "Ingresa un correo electrónico válido.";
+
+    if (manager.phone.trim() && manager.phone.trim().length !== 10) {
+      return "El teléfono debe contener exactamente 10 dígitos.";
+    }
+
     return "";
   }
 
@@ -218,11 +244,11 @@ export default function AcquisitionRequestPostCreate({
       const payload = {
         idRequest,
         idAdministrativeUnit: manager.idAdministrativeUnit,
-        firstName: manager.firstName.trim(),
-        lastName: manager.lastName.trim(),
-        secondLastName: manager.secondLastName.trim() || null,
-        email: manager.email.trim() || null,
-        phone: manager.phone.trim() || null,
+        firstName: toNullableString(manager.firstName),
+        lastName: toNullableString(manager.lastName),
+        secondLastName: toNullableString(manager.secondLastName),
+        email: manager.email.trim(),
+        phone: toNullableString(manager.phone),
       };
 
       const res = await requestJson(MANAGER_API, {
@@ -295,7 +321,7 @@ export default function AcquisitionRequestPostCreate({
         <div className={styles.grid3}>
           <div className={styles.floatingField}>
             <span className={styles.floatingLabel}>
-              Unidad administrativa <span className={styles.required}>*</span>
+              Unidad administrativa
             </span>
             <select
               className={styles.floatingSelect}
@@ -318,14 +344,15 @@ export default function AcquisitionRequestPostCreate({
           </div>
 
           <div className={styles.floatingField}>
-            <span className={styles.floatingLabel}>
-              Nombre(s) <span className={styles.required}>*</span>
-            </span>
+            <span className={styles.floatingLabel}>Nombre(s)</span>
             <input
               className={styles.floatingInput}
               value={manager.firstName}
               onChange={(e) =>
-                setManager((p) => ({ ...p, firstName: e.target.value }))
+                setManager((p) => ({
+                  ...p,
+                  firstName: normalizeNameInput(e.target.value),
+                }))
               }
               disabled={postDisabled}
               placeholder="Ej. Juan"
@@ -333,14 +360,15 @@ export default function AcquisitionRequestPostCreate({
           </div>
 
           <div className={styles.floatingField}>
-            <span className={styles.floatingLabel}>
-              Apellido paterno <span className={styles.required}>*</span>
-            </span>
+            <span className={styles.floatingLabel}>Apellido paterno</span>
             <input
               className={styles.floatingInput}
               value={manager.lastName}
               onChange={(e) =>
-                setManager((p) => ({ ...p, lastName: e.target.value }))
+                setManager((p) => ({
+                  ...p,
+                  lastName: normalizeNameInput(e.target.value),
+                }))
               }
               disabled={postDisabled}
               placeholder="Ej. Pérez"
@@ -355,7 +383,7 @@ export default function AcquisitionRequestPostCreate({
               onChange={(e) =>
                 setManager((p) => ({
                   ...p,
-                  secondLastName: e.target.value,
+                  secondLastName: normalizeNameInput(e.target.value),
                 }))
               }
               disabled={postDisabled}
@@ -364,12 +392,15 @@ export default function AcquisitionRequestPostCreate({
           </div>
 
           <div className={styles.floatingField}>
-            <span className={styles.floatingLabel}>Email</span>
+            <span className={styles.floatingLabel}>
+              Email <span className={styles.required}>*</span>
+            </span>
             <input
               className={styles.floatingInput}
+              type="email"
               value={manager.email}
               onChange={(e) =>
-                setManager((p) => ({ ...p, email: e.target.value }))
+                setManager((p) => ({ ...p, email: e.target.value.trimStart() }))
               }
               disabled={postDisabled}
               placeholder="correo@dominio.com"
@@ -382,10 +413,15 @@ export default function AcquisitionRequestPostCreate({
               className={styles.floatingInput}
               value={manager.phone}
               onChange={(e) =>
-                setManager((p) => ({ ...p, phone: e.target.value }))
+                setManager((p) => ({
+                  ...p,
+                  phone: sanitizePhoneInput(e.target.value),
+                }))
               }
               disabled={postDisabled}
               placeholder="Ej. 7711234567"
+              inputMode="numeric"
+              maxLength={10}
             />
           </div>
         </div>

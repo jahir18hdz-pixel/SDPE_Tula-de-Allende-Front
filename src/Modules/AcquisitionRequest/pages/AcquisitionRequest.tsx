@@ -190,6 +190,21 @@ function toNullableIsoDate(yyyyMmDd: string): string | null {
   return `${t}T00:00:00.000Z`;
 }
 
+function toNullableString(value: string): string | null {
+  const clean = value.trim();
+  return clean ? clean : null;
+}
+
+function capitalizeFirst(value: string): string {
+  const text = value.replace(/^\s+/, "");
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function normalizeTextInput(value: string): string {
+  return capitalizeFirst(value);
+}
+
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
@@ -237,6 +252,29 @@ function hasCreateChanges(form: CreateForm): boolean {
         d.description.trim() !== "" ||
         d.unitAmount.trim() !== "",
     )
+  );
+}
+
+function sanitizeIntegerInput(value: string): string {
+  return value.replace(/[^\d]/g, "");
+}
+
+function sanitizeDecimalInput(value: string): string {
+  const clean = value.replace(/[^\d.]/g, "");
+  const parts = clean.split(".");
+
+  if (parts.length <= 1) return clean;
+
+  return `${parts[0]}.${parts.slice(1).join("")}`;
+}
+
+function isDetailEmpty(detail: CreateDetail): boolean {
+  return (
+    detail.idCog === null &&
+    detail.quantity.trim() === "" &&
+    detail.unitMeasure.trim() === "" &&
+    detail.description.trim() === "" &&
+    detail.unitAmount.trim() === ""
   );
 }
 
@@ -674,6 +712,7 @@ export default function AcquisitionRequest() {
       if (prev.details.length === 1) {
         return { ...prev, details: [emptyDetail()] };
       }
+
       return {
         ...prev,
         details: prev.details.filter((_, i) => i !== index),
@@ -682,39 +721,31 @@ export default function AcquisitionRequest() {
   }
 
   function validateCreate(): string {
-    const req = create.requestNumber.trim();
-    const date = create.requestDate.trim();
-    const just = create.justification.trim();
+    const detailsWithContent = create.details.filter((d) => !isDetailEmpty(d));
 
-    if (!req) return "El número de solicitud es obligatorio.";
-    if (req.length < 2) return "El número de solicitud es demasiado corto.";
-    if (!date) return "La fecha de solicitud es obligatoria.";
-    if (!just) return "La justificación es obligatoria.";
-    if (just.length < 5) return "La justificación es demasiado corta.";
-    if (!create.idAcquisitionClassification)
-      return "Selecciona la clasificación de adquisición.";
-
-    if (!create.details.length) return "Debes agregar al menos un detalle.";
-
-    for (let i = 0; i < create.details.length; i++) {
-      const d = create.details[i];
-      const row = i + 1;
+    for (let i = 0; i < detailsWithContent.length; i++) {
+      const d = detailsWithContent[i];
+      const row = create.details.findIndex((x) => x === d) + 1;
 
       if (!d.idCog) return `Selecciona el COG del detalle ${row}.`;
 
       const quantity = toPositiveNumber(d.quantity);
-      if (!quantity)
+      if (!quantity) {
         return `La cantidad del detalle ${row} debe ser mayor a 0.`;
+      }
 
-      if (!d.unitMeasure.trim())
-        return `La unidad de medida del detalle ${row} es obligatoria.`;
+      if (!d.unitMeasure.trim()) {
+        return `La unidad de medida del detalle ${row} es obligatoria si capturas ese detalle.`;
+      }
 
-      if (!d.description.trim())
-        return `La descripción del detalle ${row} es obligatoria.`;
+      if (!d.description.trim()) {
+        return `La descripción del detalle ${row} es obligatoria si capturas ese detalle.`;
+      }
 
       const unitAmount = toPositiveNumber(d.unitAmount);
-      if (!unitAmount)
+      if (!unitAmount) {
         return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
+      }
     }
 
     return "";
@@ -726,14 +757,24 @@ export default function AcquisitionRequest() {
 
     setSaving(true);
     try {
+      const cleanDetails = create.details
+        .filter((d) => !isDetailEmpty(d))
+        .map((d) => ({
+          idCog: d.idCog!,
+          quantity: Number(d.quantity),
+          unitMeasure: toNullableString(d.unitMeasure) ?? "",
+          description: toNullableString(d.description) ?? "",
+          unitAmount: Number(d.unitAmount),
+        }));
+
       const payload = {
-        requestNumber: create.requestNumber.trim() || null,
+        requestNumber: toNullableString(create.requestNumber),
         requestDate: toNullableIsoDate(create.requestDate),
-        justification: create.justification.trim() || null,
+        justification: toNullableString(create.justification),
         authorizationDate: toNullableIsoDate(create.authorizationDate),
         completeMaximeDate: toNullableIsoDate(create.completeMaximeDate),
-        observations: create.observations.trim() || null,
-        cfdi: create.cfdi.trim() || null,
+        observations: toNullableString(create.observations),
+        cfdi: toNullableString(create.cfdi),
 
         idAdministrativeUnit: create.idAdministrativeUnit,
         idProject: create.idProject,
@@ -748,13 +789,7 @@ export default function AcquisitionRequest() {
         idBeneficiary: create.idBeneficiary,
         idPayementPolicy: null,
 
-        details: create.details.map((d) => ({
-          idCog: d.idCog!,
-          quantity: Number(d.quantity),
-          unitMeasure: d.unitMeasure.trim(),
-          description: d.description.trim(),
-          unitAmount: Number(d.unitAmount),
-        })),
+        details: cleanDetails,
       };
 
       const result = await requestJson(API_BASE, {
@@ -801,7 +836,7 @@ export default function AcquisitionRequest() {
     if (loadingCats) return "Cargando catálogos y preparando el formulario.";
     if (step === "postCreate")
       return "Completa el responsable y define qué documentos no aplican para esta solicitud.";
-    return "Captura la información general, relaciones y al menos un detalle para registrar la solicitud.";
+    return "Captura la información general, relaciones y los detalles que necesites para registrar la solicitud.";
   }, [loadingCats, step]);
 
   const titleRight = useMemo(() => {
@@ -875,7 +910,7 @@ export default function AcquisitionRequest() {
                 <div className={styles.sectionTitle}>Información general</div>
 
                 <div className={styles.doubleRow}>
-                  <FloatingField label="Número de solicitud" required>
+                  <FloatingField label="Número de solicitud">
                     <input
                       className={styles.floatingInput}
                       value={create.requestNumber}
@@ -890,7 +925,7 @@ export default function AcquisitionRequest() {
                     />
                   </FloatingField>
 
-                  <FloatingField label="Fecha de solicitud" required>
+                  <FloatingField label="Fecha de solicitud">
                     <div className={styles.dateWrap}>
                       <input
                         ref={requestDateRef}
@@ -919,14 +954,14 @@ export default function AcquisitionRequest() {
                   </FloatingField>
                 </div>
 
-                <FloatingFieldArea label="Justificación" required>
+                <FloatingFieldArea label="Justificación">
                   <textarea
                     className={styles.floatingTextareaArea}
                     value={create.justification}
                     onChange={(event) =>
                       setCreate((p) => ({
                         ...p,
-                        justification: event.target.value,
+                        justification: normalizeTextInput(event.target.value),
                       }))
                     }
                     disabled={createDisabled}
@@ -935,9 +970,6 @@ export default function AcquisitionRequest() {
                   />
                 </FloatingFieldArea>
 
-                <div className={styles.hint}>
-                  Tip: incluye objetivo, urgencia y beneficiarios.
-                </div>
 
                 <div className={styles.doubleRow}>
                   <FloatingField label="Fecha de autorización">
@@ -1016,7 +1048,7 @@ export default function AcquisitionRequest() {
                     onChange={(event) =>
                       setCreate((p) => ({
                         ...p,
-                        observations: event.target.value,
+                        observations: normalizeTextInput(event.target.value),
                       }))
                     }
                     disabled={createDisabled}
@@ -1078,7 +1110,9 @@ export default function AcquisitionRequest() {
                       onChange={(event) =>
                         setCreate((p) => ({
                           ...p,
-                          idAcquisitionType: toNullableNumber(event.target.value),
+                          idAcquisitionType: toNullableNumber(
+                            event.target.value,
+                          ),
                         }))
                       }
                       disabled={createDisabled}
@@ -1134,7 +1168,7 @@ export default function AcquisitionRequest() {
                     </select>
                   </FloatingField>
 
-                  <FloatingField label="Clasificación de adquisición" required>
+                  <FloatingField label="Clasificación de adquisición">
                     <select
                       className={styles.floatingSelect}
                       value={create.idAcquisitionClassification ?? ""}
@@ -1226,8 +1260,8 @@ export default function AcquisitionRequest() {
                 </div>
 
                 <div className={styles.docsHint}>
-                  Debes capturar al menos un detalle para poder guardar la
-                  solicitud.
+                  Los detalles pueden quedar vacíos, pero si capturas uno debe
+                  venir completo.
                 </div>
 
                 <div className={styles.docsWrap}>
@@ -1239,7 +1273,7 @@ export default function AcquisitionRequest() {
                         </div>
 
                         <div className={styles.grid3}>
-                          <FloatingField label="COG" required>
+                          <FloatingField label="COG">
                             <select
                               className={styles.floatingSelect}
                               value={detail.idCog ?? ""}
@@ -1259,13 +1293,15 @@ export default function AcquisitionRequest() {
                             </select>
                           </FloatingField>
 
-                          <FloatingField label="Cantidad" required>
+                          <FloatingField label="Cantidad">
                             <input
                               className={styles.floatingInput}
                               value={detail.quantity}
                               onChange={(event) =>
                                 updateDetail(index, {
-                                  quantity: event.target.value,
+                                  quantity: sanitizeIntegerInput(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                               disabled={createDisabled}
@@ -1274,13 +1310,15 @@ export default function AcquisitionRequest() {
                             />
                           </FloatingField>
 
-                          <FloatingField label="Unidad de medida" required>
+                          <FloatingField label="Unidad de medida">
                             <input
                               className={styles.floatingInput}
                               value={detail.unitMeasure}
                               onChange={(event) =>
                                 updateDetail(index, {
-                                  unitMeasure: event.target.value,
+                                  unitMeasure: normalizeTextInput(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                               disabled={createDisabled}
@@ -1290,13 +1328,15 @@ export default function AcquisitionRequest() {
                         </div>
 
                         <div className={styles.doubleRow}>
-                          <FloatingField label="Descripción" required>
+                          <FloatingField label="Descripción">
                             <input
                               className={styles.floatingInput}
                               value={detail.description}
                               onChange={(event) =>
                                 updateDetail(index, {
-                                  description: event.target.value,
+                                  description: normalizeTextInput(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                               disabled={createDisabled}
@@ -1304,13 +1344,15 @@ export default function AcquisitionRequest() {
                             />
                           </FloatingField>
 
-                          <FloatingField label="Importe unitario" required>
+                          <FloatingField label="Importe unitario">
                             <input
                               className={styles.floatingInput}
                               value={detail.unitAmount}
                               onChange={(event) =>
                                 updateDetail(index, {
-                                  unitAmount: event.target.value,
+                                  unitAmount: sanitizeDecimalInput(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                               disabled={createDisabled}
@@ -1327,7 +1369,7 @@ export default function AcquisitionRequest() {
                             onClick={() => removeDetail(index)}
                             disabled={createDisabled}
                           >
-                            Quitar detalle
+                            Eliminar detalle
                           </button>
                         </div>
                       </div>
