@@ -1,0 +1,320 @@
+/* ===== RESET ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== CONTENEDOR PRINCIPAL ===== */
+.loginContainer {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  overflow: hidden;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* TRIÁNGULOS */
+.loginContainer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 150%;
+  background: #5b0b24;
+  clip-path: polygon(0 100%, 0 0, 80% 100%);
+  z-index: 0;
+}
+
+.loginContainer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 15%;
+  height: 30%;
+  background: #5b0b24;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+  z-index: 0;
+}
+
+/* ===== PANELES ===== */
+.leftPanel,
+.rightPanel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.leftPanel {
+  flex: 1;
+}
+
+.rightPanel {
+  flex: 1;
+}
+
+/* ===== LOGO ===== */
+.logoCard {
+  background: #f3f3f3;
+  width: 520px;
+  max-width: 90%;
+  padding: 3rem;
+  border-radius: 40px 40px 0 40px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoCard img {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* ===== FORM ===== */
+.formCard {
+  background: #ffffff;
+  width: 420px;
+  max-width: 90%;
+  padding: 2.5rem 2rem;
+  border-radius: 24px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.formIcon {
+  width: 150px;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4));
+}
+
+.formTitle {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.underline {
+  width: 60%;
+  height: 2px;
+  background: #c9980b;
+  margin: 0.5rem auto 1.2rem;
+}
+
+.description {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 1.5rem;
+}
+
+/* ===== INPUTS ===== */
+.inputWrapper {
+  position: relative;
+  margin-bottom: 1.2rem;
+}
+
+.inputWrapper input {
+  width: 100%;
+  height: 46px;
+  padding: 0 3.5rem 0 1.25rem;
+  border-radius: 25px;
+  border: 1px solid #ccc;
+  background: #fafafa;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.inputWrapper input::placeholder {
+  color: #999;
+}
+
+.inputWrapper input:focus {
+  outline: none;
+  border-color: #c9980b;
+  background: #fff;
+}
+
+.icon {
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #777;
+}
+
+/* ===== BOTÓN OJO ===== */
+.togglePassword {
+  position: absolute;
+  right: 1.1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #777;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.togglePassword:hover {
+  color: #333;
+}
+
+/* ===== OLVIDÉ CONTRASEÑA ===== */
+.forgotPassContainer {
+  text-align: right;
+  margin-bottom: 1.5rem;
+}
+
+/* Mantén el estilo aunque lo cambies a <button> */
+.forgotPass {
+  font-size: 0.8rem;
+  color: #555;
+  text-decoration: none;
+  border-bottom: 1px solid #c9980b;
+
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.forgotPass:hover {
+  color: #333;
+}
+
+/* ===== BOTÓN ===== */
+.loginButton {
+  width: 100%;
+  height: 46px;
+  border-radius: 25px;
+  background: #bc955c;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.loginButton:hover {
+  background: #a6824a;
+}
+
+.loginButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1366px) {
+  .leftPanel {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .loginContainer::before {
+    width: 70%;
+    height: 120%;
+  }
+
+  .loginContainer::after {
+    width: 30%;
+    height: 20%;
+  }
+}
+
+/* =========================================================
+   ✅ AGREGADO: ANIMACIÓN "RECUPERAR CONTRASEÑA" (MÍNIMO CAMBIO)
+   ========================================================= */
+
+/* Transiciones suaves */
+.leftPanel,
+.rightPanel,
+.logoCard,
+.formCard,
+.formIcon {
+  transition: transform 450ms ease, opacity 450ms ease, filter 450ms ease;
+  will-change: transform, opacity;
+}
+
+/* En modo forgot: el panel izquierdo se va desvaneciendo */
+.isForgot .leftPanel {
+  opacity: 0;
+  transform: translateX(-40px) scale(0.98);
+  pointer-events: none;
+}
+
+/* OJO: tu layout usa justify-content:center en el contenedor,
+   así que para que el form "ocupe el lugar" del logo,
+   movemos el panel derecho hacia la izquierda. */
+.isForgot .rightPanel {
+  transform: translateX(-25vw);
+}
+
+/* La card del logo también se desvanece (refuerza el efecto) */
+.isForgot .logoCard {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.98);
+}
+
+/* El ícono se queda y crece */
+.isForgot .formIcon {
+  transform: scale(1.35);
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+}
+
+/* Botón "volver" si lo agregas en el TSX */
+.backLink {
+  margin-top: 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: #555;
+  border-bottom: 1px solid #c9980b;
+  padding: 0;
+}
+
+.backLink:hover {
+  color: #333;
+}
+
+/* En pantallas donde ya ocultas leftPanel, no tiene sentido mover tanto */
+@media (max-width: 1366px) {
+  .isForgot .rightPanel {
+    transform: none;
+  }
+}
+
+.backLink {
+  margin-top: 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: #555;
+  border-bottom: 1px solid #c9980b;
+  padding: 0;
+}
+.backLink:hover {
+  color: #333;
+}
+.actionsContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}

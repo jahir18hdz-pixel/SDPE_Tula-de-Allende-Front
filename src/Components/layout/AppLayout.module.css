@@ -1,0 +1,127 @@
+.shell {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  background: #f5f7fb;
+  overflow: hidden;
+}
+
+/* Desktop sidebar */
+.sidebarDesktop {
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Contenido */
+.content {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Botón móvil */
+.menuBtn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 30;
+  border: none;
+  background: #4b0016;
+  color: white;
+  width: 42px;
+  height: 38px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+/* Main */
+.main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+/* Mobile drawer */
+.overlay {
+  display: none;
+}
+
+.sidebarMobile {
+  display: none;
+}
+
+/* ===== Responsive (móvil) ===== */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebarDesktop {
+    display: none;
+  }
+
+  .menuBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .main {
+    padding: 62px 14px 14px;
+  }
+
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    z-index: 19;
+  }
+
+  .overlayOpen {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebarMobile {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: 280px;
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    z-index: 20;
+    overflow: hidden;
+  }
+
+  .sidebarMobileOpen {
+    transform: translateX(0);
+  }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .sidebarMobile {
+    transition: none !important;
+  }
+}

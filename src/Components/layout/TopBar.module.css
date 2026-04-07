@@ -1,0 +1,84 @@
+/* ===== CONTENEDOR PRINCIPAL ===== */
+.topBar {
+  width: 100%;
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  position: relative;
+  overflow: hidden;
+
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+
+  /*  DEGRADADO VINO → BLANCO */
+  background: #4F071F
+}
+
+/* ===== LADO IZQUIERDO ===== */
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* ===== TÍTULO ===== */
+.topTitle {
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== TARJETA FECHA / HORA ===== */
+.datetimeCard {
+  display: grid;
+  gap: 8px;
+  min-width: 190px;
+}
+
+/* ===== FILA FECHA / HORA ===== */
+.dtRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  font-weight: 800;
+  color: #000000;
+
+  padding: 6px 12px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* ===== ICONOS ===== */
+.dtRow svg {
+  font-size: 16px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .topBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .datetimeCard {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .dtRow {
+    width: fit-content;
+  }
+}

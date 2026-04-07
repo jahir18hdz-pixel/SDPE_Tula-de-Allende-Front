@@ -1,0 +1,422 @@
+/* =========================
+   SIDEBAR BASE
+   - El ancho lo controla AppLayout (grid con --sidebar-w)
+========================= */
+.sidebar {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+
+  background: #4b0016;
+  color: #fff;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 14px 14px 12px;
+  overflow: hidden;
+
+  position: relative;
+
+  /* Vars */
+  --item-gap: 12px;
+  --item-radius: 12px;
+  --item-pad: 10px;
+
+  --icon-size: 28px;
+  --icon-font: 19px;
+
+  /* ✅ solo para colapsado */
+  --collapsed-gap: 12px;
+}
+
+/* =========================
+   TOP
+========================= */
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(20px, 1.25vw, 26px);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.logoWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin-top: 6px;
+}
+
+.logo {
+  width: clamp(150px, 9vw, 190px);
+  height: auto;
+  object-fit: contain;
+  opacity: 0.95;
+}
+
+.goldLine {
+  height: 2px;
+  width: 100%;
+  background: #b68a2a;
+  opacity: 0.9;
+  margin: 2px 0;
+}
+
+/* Perfil */
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--item-radius);
+  min-width: 0;
+  margin: -4px 0 4px;
+}
+
+.userIcon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--icon-size);
+  font-size: var(--icon-font);
+  text-align: center;
+  opacity: 0.95;
+}
+
+.userName {
+  font-weight: 600;
+  opacity: 0.95;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================
+   SCROLL SOLO MENÚ
+========================= */
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 8px;
+
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+
+  scrollbar-gutter: stable;
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(209, 32, 85, 0.45) rgba(0, 0, 0, 0.04);
+}
+
+.scrollArea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollArea::-webkit-scrollbar-track {
+  background: rgba(164, 11, 57, 0.45);
+  border-radius: 999px;
+}
+.scrollArea::-webkit-scrollbar-thumb {
+  background: rgba(164, 11, 57, 0.45);
+  border-radius: 999px;
+}
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: rgba(164, 11, 57, 0.45);
+}
+
+/* =========================
+   NAV
+========================= */
+.nav {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.item,
+.itemBtn,
+.bottomBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--item-gap);
+  padding: var(--item-pad);
+  border-radius: var(--item-radius);
+  color: #fff;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  font-size: clamp(15px, 0.95vw, 16.5px);
+
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.active {
+  background: rgba(182, 138, 42, 0.14);
+
+  /* en vez de outline (se recorta), shadow inset (no se recorta) */
+  box-shadow: inset 0 0 0 2px rgba(182, 138, 42, 0.55);
+
+  position: relative;
+  z-index: 1;
+}
+
+
+.icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--icon-size);
+  font-size: var(--icon-font);
+  text-align: center;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group {
+  display: grid;
+  gap: 8px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--item-gap);
+  flex: 1;
+  min-width: 0;
+}
+
+.chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms ease;
+  opacity: 0.9;
+}
+.chevOpen {
+  transform: rotate(180deg);
+}
+
+.submenu {
+  display: none;
+  padding-left: 36px;
+  gap: 8px;
+}
+.submenuOpen {
+  display: grid;
+}
+
+.subItem {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: clamp(13.5px, 0.9vw, 14.5px);
+}
+
+/* =========================
+   BOTTOM
+========================= */
+.bottom {
+  flex: 0 0 auto;
+  margin-top: auto; /* normal: se va abajo */
+  padding-top: 14px;
+  display: grid;
+  gap: 10px;
+  background: #4b0016;
+}
+
+/* =========================
+   COLAPSADO: MÁS ANCHO + ICONOS CENTRADOS
+   - Centramos TODO el contenido verticalmente
+   - Misma distancia entre iconos (nav + bottom + user)
+========================= */
+/* =========================
+   COLAPSADO: LOGO ARRIBA, NAV CENTRADO, BOTONES ABAJO
+========================= */
+.collapsed {
+  padding: 12px 10px;
+
+  /* ❌ quita esto (era lo que centraba TODO) */
+  /* justify-content: center; */
+
+  /* mantenemos el layout normal: top arriba, bottom abajo */
+  overflow: hidden;
+}
+
+/* ocultar texto */
+.collapsed .label,
+.collapsed .userName,
+.collapsed .title,
+.collapsed .submenu,
+.collapsed .goldLine,
+.collapsed .chev {
+  display: none;
+}
+
+/* TOP arriba y centrado horizontal */
+.collapsed .top {
+  gap: var(--collapsed-gap);
+  align-items: center;
+}
+
+/* Logo pequeño arriba */
+.collapsed .logoWrap {
+  margin-top: 0;
+}
+.collapsed .logo {
+  width: 100px;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Perfil centrado */
+.collapsed .userRow {
+  margin: 0;
+  padding: 12px 0;
+  justify-content: center;
+  border-radius: 14px;
+}
+
+/* ✅ Área del menú: ocupa el centro y centra los iconos */
+.collapsed .scrollArea {
+  flex: 1 1 auto;     /* ✅ llena el espacio entre top y bottom */
+  min-height: 0;
+
+  display: flex;
+  align-items: center;     /* ✅ centra verticalmente */
+  justify-content: center; /* ✅ centra horizontalmente */
+
+  overflow: visible; /* evita recortes raros en colapsado */
+  padding: 0;
+}
+
+/* nav con separación uniforme */
+.collapsed .nav {
+  gap: var(--collapsed-gap);
+}
+
+/* ✅ bottom SIEMPRE abajo */
+.collapsed .bottom {
+  margin-top: auto;  /* ✅ clave: empuja hacia abajo */
+  padding-top: 0;
+  gap: var(--collapsed-gap);
+  background: #4b0016;
+}
+
+/* Botones/links centrados */
+/* ✅ MISMO TAMAÑO DE "CUADRO" PARA TODOS EN COLAPSADO */
+.collapsed .item,
+.collapsed .itemBtn,
+.collapsed .bottomBtn,
+.collapsed .userRow {
+  width: 56px;          /* ← este es el tamaño del contorno (ajústalo si quieres) */
+  height: 48px;         /* ← altura uniforme */
+  margin-left: auto;
+  margin-right: auto;
+
+  padding: 0;           /* importante: que no cambie el tamaño por padding */
+  justify-content: center;
+  border-radius: 10px;  /* el radio que te guste */
+}
+
+
+/* El contenedor "left" no empuja */
+.collapsed .left {
+  width: 100%;
+  flex: 0;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+}
+
+/* Iconos centrados */
+.collapsed .icon,
+.collapsed .userIcon {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+
+.collapsed .icon svg,
+.collapsed .userIcon svg {
+  display: block;
+}
+
+/* =========================
+   HOVER Y FOCUS
+========================= */
+.item:hover,
+.itemBtn:hover,
+.bottomBtn:hover,
+.subItem:hover,
+.collapsed .userRow:hover {
+  background: rgba(182, 138, 42, 0.18);
+  color: #fff;
+  text-decoration: none;
+}
+
+.item:visited,
+.subItem:visited {
+  color: #fff;
+}
+
+.item:focus-visible,
+.itemBtn:focus-visible,
+.bottomBtn:focus-visible,
+.subItem:focus-visible {
+  outline: 2px solid rgba(182, 138, 42, 0.7);
+  outline-offset: 2px;
+}
+
+/* =========================
+   PANTALLAS GRANDES
+========================= */
+@media (min-width: 1600px) {
+  .sidebar {
+    --icon-size: 30px;
+    --icon-font: 20px;
+    --item-pad: 11px;
+
+    --collapsed-gap: 14px; /* un poco más aire en 1080p */
+  }
+}
+.item {
+  position: relative;
+}
+
+.itemBtn {
+  position: relative;
+}

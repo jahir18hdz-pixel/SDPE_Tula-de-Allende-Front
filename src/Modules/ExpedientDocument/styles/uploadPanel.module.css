@@ -1,0 +1,524 @@
+:root {
+  --bg: #f6f6f7;
+  --card: #ffffff;
+  --border: #e6e6ea;
+  --border2: #d7d7dd;
+  --guinda: #004b05;
+  --guinda2: #65001f;
+  --gold: #b68a2a;
+  --text: #111827;
+  --textSoft: rgba(17, 24, 39, 0.72);
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
+  --radiusCard: 16px;
+  --radiusSoft: 12px;
+}
+
+/* =========================
+   OVERLAY SOLO EN VISTA
+========================= */
+.uploadOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+
+  background: rgba(17, 24, 39, 0.22);
+  backdrop-filter: blur(3px);
+
+  opacity: 0;
+  transition: opacity 600ms ease;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.uploadOverlayOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.uploadOverlayClosed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* =========================
+   SHEET
+========================= */
+.uploadSheet {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 244, 247, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  transform: translateY(100%);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.18);
+  border-radius: 14px;
+  will-change: transform;
+}
+
+.uploadOverlayOpen .uploadSheet {
+  transform: translateY(0);
+}
+
+.uploadOverlayClosed .uploadSheet {
+  transform: translateY(100%);
+}
+
+/* =========================
+   HEADER
+========================= */
+.uploadSheetHeader {
+  flex: 0 0 auto;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid rgba(230, 230, 234, 0.9);
+  background: linear-gradient(
+    90deg,
+    rgba(75, 0, 22, 0.12),
+    rgba(182, 138, 42, 0.12)
+  );
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.uploadSheetTitleWrap {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.uploadHandle {
+  width: 54px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.22);
+  margin-bottom: 4px;
+}
+
+.uploadSheetTitle {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--guinda2);
+  line-height: 1.1;
+}
+
+.uploadSheetNote {
+  font-size: 13px;
+  color: var(--textSoft);
+}
+
+.uploadSheetActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   BODY
+========================= */
+.uploadSheetBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px;
+}
+/* =========================
+   SCROLL PERSONALIZADO
+========================= */
+.uploadSheetBody::-webkit-scrollbar {
+  width: 10px;
+}
+
+.uploadSheetBody::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+}
+
+.uploadSheetBody::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(101, 0, 31, 0.75),
+    rgba(182, 138, 42, 0.75)
+  );
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.uploadSheetBody::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(101, 0, 31, 0.95),
+    rgba(182, 138, 42, 0.95)
+  );
+}
+
+/* Firefox */
+.uploadSheetBody {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(101, 0, 31, 0.7) rgba(0, 0, 0, 0.05);
+}
+
+/* =========================
+   DROPZONE
+========================= */
+.dropzoneLarge {
+  padding: 24px;
+  border-radius: 18px;
+  border: 2px dashed rgba(66, 71, 81, 0.32);
+  background: rgba(255, 255, 255, 0.82);
+  text-align: center;
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+.dropzoneLarge:hover {
+  background: rgba(182, 138, 42, 0.08);
+  border-color: rgba(182, 138, 42, 0.58);
+  transform: translateY(-1px);
+}
+
+.dropTitle {
+  font-weight: 900;
+  color: rgba(17, 24, 39, 0.92);
+}
+
+.dropSub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--textSoft);
+}
+
+/* =========================
+   EMPTY
+========================= */
+.emptyUploadState {
+  margin-top: 16px;
+  padding: 26px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(230, 230, 234, 0.85);
+  text-align: center;
+  color: var(--textSoft);
+}
+
+/* =========================
+   LIST
+========================= */
+.uploadListFullscreen {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+/* =========================
+   ROW
+========================= */
+.uploadRow {
+  border: 1px solid rgba(230, 230, 234, 0.92);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 248, 250, 0.98)
+  );
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  display: grid;
+  gap: 12px;
+}
+
+.fileInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+  min-width: 0;
+}
+
+.fileName {
+  font-weight: 900;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 72%;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+.fileName::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(101, 0, 31, 0.85),
+    rgba(182, 138, 42, 0.85)
+  );
+  opacity: 0.65;
+}
+
+.uploadRow:hover .fileName::after {
+  opacity: 1;
+}
+
+.fileMeta {
+  font-size: 12px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.uploadControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* =========================
+   INPUTS / SELECT
+========================= */
+.input,
+.editorFloatingInput,
+.editorFloatingSelect {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  padding: 0 14px;
+  outline: none;
+  font-size: 14px;
+  background: #fff;
+  color: #111827 !important;
+
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    background 120ms ease;
+
+  font-family: inherit;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.input::placeholder,
+.editorFloatingInput::placeholder {
+  color: rgba(17, 24, 39, 0.52);
+  opacity: 1;
+}
+
+.editorFloatingSelect {
+  appearance: none;
+}
+
+.input:hover,
+.editorFloatingInput:hover,
+.editorFloatingSelect:hover {
+  border-color: #c9c9d0;
+}
+
+.input:focus,
+.editorFloatingInput:focus,
+.editorFloatingSelect:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
+  transform: translateY(-1px);
+}
+
+.input:disabled,
+.editorFloatingInput:disabled,
+.editorFloatingSelect:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+
+.editorFloatingField,
+.editorFloatingSelectField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editorFloatingLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* =========================
+   FOOTER
+========================= */
+.uploadSheetFooter {
+  flex: 0 0 auto;
+  padding: 14px 22px 18px;
+  border-top: 1px solid rgba(230, 230, 234, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.primaryBtn,
+.ghostBtn,
+.saveBtn,
+.dangerBtn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.15px;
+  cursor: pointer;
+
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.primaryBtn {
+  border: none;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--guinda2), var(--guinda));
+  box-shadow: var(--shadowSoft);
+}
+
+.primaryBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  background: linear-gradient(135deg, var(--guinda), var(--guinda2));
+}
+
+.ghostBtn {
+  border: 1.5px solid rgba(66, 71, 81, 0.35);
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+}
+
+.ghostBtn:hover:not(:disabled) {
+  border-color: rgba(107, 114, 128, 0.72);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.saveBtn {
+  border: 2px solid rgba(22, 163, 74, 0.72);
+  background: rgba(22, 163, 74, 0.14);
+  color: #111827;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.92);
+  border-color: rgba(22, 163, 74, 0.98);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.dangerBtn {
+  border: 2px solid rgba(255, 77, 46, 0.78);
+  background: rgba(255, 77, 46, 0.12);
+  color: #111827;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: rgba(255, 77, 46, 0.92);
+  border-color: rgba(255, 77, 46, 0.98);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.primaryBtn:disabled,
+.ghostBtn:disabled,
+.saveBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 900px) {
+  .uploadControls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .uploadSheetHeader,
+  .uploadSheetBody,
+  .uploadSheetFooter {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .uploadSheetFooter {
+    flex-direction: column;
+  }
+
+  .uploadSheetFooter > button {
+    width: 100%;
+  }
+
+  .fileInfo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fileName {
+    max-width: 100%;
+  }
+}
