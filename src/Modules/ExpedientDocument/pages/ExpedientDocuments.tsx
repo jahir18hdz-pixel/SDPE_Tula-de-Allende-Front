@@ -1,10 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useCallback, useMemo, useState } from "react";
-
 import styles from "../styles/ExpedientDocuments.module.css";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
-
 import ChecklistTable from "../components/ChecklistTable";
 import UploadPanel from "../components/UploadPanel";
 import ManagerPanel from "../components/ManagerPanel";
@@ -14,7 +12,6 @@ import ChecklistEditorPanel from "../components/ChecklistEditorPanel";
 import PreviewModal from "../components/PreviewModal";
 import DeleteDocumentModal from "../components/DeleteDocumentModal";
 import ExpedientHeaderInfo from "../components/ExpedientHeaderInfo";
-
 import { useExpedientData } from "../hooks/useExpedientData";
 import type { PreviewItem } from "../types/expedient.types";
 

@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 
 type Props = {
-  modulePath: string; // ej: "/home" o "/catalogos/roles"
+  modulePath: string;
 };
 
 export default function RequireModule({ modulePath }: Props) {
@@ -16,8 +16,7 @@ export default function RequireModule({ modulePath }: Props) {
   const canView = allowedModules?.has(modulePath) ?? false;
 
   if (!canView) {
-    // puedes mandar a /home o a una página "403"
-    return <Navigate to="/home" replace state={{ from: location }} />;
+    return <Navigate to="/sin-acceso" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

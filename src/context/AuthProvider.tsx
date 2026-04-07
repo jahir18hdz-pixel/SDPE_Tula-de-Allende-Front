@@ -25,7 +25,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     readAllowedModulesFromStorage()
   );
 
-  // ✅ ahora recibe también allowedModules
   const loginWithToken = (token: string, email?: string, allowedModules?: string[]) => {
     setToken(token);
     setTokenState(token);
@@ -39,26 +38,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("allowedModules", JSON.stringify(allowedModules));
       setAllowedModulesState(new Set(allowedModules));
     } else {
-      // si no te pasaron módulos, intenta leer lo que ya haya en storage
       setAllowedModulesState(readAllowedModulesFromStorage());
     }
   };
 
   const logout = () => {
-    clearToken();
-    setTokenState(null);
-    setEmailState(null);
+  clearToken();
 
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("allowedModules");
-    setAllowedModulesState(new Set());
-  };
+  localStorage.removeItem("auth"); 
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("allowedModules");
 
-  // ✅ sync entre pestañas / cambios externos
+  setTokenState(null);
+  setEmailState(null);
+  setAllowedModulesState(new Set());
+};
+
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === null || e.key === "authToken" || e.key === "token") {
-        // depende cómo implementaste token.service; por eso solo refrescamos tokenState:
         setTokenState(getToken());
       }
 
@@ -80,8 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: tokenState,
       email: emailState,
       isAuthenticated: !!tokenState,
-      allowedModules: allowedModulesState, // ✅ NUEVO
-      loginWithToken, // ✅ firma nueva
+      allowedModules: allowedModulesState, 
+      loginWithToken, 
       logout,
     }),
     [tokenState, emailState, allowedModulesState]

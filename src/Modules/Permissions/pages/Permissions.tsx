@@ -1,9 +1,10 @@
-import  { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/Permissions.module.css";
 
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import ConfirmDialog from "../../../Components/layout/ConfirmDialog";
+import { requestJson, readToken } from "../../../services/api";
 
 type Role = {
   idRol?: number;
@@ -44,26 +45,197 @@ type PermissionState = {
   id: number;
   modulo: string;
   accion: string;
+  nombre: string;
+  descripcion: string;
   asignado: boolean;
 };
 
-type AuthStored = { token?: string; Token?: string };
 type UnknownRecord = Record<string, unknown>;
 type UnknownObject = Record<string, unknown>;
 
-const BASE_API = "https://localhost:7197";
-const PERMISSIONS_API = `${BASE_API}/api/Permissions`;
-
 const ROLES_ENDPOINTS = [
-  `${BASE_API}/api/Role`,
-  `${BASE_API}/api/role`,
-  `${BASE_API}/api/Roles`,
-  `${BASE_API}/api/roles`,
-  `${BASE_API}/api/Roles/all`,
-  `${BASE_API}/api/roles/all`,
+  "/api/Role",
+  "/api/role",
+  "/api/Roles",
+  "/api/roles",
+  "/api/Roles/all",
+  "/api/roles/all",
 ];
 
+const PERMISSIONS_API = "/api/Permissions";
+
 type ConfirmIntent = "switchRole" | "clearAll";
+
+const PERMISSION_META: Record<
+  number,
+  { nombre: string; descripcion: string; grupo: string }
+> = {
+  1: {
+    nombre: "Ver inicio",
+    descripcion: "Accede al panel principal del sistema.",
+    grupo: "Inicio",
+  },
+  2: {
+    nombre: "Ver usuarios",
+    descripcion: "Permite registrar y administrar usuarios.",
+    grupo: "Usuarios y seguridad",
+  },
+  3: {
+    nombre: "Registrar solicitud",
+    descripcion: "Permite crear una nueva solicitud de adquisición.",
+    grupo: "Adquisiciones",
+  },
+  4: {
+    nombre: "Gestionar expediente",
+    descripcion: "Permite ver y administrar documentos del expediente.",
+    grupo: "Expediente",
+  },
+  5: {
+    nombre: "Unidades administrativas",
+    descripcion: "Permite visualizar y administrar unidades administrativas.",
+    grupo: "Catálogos",
+  },
+  6: {
+    nombre: "Roles",
+    descripcion: "Permite visualizar y administrar roles del sistema.",
+    grupo: "Usuarios y seguridad",
+  },
+  7: {
+    nombre: "Permisos",
+    descripcion: "Permite gestionar permisos del sistema.",
+    grupo: "Usuarios y seguridad",
+  },
+  8: {
+    nombre: "COG",
+    descripcion: "Permite visualizar el catálogo COG.",
+    grupo: "Catálogos",
+  },
+  9: {
+    nombre: "Fondo de financiamiento",
+    descripcion: "Permite administrar fondos de financiamiento.",
+    grupo: "Catálogos",
+  },
+  10: {
+    nombre: "Acciones de póliza",
+    descripcion: "Permite visualizar el catálogo de acciones de póliza.",
+    grupo: "Catálogos",
+  },
+  11: {
+    nombre: "Comunidades",
+    descripcion: "Permite administrar comunidades.",
+    grupo: "Catálogos",
+  },
+  12: {
+    nombre: "Beneficiarios",
+    descripcion: "Permite administrar beneficiarios.",
+    grupo: "Catálogos",
+  },
+  13: {
+    nombre: "Proveedores",
+    descripcion: "Permite administrar proveedores.",
+    grupo: "Catálogos",
+  },
+  14: {
+    nombre: "Programas",
+    descripcion: "Permite administrar programas.",
+    grupo: "Catálogos",
+  },
+  15: {
+    nombre: "Proyectos",
+    descripcion: "Permite administrar proyectos.",
+    grupo: "Catálogos",
+  },
+  16: {
+    nombre: "Clasificación de adquisiciones",
+    descripcion: "Permite administrar la clasificación de adquisiciones.",
+    grupo: "Catálogos",
+  },
+  17: {
+    nombre: "Tipos de adquisición",
+    descripcion: "Permite administrar tipos de adquisición.",
+    grupo: "Catálogos",
+  },
+  18: {
+    nombre: "Tipos de documento",
+    descripcion: "Permite visualizar y gestionar tipos de documento.",
+    grupo: "Catálogos",
+  },
+  19: {
+    nombre: "Registrar adquisición",
+    descripcion: "Permite registrar una nueva adquisición.",
+    grupo: "Adquisiciones",
+  },
+  20: {
+    nombre: "Consultar detalle",
+    descripcion:
+      "Permite consultar el detalle de una solicitud de adquisición.",
+    grupo: "Adquisiciones",
+  },
+  21: {
+    nombre: "Ver expediente",
+    descripcion: "Permite acceder a la vista del expediente de la solicitud.",
+    grupo: "Expediente",
+  },
+  22: {
+    nombre: "Subir documentos masivos",
+    descripcion:
+      "Permite cargar varios documentos al expediente en una sola acción.",
+    grupo: "Expediente",
+  },
+  23: {
+    nombre: "Buscar documentos",
+    descripcion: "Permite buscar documentos por nombre dentro del expediente.",
+    grupo: "Expediente",
+  },
+  24: {
+    nombre: "Consultar checklist",
+    descripcion: "Permite consultar el checklist de documentos del expediente.",
+    grupo: "Expediente",
+  },
+  25: {
+    nombre: "Ver registro de adquisiciones",
+    descripcion:
+      "Permite acceder a la vista de registro de solicitudes de adquisición.",
+    grupo: "Adquisiciones",
+  },
+  26: {
+    nombre: "Pólizas de pago",
+    descripcion:
+      "Permite visualizar y gestionar el catálogo de pólizas de pago.",
+    grupo: "Catálogos",
+  },
+  27: {
+    nombre: "Notificaciones",
+    descripcion: "Permite acceder a notificaciones en tiempo real e historial.",
+    grupo: "Sistema",
+  },
+  28: {
+    nombre: "Configuración del sistema",
+    descripcion:
+      "Permite visualizar y administrar la configuración del sistema.",
+    grupo: "Sistema",
+  },
+  29: {
+    nombre: "Agregar archivos",
+    descripcion: "Permite agregar archivos al expediente de documentos.",
+    grupo: "Expediente",
+  },
+  30: {
+    nombre: "Aprobar documentos",
+    descripcion: "Permite aprobar documentos del expediente.",
+    grupo: "Expediente",
+  },
+  31: {
+    nombre: "Denegar documentos",
+    descripcion: "Permite denegar documentos del expediente.",
+    grupo: "Expediente",
+  },
+  32: {
+    nombre: "Eliminar documentos",
+    descripcion: "Permite eliminar documentos del expediente.",
+    grupo: "Expediente",
+  },
+};
 
 export default function PermissionsByRole() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -83,7 +255,8 @@ export default function PermissionsByRole() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingRole, setPendingRole] = useState<Role | null>(null);
-  const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>("switchRole");
+  const [confirmIntent, setConfirmIntent] =
+    useState<ConfirmIntent>("switchRole");
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastType, setToastType] = useState<ToastType>("success");
@@ -97,63 +270,11 @@ export default function PermissionsByRole() {
 
   useEffect(() => {
     void loadRoles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ========= Auth / Request =========
-  function readToken(): string {
-    const rawAuth = localStorage.getItem("auth");
-    if (rawAuth) {
-      try {
-        const parsed = JSON.parse(rawAuth) as AuthStored;
-        const token = (parsed.token ?? parsed.Token ?? "").trim();
-        if (token) return token;
-      } catch {
-        // ignore
-      }
-    }
-    return "";
-  }
-
-  function authHeaders(): HeadersInit {
-    const token = readToken();
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function requestJson(
-    url: string,
-    init?: RequestInit
-  ): Promise<
-    | { ok: true; data: unknown; status: number }
-    | { ok: false; error: string; status: number }
-  > {
-    const res = await fetch(url, { ...init, credentials: "omit" });
-
-    if (res.status === 204) return { ok: true, data: [], status: 204 };
-
-    const text = await safeText(res);
-    const parsed = tryParseJson(text);
-
-    if (!res.ok) {
-      const apiMsg = pickFirstString(parsed, ["message", "title", "detail"]) ?? "";
-      const msg =
-        apiMsg ||
-        (typeof parsed === "string" ? parsed : "") ||
-        text ||
-        `HTTP ${res.status}`;
-      return { ok: false, error: msg, status: res.status };
-    }
-
-    return { ok: true, data: parsed, status: res.status };
-  }
-
   async function firstWorkingEndpoint(endpoints: string[]) {
-    const headers = authHeaders();
     for (const url of endpoints) {
-      const r = await requestJson(url, { method: "GET", headers });
+      const r = await requestJson(url, { method: "GET" });
       if (r.ok) return { url, data: r.data };
     }
     return { url: endpoints[0] ?? "", data: [] as unknown };
@@ -184,17 +305,27 @@ export default function PermissionsByRole() {
     const values = obj["$values"];
     if (Array.isArray(values)) return values;
 
-    const keys = ["data", "result", "items", "value", "values", "Items", "Data", "Result"];
+    const keys = [
+      "data",
+      "result",
+      "items",
+      "value",
+      "values",
+      "Items",
+      "Data",
+      "Result",
+    ];
+
     for (const k of keys) {
       const v = obj[k];
       if (Array.isArray(v)) return v;
       const nested = findArrayDeep(v, depth + 1);
       if (nested) return nested;
     }
+
     return null;
   }
 
-  // ========= Loaders =========
   async function loadRoles() {
     setRolesLoading(true);
     try {
@@ -227,20 +358,29 @@ export default function PermissionsByRole() {
       const accionRaw = String(p.Accion ?? p.accion ?? "").trim() || "Ver";
       const asignado = toBool(p.Asignado ?? p.asignado ?? false);
 
-      // ✅ mostrar solo nombre (sin /rutas ni separadores raros) y bonito
-      const modulo = toNiceLabel(moduloRaw);
-      const accion = toNiceLabel(accionRaw);
+      const moduloNice = toNiceLabel(moduloRaw);
+      const accionNice = toNiceLabel(accionRaw);
+      const meta = PERMISSION_META[id];
 
-      out.push({ id, modulo, accion, asignado });
+      out.push({
+        id,
+        modulo: meta?.grupo ?? moduloNice,
+        accion: accionNice,
+        nombre: meta?.nombre ?? `${moduloNice} ${accionNice}`,
+        descripcion: meta?.descripcion ?? "Sin descripción disponible.",
+        asignado,
+      });
     }
 
-    // ✅ ORDEN: primero asignados, luego no asignados; luego por modulo/accion/id
     out.sort((a, b) => {
       if (a.asignado !== b.asignado) return a.asignado ? -1 : 1;
-      const m = a.modulo.localeCompare(b.modulo);
-      if (m !== 0) return m;
-      const ac = a.accion.localeCompare(b.accion);
-      if (ac !== 0) return ac;
+
+      const g = a.modulo.localeCompare(b.modulo);
+      if (g !== 0) return g;
+
+      const n = a.nombre.localeCompare(b.nombre);
+      if (n !== 0) return n;
+
       return a.id - b.id;
     });
 
@@ -252,7 +392,6 @@ export default function PermissionsByRole() {
     try {
       const result = await requestJson(`${PERMISSIONS_API}/${idRol}`, {
         method: "GET",
-        headers: authHeaders(),
       });
 
       if (!result.ok) {
@@ -277,17 +416,13 @@ export default function PermissionsByRole() {
     }
   }
 
-  // ========= limpiar =========
   function clearAllSelectionImmediate() {
     setConfirmOpen(false);
     setPendingRole(null);
-
     setMode("view");
     setDirty(false);
-
     setRoleSearch("");
     setModuleSearch("");
-
     setSelectedRole(null);
     setPerms([]);
   }
@@ -301,7 +436,6 @@ export default function PermissionsByRole() {
     clearAllSelectionImmediate();
   }
 
-  // ========= UI: selección rol =========
   function requestSelectRole(r: Role) {
     const id = getRoleId(r);
     if (id == null) return;
@@ -350,25 +484,36 @@ export default function PermissionsByRole() {
 
   function togglePermission(idPermiso: number, next: boolean) {
     if (mode !== "edit" || saving) return;
-    setPerms((prev) => prev.map((p) => (p.id === idPermiso ? { ...p, asignado: next } : p)));
+
+    setPerms((prev) =>
+      prev.map((p) => (p.id === idPermiso ? { ...p, asignado: next } : p)),
+    );
     setDirty(true);
   }
 
   async function onSave() {
-    if (!selectedRoleId) return showToast("error", "Selecciona un rol.");
+    if (!selectedRoleId) {
+      showToast("error", "Selecciona un rol.");
+      return;
+    }
 
     setSaving(true);
     try {
       const permisosIds = perms.filter((p) => p.asignado).map((p) => p.id);
-      const payload: Record<string, unknown> = { IdRol: selectedRoleId, Permisos: permisosIds };
+      const payload: Record<string, unknown> = {
+        IdRol: selectedRoleId,
+        Permisos: permisosIds,
+      };
 
       const result = await requestJson(`${PERMISSIONS_API}/update`, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
-      if (!result.ok) return showToast("error", `Guardar (${result.status}): ${result.error}`);
+      if (!result.ok) {
+        showToast("error", `Guardar (${result.status}): ${result.error}`);
+        return;
+      }
 
       showToast("success", "Permisos actualizados correctamente");
       setDirty(false);
@@ -381,24 +526,29 @@ export default function PermissionsByRole() {
     }
   }
 
-  // ========= Derived =========
-
-  // ✅ Roles: filtrar solo por NOMBRE (sin id)
   const filteredRoles = useMemo(() => {
     const q = roleSearch.trim().toLowerCase();
     if (!q) return roles;
-    return roles.filter((r) => (getRoleName(r) ?? "").toLowerCase().includes(q));
+    return roles.filter((r) =>
+      (getRoleName(r) ?? "").toLowerCase().includes(q),
+    );
   }, [roles, roleSearch]);
 
-  // ✅ Permisos: filtrar por modulo/accion (sin id) y mantener orden de asignados primero
   const filteredPerms = useMemo(() => {
     const q = moduleSearch.trim().toLowerCase();
     if (!q) return perms;
 
     return perms.filter((p) => {
-      return p.modulo.toLowerCase().includes(q) || p.accion.toLowerCase().includes(q);
+      return (
+        p.modulo.toLowerCase().includes(q) ||
+        p.accion.toLowerCase().includes(q) ||
+        p.nombre.toLowerCase().includes(q) ||
+        p.descripcion.toLowerCase().includes(q)
+      );
     });
   }, [perms, moduleSearch]);
+
+  const visiblePerms = useMemo(() => filteredPerms, [filteredPerms]);
 
   const isEdit = mode === "edit";
 
@@ -430,12 +580,21 @@ export default function PermissionsByRole() {
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
             <h1 className={styles.h1}>Permisos</h1>
-            <p className={styles.sub}>Selecciona un rol y asigna permisos por módulo y acción.</p>
+            <p className={styles.sub}>
+              Selecciona un rol y asigna permisos por módulo y acción.
+            </p>
           </div>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchIcon} aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
@@ -443,7 +602,7 @@ export default function PermissionsByRole() {
 
             <input
               className={styles.searchInput}
-              placeholder="Buscar módulo o acción…"
+              placeholder="Buscar permiso, módulo o descripción…"
               value={moduleSearch}
               onChange={(e) => setModuleSearch(e.target.value)}
               disabled={!selectedRoleId || saving || permsLoading}
@@ -460,7 +619,14 @@ export default function PermissionsByRole() {
                 aria-label="Limpiar búsqueda"
                 disabled={!selectedRoleId || saving || permsLoading}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -471,7 +637,6 @@ export default function PermissionsByRole() {
       </div>
 
       <div className={styles.layout}>
-        {/* LEFT: roles */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <p className={styles.cardTitle}>Roles</p>
@@ -480,7 +645,14 @@ export default function PermissionsByRole() {
           <div style={{ padding: 14 }}>
             <div className={styles.searchWrapper}>
               <div className={styles.searchIcon} aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.35-4.35" />
                 </svg>
@@ -505,7 +677,14 @@ export default function PermissionsByRole() {
                   aria-label="Limpiar búsqueda"
                   disabled={saving || rolesLoading}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
@@ -518,7 +697,6 @@ export default function PermissionsByRole() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {/* ✅ no mostrar id */}
                   <th>Nombre</th>
                   <th style={{ width: 140 }}>Activo</th>
                 </tr>
@@ -544,7 +722,10 @@ export default function PermissionsByRole() {
                     const active = getRoleActive(r) ?? false;
 
                     const key = id != null ? `${id}-${idx}` : `role-${idx}`;
-                    const isSelected = selectedRoleId != null && id != null && id === selectedRoleId;
+                    const isSelected =
+                      selectedRoleId != null &&
+                      id != null &&
+                      id === selectedRoleId;
 
                     return (
                       <tr
@@ -566,15 +747,18 @@ export default function PermissionsByRole() {
           </div>
         </section>
 
-        {/* RIGHT: permisos */}
         <aside className={styles.card}>
           <div className={styles.cardHeader}>
-            <p className={styles.cardTitle}>{isEdit ? "Editar permisos" : "Permisos"}</p>
+            <p className={styles.cardTitle}>
+              {isEdit ? "Editar permisos" : "Permisos"}
+            </p>
           </div>
 
           <div className={styles.panelBody}>
             {!selectedRoleId ? (
-              <div className={styles.helper}>Selecciona un rol para ver permisos.</div>
+              <div className={styles.helper}>
+                Selecciona un rol para ver permisos.
+              </div>
             ) : permsLoading ? (
               <div className={styles.helper}>Cargando permisos...</div>
             ) : perms.length === 0 ? (
@@ -584,23 +768,24 @@ export default function PermissionsByRole() {
                 <div className={styles.detailBox}>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Rol</span>
-                    <span className={styles.detailValue}>{getRoleName(selectedRole) ?? "—"}</span>
+                    <span className={styles.detailValue}>
+                      {getRoleName(selectedRole) ?? "—"}
+                    </span>
                   </div>
                 </div>
 
                 <div className={styles.permsScroll}>
-                  {filteredPerms.length === 0 ? (
-                    <div className={styles.helper}>No se encontraron permisos.</div>
+                  {visiblePerms.length === 0 ? (
+                    <div className={styles.helper}>
+                      No se encontraron permisos.
+                    </div>
                   ) : (
-                    filteredPerms.map((p) => (
-                      <div key={p.id} className={styles.actionRow}>
-                        <div className={styles.actionLeft}>
-                          {/* ✅ solo nombre del modulo (sin /ruta) */}
-                          <div className={styles.actionName}>
-                            {p.modulo} — {p.accion}
+                    visiblePerms.map((p) => (
+                      <div key={p.id} className={styles.permissionCard}>
+                        <div className={styles.permissionInfo}>
+                          <div className={styles.permissionDescOnly}>
+                            {p.descripcion}
                           </div>
-                          {/* ✅ ocultar id */}
-                          {/* <div className={styles.actionId}>#{p.id}</div> */}
                         </div>
 
                         <Switch
@@ -638,13 +823,21 @@ export default function PermissionsByRole() {
                     </>
                   ) : (
                     <>
-                      <button type="button" className={styles.btnGhost} onClick={cancelEdit} disabled={saving}>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={cancelEdit}
+                        disabled={saving}
+                      >
                         Cancelar
                       </button>
 
-                      
-
-                      <button type="button" className={styles.btnSave} onClick={() => void onSave()} disabled={saving || !dirty}>
+                      <button
+                        type="button"
+                        className={styles.btnSave}
+                        onClick={() => void onSave()}
+                        disabled={saving || !dirty}
+                      >
                         {saving ? "Guardando..." : "Guardar cambios"}
                       </button>
                     </>
@@ -659,7 +852,6 @@ export default function PermissionsByRole() {
   );
 }
 
-/** Switch */
 type SwitchProps = {
   checked: boolean;
   onChange?: (next: boolean) => void;
@@ -685,7 +877,6 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
   );
 }
 
-/** Helpers */
 function getRoleId(r: Role | null): number | null {
   if (!r) return null;
   const v = r.idRol ?? r.IdRol ?? r.id ?? r.Id;
@@ -695,7 +886,8 @@ function getRoleId(r: Role | null): number | null {
 
 function getRoleName(r: Role | null): string | null {
   if (!r) return null;
-  const v = r.rolName ?? r.RolName ?? r.roleName ?? r.RoleName ?? r.name ?? r.Name;
+  const v =
+    r.rolName ?? r.RolName ?? r.roleName ?? r.RoleName ?? r.name ?? r.Name;
   const s = String(v ?? "").trim();
   return s ? s : null;
 }
@@ -707,24 +899,19 @@ function getRoleActive(r: Role | null): boolean | null {
 }
 
 function toNiceLabel(input: string): string {
-  // /home -> home ; permisos.view -> view ; "HOME" -> "Home"
   const raw = (input ?? "").trim();
   if (!raw) return "—";
 
-  const last = raw
-    .split(/[/\\]/) // rutas
-    .filter(Boolean)
-    .pop() ?? raw;
+  const last = raw.split(/[/\\]/).filter(Boolean).pop() ?? raw;
 
-  const last2 = last
-    .split(/[>|-]/) // separadores raros
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .pop() ?? last;
+  const last2 =
+    last
+      .split(/[>|-]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .pop() ?? last;
 
-  const last3 = last2
-    .split(".") // namespaces tipo Modulo.Accion
-    .pop() ?? last2;
+  const last3 = last2.split(".").pop() ?? last2;
 
   const clean = last3.replace(/[_-]+/g, " ").trim();
   return toTitle(clean);
@@ -733,7 +920,7 @@ function toNiceLabel(input: string): string {
 function toTitle(s: string): string {
   const t = s.trim();
   if (!t) return "—";
-  // Title Case simple (Home, View, etc.)
+
   return t
     .toLowerCase()
     .split(" ")
@@ -742,39 +929,8 @@ function toTitle(s: string): string {
     .join(" ");
 }
 
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "";
-  }
-}
-
-function tryParseJson(text: string): unknown {
-  const t = (text ?? "").trim();
-  if (!t) return null;
-  try {
-    return JSON.parse(t) as unknown;
-  } catch {
-    return text;
-  }
-}
-
 function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null;
-}
-
-function pickFirstString(payload: unknown, keys: string[]): string | null {
-  if (!isRecord(payload)) return null;
-  const obj = payload as UnknownObject;
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "string") {
-      const s = v.trim();
-      if (s) return s;
-    }
-  }
-  return null;
 }
 
 function toBool(v: unknown): boolean {

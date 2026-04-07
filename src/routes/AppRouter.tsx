@@ -24,6 +24,7 @@ import SystemConfigurationView from "../Modules/SystemConfigurationView/pages/Sy
 import AppLayout from "../Components/layout/AppLayout";
 import RequireAuth from "./RequireAuth";
 import RequireModule from "./RequireModule";
+import SinAcceso from "../Modules/SinAcceso/pages/SinAcceso";
 
 export default function AppRouter() {
   return (
@@ -41,6 +42,9 @@ export default function AppRouter() {
               <Route path="/home" element={<Home />} />
             </Route>
 
+             {/* SIN ACCESO */}
+            <Route path="/sin-acceso" element={<SinAcceso />} />
+
             {/* Notificaciones */}
             <Route element={<RequireModule modulePath="/notificaciones" />}>
               <Route path="/notificaciones" element={<NotificationsView />} />
@@ -51,9 +55,7 @@ export default function AppRouter() {
               <Route path="/usuarios/nuevo" element={<UserCreate />} />
             </Route>
 
-            {/* =========================
-                ADQUISICIONES
-            ========================== */}
+            {/* ADQUISICIONES*/}
             <Route element={<RequireModule modulePath="/adquisiciones/registrar" />}>
               <Route path="/adquisiciones/registrar" element={<AcquisitionRequest />} />
             </Route>
@@ -62,9 +64,7 @@ export default function AppRouter() {
               <Route path="/adquisiciones/:id/expediente" element={<ExpedientDocuments />} />
             </Route>
 
-            {/* =========================
-                CATÁLOGOS
-            ========================== */}
+            {/*CATÁLOGOS */}
 
             <Route element={<RequireModule modulePath="/catalogos/unidades-administrativas" />}>
               <Route

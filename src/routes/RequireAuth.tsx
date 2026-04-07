@@ -41,7 +41,7 @@ export default function RequireAuth() {
     }, Math.max(0, msLeft));
 
     return () => clearTimer();
-  }, [token, logout, navigate, location]); // 👈 CLAVE: depende de token
+  }, [token, logout, navigate, location]); 
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;

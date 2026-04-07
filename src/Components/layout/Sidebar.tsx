@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import styles from "./Sidebar.module.css";
 import {
   FiHome,
@@ -43,7 +43,6 @@ export default function Sidebar({
   onNavigate,
   onBackgroundToggle,
 }: SidebarProps) {
-  const navigate = useNavigate();
   const location = useLocation();
 
   const { logout, allowedModules } = useAuth();
@@ -169,7 +168,7 @@ export default function Sidebar({
   const handleLogout = () => {
     onNavigate?.();
     logout();
-    navigate("/login", { replace: true });
+    window.location.replace("/login");
   };
 
   const handleGroupClick = (label: string) => {

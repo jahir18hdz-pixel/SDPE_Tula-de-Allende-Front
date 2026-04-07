@@ -684,3 +684,19 @@
     min-width: 420px;
   }
 }
+.permissionCard {
+  display: flex;
+  align-items: center;      /* 🔥 esto alinea verticalmente */
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 12px 14px;
+  border: 1px solid rgba(230, 230, 234, 0.95);
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96),
+    rgba(248, 248, 250, 0.96)
+  );
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+}
