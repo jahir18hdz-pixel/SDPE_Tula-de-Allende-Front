@@ -52,14 +52,18 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
     .map((raw): ChecklistRow | null => {
       if (!isRecord(raw)) return null;
 
-      const documentTypeId = toNumber(raw["documentTypeId"] ?? raw["DocumentTypeId"]);
+      const documentTypeId = toNumber(
+        raw["documentTypeId"] ?? raw["DocumentTypeId"],
+      );
       const documentName = toStringSafe(
         raw["documentName"] ?? raw["DocumentName"],
       ).trim();
 
       if (!documentTypeId || !documentName) return null;
 
-      const requiredByRule = Boolean(raw["requiredByRule"] ?? raw["RequiredByRule"]);
+      const requiredByRule = Boolean(
+        raw["requiredByRule"] ?? raw["RequiredByRule"],
+      );
       const noApplies = Boolean(raw["noApplies"] ?? raw["NoApplies"]);
       const uploaded = Boolean(raw["uploaded"] ?? raw["Uploaded"]);
       const globalStatus = toStringSafe(
@@ -80,7 +84,9 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
 
           return {
             id: toNumber(file["fileId"] ?? file["FileId"]),
-            name: toStringSafe(file["fileName"] ?? file["FileName"]).trim() || "Archivo",
+            name:
+              toStringSafe(file["fileName"] ?? file["FileName"]).trim() ||
+              "Archivo",
             url: normalizeUrlMaybe(
               toStringSafe(file["fileUrl"] ?? file["FileUrl"]),
             ),
@@ -98,9 +104,7 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
             ).trim(),
           };
         })
-        .filter(
-          (file): file is ChecklistRow["files"][number] => file !== null,
-        );
+        .filter((file): file is ChecklistRow["files"][number] => file !== null);
 
       return {
         documentTypeId,
@@ -305,112 +309,112 @@ export function useExpedientData({
   }, [canUse, requestId]);
 
   const loadManager = useCallback(async () => {
-  if (!canUse) return;
+    if (!canUse) return;
 
-  setLoadingManager(true);
-  try {
-    const res = (await requestJson(MANAGER_API, {
-      method: "GET",
-      headers: authHeaders(),
-    })) as RequestResult;
+    setLoadingManager(true);
+    try {
+      const res = (await requestJson(MANAGER_API, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
 
-    if (!res.ok) {
-      setManager(null);
-      return;
-    }
+      if (!res.ok) {
+        setManager(null);
+        return;
+      }
 
-    const list = unwrapList(res.data);
+      const list = unwrapList(res.data);
 
-    let found: UnknownRecord | null =
-      (list.find((x) => {
-        if (!isRecord(x)) return false;
-
-        const idRequest = toNumber(
-          x["idRequest"] ??
-            x["IdRequest"] ??
-            x["requestId"] ??
-            x["RequestId"],
-        );
-
-        return idRequest === requestId;
-      }) as UnknownRecord) ?? null;
-
-    if (!found && requestNumber.trim()) {
-      found =
+      let found: UnknownRecord | null =
         (list.find((x) => {
           if (!isRecord(x)) return false;
 
-          const rn = toStringSafe(
-            x["requestNumber"] ?? x["RequestNumber"],
-          ).trim();
+          const idRequest = toNumber(
+            x["idRequest"] ??
+              x["IdRequest"] ??
+              x["requestId"] ??
+              x["RequestId"],
+          );
 
-          return rn === requestNumber.trim();
+          return idRequest === requestId;
         }) as UnknownRecord) ?? null;
-    }
 
-    if (!found) {
+      if (!found && requestNumber.trim()) {
+        found =
+          (list.find((x) => {
+            if (!isRecord(x)) return false;
+
+            const rn = toStringSafe(
+              x["requestNumber"] ?? x["RequestNumber"],
+            ).trim();
+
+            return rn === requestNumber.trim();
+          }) as UnknownRecord) ?? null;
+      }
+
+      if (!found) {
+        setManager(null);
+        return;
+      }
+
+      const idRequestManager = toNumber(
+        found["idRequestManager"] ?? found["IdRequestManager"],
+      );
+
+      const firstName = toStringSafe(
+        found["firstName"] ?? found["FirstName"],
+      ).trim();
+
+      const lastName = toStringSafe(
+        found["lastName"] ?? found["LastName"],
+      ).trim();
+
+      const secondLastName = toStringSafe(
+        found["secondLastName"] ?? found["SecondLastName"],
+      ).trim();
+
+      const fullNameDirect = toStringSafe(
+        found["fullName"] ?? found["FullName"],
+      ).trim();
+
+      const fullName =
+        fullNameDirect ||
+        [firstName, lastName, secondLastName].filter(Boolean).join(" ").trim();
+
+      const administrativeUnit =
+        toStringSafe(
+          found["administrativeUnit"] ?? found["AdministrativeUnit"],
+        ).trim() || null;
+
+      const reqNum =
+        toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() ||
+        null;
+
+      const email =
+        toStringSafe(found["email"] ?? found["Email"]).trim() || null;
+
+      const phone =
+        toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
+
+      if (!idRequestManager) {
+        setManager(null);
+        return;
+      }
+
+      setManager({
+        idRequestManager,
+        fullName,
+        requestNumber: reqNum,
+        administrativeUnit,
+        email,
+        phone,
+      });
+    } catch {
       setManager(null);
-      return;
+    } finally {
+      setLoadingManager(false);
     }
-
-    const idRequestManager = toNumber(
-      found["idRequestManager"] ?? found["IdRequestManager"],
-    );
-
-    const firstName = toStringSafe(
-      found["firstName"] ?? found["FirstName"],
-    ).trim();
-
-    const lastName = toStringSafe(
-      found["lastName"] ?? found["LastName"],
-    ).trim();
-
-    const secondLastName = toStringSafe(
-      found["secondLastName"] ?? found["SecondLastName"],
-    ).trim();
-
-    const fullNameDirect = toStringSafe(
-      found["fullName"] ?? found["FullName"],
-    ).trim();
-
-    const fullName =
-      fullNameDirect ||
-      [firstName, lastName, secondLastName].filter(Boolean).join(" ").trim();
-
-    const administrativeUnit =
-      toStringSafe(
-        found["administrativeUnit"] ?? found["AdministrativeUnit"],
-      ).trim() || null;
-
-    const reqNum =
-      toStringSafe(found["requestNumber"] ?? found["RequestNumber"]).trim() ||
-      null;
-
-    const email =
-      toStringSafe(found["email"] ?? found["Email"]).trim() || null;
-
-    const phone =
-      toStringSafe(found["phone"] ?? found["Phone"]).trim() || null;
-
-    if (!idRequestManager) {
-      setManager(null);
-      return;
-    }
-
-    setManager({
-      idRequestManager,
-      fullName,
-      requestNumber: reqNum,
-      administrativeUnit,
-      email,
-      phone,
-    });
-  } catch {
-    setManager(null);
-  } finally {
-    setLoadingManager(false);
-  }
-}, [canUse, requestId, requestNumber]);
+  }, [canUse, requestId, requestNumber]);
 
   const loadChecklist = useCallback(async () => {
     if (!canUse) return;
@@ -481,35 +485,34 @@ export function useExpedientData({
   }, [canUse, loadChecklist]);
 
   const stats = useMemo(() => {
-  const required = checklist.filter(
-    (x) => x.requiredByRule && !x.noApplies,
-  ).length;
+    const required = checklist.filter(
+      (x) => x.requiredByRule && !x.noApplies,
+    ).length;
 
-  const uploadedOk = checklist.filter((x) => x.uploaded).length;
+    const uploadedOk = checklist.filter((x) => x.uploaded).length;
 
-  const requiredUploaded = checklist.filter(
-    (x) => x.requiredByRule && !x.noApplies && x.uploaded,
-  ).length;
+    const requiredUploaded = checklist.filter(
+      (x) => x.requiredByRule && !x.noApplies && x.uploaded,
+    ).length;
 
-  const missingRequired = Math.max(0, required - requiredUploaded);
+    const missingRequired = Math.max(0, required - requiredUploaded);
 
-  // 👇 NUEVO: contar observados
-  const observed = checklist.filter((x) =>
-    x.files?.some(
-      (f) =>
-        (f.status || "").toLowerCase().includes("observado") ||
-        (f.status || "").toLowerCase().includes("rechazado"),
-    ),
-  ).length;
+    const observed = checklist.filter((x) =>
+      x.files?.some(
+        (f) =>
+          (f.status || "").toLowerCase().includes("observado") ||
+          (f.status || "").toLowerCase().includes("rechazado"),
+      ),
+    ).length;
 
-  return {
-    required,
-    uploadedOk,
-    requiredUploaded,
-    missingRequired,
-    observed, // 👈 agregado
-  };
-}, [checklist]);
+    return {
+      required,
+      uploadedOk,
+      requiredUploaded,
+      missingRequired,
+      observed,
+    };
+  }, [checklist]);
 
   const filteredChecklist = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -676,21 +679,17 @@ export function useExpedientData({
       setReviewingDocument(true);
 
       try {
-        const res = (await requestJson(
-          `${EXPEDIENT_API}/expedient-documents/${item.id}/review`,
-          {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              DocumentStatusId: documentStatusId,
-              Observations:
-                documentStatusId === DOCUMENT_STATUS_REJECTED
-                  ? (observations?.trim() ?? "")
-                  : null,
-            }),
-          },
-        )) as RequestResult;
-
+        const res = (await requestJson(`${EXPEDIENT_API}/${item.id}/review`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            DocumentStatusId: documentStatusId,
+            Observations:
+              documentStatusId === DOCUMENT_STATUS_REJECTED
+                ? (observations?.trim() ?? "")
+                : null,
+          }),
+        })) as RequestResult;
         if (!res.ok) {
           showToast("error", res.error || "No se pudo revisar el documento.");
           return;
@@ -889,87 +888,87 @@ export function useExpedientData({
   }
 
   async function openManagerPanel() {
-  if (!canUse) return;
+    if (!canUse) return;
 
-  let units = administrativeUnits;
+    let units = administrativeUnits;
 
-  if (units.length === 0) {
-    setLoadingAdministrativeUnits(true);
-    try {
-      const res = (await requestJson(ADMIN_UNIT_API, {
-        method: "GET",
-        headers: authHeaders(),
-      })) as RequestResult;
+    if (units.length === 0) {
+      setLoadingAdministrativeUnits(true);
+      try {
+        const res = (await requestJson(ADMIN_UNIT_API, {
+          method: "GET",
+          headers: authHeaders(),
+        })) as RequestResult;
 
-      if (res.ok) {
-        const list = unwrapList(res.data);
+        if (res.ok) {
+          const list = unwrapList(res.data);
 
-        units = list
-          .map((raw): AdministrativeUnitOption | null => {
-            if (!isRecord(raw)) return null;
+          units = list
+            .map((raw): AdministrativeUnitOption | null => {
+              if (!isRecord(raw)) return null;
 
-            const idAdministrativeUnit = toNumber(
-              raw["idAdministrativeUnit"] ??
-                raw["IdAdministrativeUnit"] ??
-                raw["id"] ??
-                raw["Id"],
-            );
+              const idAdministrativeUnit = toNumber(
+                raw["idAdministrativeUnit"] ??
+                  raw["IdAdministrativeUnit"] ??
+                  raw["id"] ??
+                  raw["Id"],
+              );
 
-            const description = toStringSafe(
-              raw["description"] ??
-                raw["Description"] ??
-                raw["descripcion"] ??
-                raw["Descripcion"],
-            ).trim();
+              const description = toStringSafe(
+                raw["description"] ??
+                  raw["Description"] ??
+                  raw["descripcion"] ??
+                  raw["Descripcion"],
+              ).trim();
 
-            if (!idAdministrativeUnit || !description) return null;
+              if (!idAdministrativeUnit || !description) return null;
 
-            return { idAdministrativeUnit, description };
-          })
-          .filter((x): x is AdministrativeUnitOption => x !== null);
+              return { idAdministrativeUnit, description };
+            })
+            .filter((x): x is AdministrativeUnitOption => x !== null);
 
-        setAdministrativeUnits(units);
+          setAdministrativeUnits(units);
+        }
+      } catch {
+        units = [];
+      } finally {
+        setLoadingAdministrativeUnits(false);
       }
-    } catch {
-      units = [];
-    } finally {
-      setLoadingAdministrativeUnits(false);
     }
+
+    if (manager) {
+      const nameParts = splitFullName(manager.fullName);
+
+      const matchedUnit =
+        units.find(
+          (u) =>
+            u.description.trim().toLowerCase() ===
+            (manager.administrativeUnit ?? "").trim().toLowerCase(),
+        ) ?? null;
+
+      setManagerForm({
+        idRequestManager: manager.idRequestManager,
+        idAdministrativeUnit: matchedUnit?.idAdministrativeUnit ?? null,
+        firstName: nameParts.firstName,
+        lastName: nameParts.lastName,
+        secondLastName: nameParts.secondLastName,
+        email: manager.email ?? "",
+        phone: manager.phone ?? "",
+      });
+    } else {
+      setManagerForm({
+        idRequestManager: null,
+        idAdministrativeUnit: null,
+        firstName: "",
+        lastName: "",
+        secondLastName: "",
+        email: "",
+        phone: "",
+      });
+    }
+
+    setActivePanel("manager");
   }
-
-  if (manager) {
-    const nameParts = splitFullName(manager.fullName);
-
-    const matchedUnit =
-      units.find(
-        (u) =>
-          u.description.trim().toLowerCase() ===
-          (manager.administrativeUnit ?? "").trim().toLowerCase(),
-      ) ?? null;
-
-    setManagerForm({
-      idRequestManager: manager.idRequestManager,
-      idAdministrativeUnit: matchedUnit?.idAdministrativeUnit ?? null,
-      firstName: nameParts.firstName,
-      lastName: nameParts.lastName,
-      secondLastName: nameParts.secondLastName,
-      email: manager.email ?? "",
-      phone: manager.phone ?? "",
-    });
-  } else {
-    setManagerForm({
-      idRequestManager: null,
-      idAdministrativeUnit: null,
-      firstName: "",
-      lastName: "",
-      secondLastName: "",
-      email: "",
-      phone: "",
-    });
-  }
-
-  setActivePanel("manager");
-}
 
   async function openPolicyPanel() {
     if (!canUse) return;
