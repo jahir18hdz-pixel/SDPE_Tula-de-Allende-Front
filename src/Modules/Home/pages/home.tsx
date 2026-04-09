@@ -261,7 +261,6 @@ export default function Home() {
     message: "",
     requestId: null,
   });
-  
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
@@ -784,28 +783,28 @@ export default function Home() {
 
   const kpiTotal = filtered.length;
 
-const kpiCompleto = filtered.filter(
-  (r) => normalizeText(r.estado) === "completo",
-).length;
+  const kpiCompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "completo",
+  ).length;
 
-const kpiIncompleto = filtered.filter(
-  (r) => normalizeText(r.estado) === "incompleto",
-).length;
+  const kpiIncompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "incompleto",
+  ).length;
 
-const kpiObservados = filtered.filter((r) => {
-  const estado = normalizeText(r.estado);
-  return estado.includes("observado");
-}).length;
+  const kpiObservados = filtered.filter((r) => {
+    const estado = normalizeText(r.estado);
+    return estado.includes("observado");
+  }).length;
 
-const kpiRevision = filtered.filter((r) => {
-  const estado = normalizeText(r.estado);
-  return (
-    estado.includes("revision") ||
-    estado.includes("revisión") ||
-    estado.includes("en revision") ||
-    estado.includes("en revisión")
-  );
-}).length;
+  const kpiRevision = filtered.filter((r) => {
+    const estado = normalizeText(r.estado);
+    return (
+      estado.includes("revision") ||
+      estado.includes("revisión") ||
+      estado.includes("en revision") ||
+      estado.includes("en revisión")
+    );
+  }).length;
 
   function goRegister() {
     navigate("/adquisiciones/registrar");
@@ -993,7 +992,11 @@ const kpiRevision = filtered.filter((r) => {
                         ? styles.badgeOk
                         : st === "incompleto"
                           ? styles.badgeBad
-                          : styles.badgeNeutral;
+                          : st.includes("revision") || st.includes("revisión")
+                            ? styles.badgeReview
+                            : st.includes("observado")
+                              ? styles.badgeObserved
+                              : styles.badgeNeutral;
 
                     const policyExists = hasPolicy(r.poliza);
                     const cfdiExists = hasCfdi(r.cfdi);

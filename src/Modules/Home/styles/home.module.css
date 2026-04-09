@@ -530,6 +530,17 @@
   color: rgba(15, 23, 42, 0.75);
 }
 
+.badgeReview {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #6d28d9;
+}
+
+.badgeObserved {
+  background: rgba(234, 179, 8, 0.18);
+  border-color: rgba(234, 179, 8, 0.4);
+  color: #854d0e;
+}
 .statusCell {
   text-align: center;
   white-space: nowrap;
