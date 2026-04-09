@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://localhost:7197",
+        target: "https://sistemapolizasegresostulaallende.somee.com",
         changeOrigin: true,
         secure: false,
       },
