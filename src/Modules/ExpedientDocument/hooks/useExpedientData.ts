@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { authHeaders, requestJson } from "../../../services/api";
+import {
+  authHeaders,
+  requestJson,
+  requestFormData,
+} from "../../../services/api";
 import type { ToastType } from "../../../Components/layout/Toast";
 
 import type {
@@ -1236,14 +1240,13 @@ export function useExpedientData({
         fd.append("observations", u.observations ?? "");
       });
 
-      const headers = authHeaders() as Record<string, string>;
-      if ("Content-Type" in headers) delete headers["Content-Type"];
-
-      const resp = await fetch(`${EXPEDIENT_API}/upload-massive`, {
-        method: "POST",
-        headers,
-        body: fd,
-      });
+      const resp = await requestFormData(
+        `${EXPEDIENT_API}/upload-massive`,
+        {
+          method: "POST",
+          body: fd,
+        },
+      );
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => "");
