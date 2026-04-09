@@ -178,37 +178,37 @@ export default function NotificationsView() {
   }, [showAppToast, userId]);
 
   const markAsRead = useCallback(
-    async (notificationId: number) => {
-      try {
-        setProcessingId(notificationId);
+  async (notificationId: number) => {
+    try {
+      setProcessingId(notificationId);
 
-        const response = await requestJson(
-          `/api/notifications/read/${notificationId}`,
-          {
-            method: "PUT",
-          },
+      const response = await requestJson(
+        `/api/notifications/${notificationId}/read`,
+        {
+          method: "PUT",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.error || "No se pudo marcar la notificación como leída.",
         );
-
-        if (!response.ok) {
-          throw new Error(
-            response.error || "No se pudo marcar la notificación como leída.",
-          );
-        }
-
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n,
-          ),
-        );
-      } catch (error) {
-        console.error(error);
-        showAppToast("No se pudo marcar la notificación como leída.", "error");
-      } finally {
-        setProcessingId(null);
       }
-    },
-    [showAppToast],
-  );
+
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, isRead: true } : n,
+        ),
+      );
+    } catch (error) {
+      console.error(error);
+      showAppToast("No se pudo marcar la notificación como leída.", "error");
+    } finally {
+      setProcessingId(null);
+    }
+  },
+  [showAppToast],
+);
 
   const markAllAsRead = useCallback(async () => {
     if (!userId) {
