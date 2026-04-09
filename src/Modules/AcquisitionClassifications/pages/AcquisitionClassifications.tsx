@@ -4,6 +4,7 @@ import styles from "../styles/AcquisitionClassifications.module.css";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import { requestJson } from "../../../services/api";
+import ClassificationDocumentsModal from "../components/ClassificationDocumentsModal";
 
 type AcquisitionClassification = {
   idAcquisitionClassification?: number;
@@ -64,6 +65,8 @@ export default function AcquisitionClassifications() {
   const [toastType, setToastType] = useState<ToastType>("success");
   const [toastMsg, setToastMsg] = useState("");
 
+  const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
+
   const showToast = useCallback((type: ToastType, msg: string) => {
     setToastType(type);
     setToastMsg(msg);
@@ -81,6 +84,7 @@ export default function AcquisitionClassifications() {
 
   useEffect(() => {
     void loadAll(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function extractList(payload: unknown): AcquisitionClassification[] {
@@ -167,7 +171,10 @@ export default function AcquisitionClassifications() {
 
       if (!result.ok) {
         if (result.status === 401) {
-          showToast("error", "No hay token o tu sesión expiró. Inicia sesión nuevamente.");
+          showToast(
+            "error",
+            "No hay token o tu sesión expiró. Inicia sesión nuevamente."
+          );
         } else {
           showToast("error", result.error);
         }
@@ -206,7 +213,6 @@ export default function AcquisitionClassifications() {
     const cleanValue = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
 
     if (!cleanValue) return "";
-
     return cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1);
   }
 
@@ -267,6 +273,20 @@ export default function AcquisitionClassifications() {
     });
 
     setMode("edit");
+  }
+
+  function openDocumentsModal() {
+    if (!selected) {
+      showToast("error", "Selecciona una clasificación.");
+      return;
+    }
+
+    if (selectedId == null) {
+      showToast("error", "No se pudo resolver el id de la clasificación.");
+      return;
+    }
+
+    setDocumentsModalOpen(true);
   }
 
   function toggleViewActiveInactive() {
@@ -379,44 +399,6 @@ export default function AcquisitionClassifications() {
       setMode("view");
       setSelected(null);
       await loadAll(Number.isFinite(newCode) ? newCode : null);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onToggleActive() {
-    if (!selected) {
-      showToast("error", "Selecciona una clasificación.");
-      return;
-    }
-
-    const code = getCode(selected);
-    if (code == null) {
-      showToast("error", "No se pudo resolver el Code.");
-      return;
-    }
-
-    const next = !(getActive(selected) ?? false);
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        body: JSON.stringify(next),
-      });
-
-      if (!result.ok) {
-        showToast("error", result.error);
-        return;
-      }
-
-      showToast(
-        "success",
-        `Estatus actualizado: ${next ? "Activo" : "Inactivo"}`
-      );
-      await loadAll(code);
     } catch (e: unknown) {
       showToast("error", toErrorMessage(e));
     } finally {
@@ -855,6 +837,15 @@ export default function AcquisitionClassifications() {
                   </button>
 
                   <button
+                    className={styles.btnPrimary}
+                    type="button"
+                    onClick={openDocumentsModal}
+                    disabled={formDisabled}
+                  >
+                    Asignar documentos
+                  </button>
+
+                  <button
                     className={styles.btnEdit}
                     type="button"
                     onClick={startEdit}
@@ -862,22 +853,23 @@ export default function AcquisitionClassifications() {
                   >
                     Editar
                   </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onToggleActive()}
-                    disabled={formDisabled}
-                    title="Activar / Desactivar"
-                  >
-                    {getActive(selected) ? "Desactivar" : "Activar"}
-                  </button>
                 </div>
               </div>
             )}
           </div>
         </aside>
       </div>
+
+      <ClassificationDocumentsModal
+        open={documentsModalOpen}
+        classificationId={selectedId}
+        classificationName={getDescription(selected) ?? ""}
+        onClose={() => setDocumentsModalOpen(false)}
+        onSaved={() => {
+          void loadAll(selectedCode);
+        }}
+        showToast={showToast}
+      />
     </div>
   );
 }
@@ -909,7 +901,11 @@ function Switch({ checked, onChange, disabled, label }: SwitchProps) {
 
 function getId(u: AcquisitionClassification | null): number | null {
   if (!u) return null;
-  const v = u.idAcquisitionClassification ?? u.IdAcquisitionClassification ?? u.id ?? u.Id;
+  const v =
+    u.idAcquisitionClassification ??
+    u.IdAcquisitionClassification ??
+    u.id ??
+    u.Id;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }

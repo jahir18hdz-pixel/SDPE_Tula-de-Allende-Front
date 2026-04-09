@@ -529,19 +529,67 @@ export default function AcquisitionRequest() {
         },
         {
           key: "suppliers",
-          run: () =>
-            loadCatalogGeneric(CATALOG_ENDPOINTS.suppliers, "Proveedores", {
-              idKeys: ["idSupplier", "IdSupplier", "id", "Id"],
-              nameKeys: [
-                "supplierName",
-                "SupplierName",
-                "businessName",
-                "BusinessName",
-                "name",
-                "Name",
-                "description",
-              ],
-            }),
+          run: async () => {
+            const result = await requestJson(CATALOG_ENDPOINTS.suppliers, {
+              method: "GET",
+              headers: authHeaders(),
+            });
+
+            if (!result.ok) throw new Error(`Proveedores: ${result.error}`);
+
+            const payload = result.data;
+
+            const list: unknown[] = Array.isArray(payload)
+              ? payload
+              : isRecord(payload)
+                ? asArray(
+                    getValue(payload, [
+                      "items",
+                      "Items",
+                      "data",
+                      "Data",
+                      "result",
+                      "Result",
+                    ]),
+                  )
+                : [];
+
+            return list
+              .map((raw): CatalogItem | null => {
+                if (!isRecord(raw)) return null;
+
+                const id = toNumber(
+                  getValue(raw, ["idSupplier", "IdSupplier", "id", "Id"]),
+                );
+                if (!id || id <= 0) return null;
+
+                // 🔥 CAMPOS
+                const businessName = toStringSafe(
+                  getValue(raw, ["businessName", "BusinessName"]),
+                ).trim();
+
+                const contactName = toStringSafe(
+                  getValue(raw, ["contactName", "ContactName"]),
+                ).trim();
+
+                // 🎯 LÓGICA FINAL
+                let name = "";
+
+                if (
+                  businessName &&
+                  businessName.toLowerCase() !== "no aplica"
+                ) {
+                  name = businessName;
+                } else if (contactName) {
+                  name = contactName;
+                }
+
+                if (!name) return null;
+
+                return { id, name };
+              })
+              .filter((x): x is CatalogItem => x !== null);
+          },
         },
         {
           key: "fundingSources",
@@ -969,7 +1017,6 @@ export default function AcquisitionRequest() {
                     rows={4}
                   />
                 </FloatingFieldArea>
-
 
                 <div className={styles.doubleRow}>
                   <FloatingField label="Fecha de autorización">

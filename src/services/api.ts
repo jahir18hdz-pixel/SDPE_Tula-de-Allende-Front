@@ -1,5 +1,5 @@
 export const BASE_URL =
-  (import.meta.env.VITE_API_URL as string) || "https://sistemapolizasegresostulaallende.somee.com";
+  (import.meta.env.VITE_API_URL as string) || "https://localhost:7197";
 
 type AuthStored = { token?: string; Token?: string };
 

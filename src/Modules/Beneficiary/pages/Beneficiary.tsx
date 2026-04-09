@@ -347,6 +347,10 @@ export default function BeneficiaryPage() {
     return String(v ?? "").replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, "");
   }
 
+  function sanitizeAddressLive(v: string): string {
+    return String(v ?? "").replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9#.,/' -]/g, "");
+  }
+
   function normalizeLettersSpacesTitle(v: string): string {
     const raw = String(v ?? "")
       .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, "")
@@ -355,11 +359,117 @@ export default function BeneficiaryPage() {
 
     if (!raw) return "";
 
+    const lowerWords = new Set([
+      "de",
+      "del",
+      "la",
+      "las",
+      "el",
+      "los",
+      "y",
+      "e",
+      "o",
+      "u",
+    ]);
+
     return raw
       .toLowerCase()
       .split(" ")
       .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .map((w, i) => {
+        if (i > 0 && lowerWords.has(w)) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      })
+      .join(" ");
+  }
+
+  function normalizeAddressTitle(v: string): string {
+    const raw = String(v ?? "")
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9#.,/' -]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!raw) return "";
+
+    const lowerWords = new Set([
+      "de",
+      "del",
+      "la",
+      "las",
+      "el",
+      "los",
+      "y",
+      "e",
+      "o",
+      "u",
+    ]);
+
+    return raw
+      .toLowerCase()
+      .split(" ")
+      .filter(Boolean)
+      .map((w, i) => {
+        if (/^\d+[A-Za-z0-9-]*$/.test(w)) return w.toUpperCase();
+        if (i > 0 && lowerWords.has(w)) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      })
+      .join(" ");
+  }
+
+  function liveTitleCaseName(v: string): string {
+    const clean = sanitizeLettersSpacesLive(v).replace(/\s+/g, " ");
+    if (!clean.trim()) return clean;
+
+    const lowerWords = new Set([
+      "de",
+      "del",
+      "la",
+      "las",
+      "el",
+      "los",
+      "y",
+      "e",
+      "o",
+      "u",
+    ]);
+
+    return clean
+      .split(" ")
+      .map((word, index) => {
+        const lower = word.toLowerCase();
+        if (!lower) return lower;
+        if (index > 0 && lowerWords.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join(" ");
+  }
+
+  function liveTitleCaseAddress(v: string): string {
+    const clean = sanitizeAddressLive(v).replace(/\s+/g, " ");
+    if (!clean.trim()) return clean;
+
+    const lowerWords = new Set([
+      "de",
+      "del",
+      "la",
+      "las",
+      "el",
+      "los",
+      "y",
+      "e",
+      "o",
+      "u",
+    ]);
+
+    return clean
+      .split(" ")
+      .map((word, index) => {
+        const lower = word.toLowerCase();
+        if (!lower) return lower;
+        if (/^\d+[A-Za-z0-9-]*$/.test(word)) return word.toUpperCase();
+        if (index > 0 && lowerWords.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
       .join(" ");
   }
 
@@ -413,7 +523,7 @@ export default function BeneficiaryPage() {
     if (pat.length < 2) return "El apellido paterno es muy corto.";
     if (mat && mat.length < 2) return "El apellido materno es muy corto.";
 
-    const street = asTrim(f.street);
+    const street = normalizeAddressTitle(f.street);
     if (!street || street.length < 3) {
       return "La calle es obligatoria (mínimo 3 caracteres).";
     }
@@ -477,10 +587,12 @@ export default function BeneficiaryPage() {
             ? normalizeLettersSpacesTitle(formCreate.maternalLastName)
             : null,
 
-          Street: asTrim(formCreate.street),
+          Street: normalizeAddressTitle(formCreate.street),
           ExternalNumber: asTrim(formCreate.externalNumber) || null,
           InternalNumber: asTrim(formCreate.internalNumber) || null,
-          Neighborhood: asTrim(formCreate.neighborhood) || null,
+          Neighborhood: asTrim(formCreate.neighborhood)
+            ? normalizeAddressTitle(formCreate.neighborhood)
+            : null,
           PostalCode: Number(onlyDigits(formCreate.postalCode, CP_LEN)),
 
           City: asTrim(formCreate.city)
@@ -544,10 +656,12 @@ export default function BeneficiaryPage() {
           ? normalizeLettersSpacesTitle(formEdit.maternalLastName)
           : null,
 
-        Street: asTrim(formEdit.street),
+        Street: normalizeAddressTitle(formEdit.street),
         ExternalNumber: asTrim(formEdit.externalNumber) || null,
         InternalNumber: asTrim(formEdit.internalNumber) || null,
-        Neighborhood: asTrim(formEdit.neighborhood) || null,
+        Neighborhood: asTrim(formEdit.neighborhood)
+          ? normalizeAddressTitle(formEdit.neighborhood)
+          : null,
         PostalCode: Number(onlyDigits(formEdit.postalCode, CP_LEN)),
 
         City: asTrim(formEdit.city)
@@ -834,16 +948,7 @@ export default function BeneficiaryPage() {
                           value={formCreate.firstName}
                           onChange={(e) =>
                             setCreate({
-                              firstName: sanitizeLettersSpacesLive(
-                                e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            setCreate({
-                              firstName: normalizeLettersSpacesTitle(
-                                formCreate.firstName,
-                              ),
+                              firstName: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -860,15 +965,8 @@ export default function BeneficiaryPage() {
                           value={formCreate.paternalLastName}
                           onChange={(e) =>
                             setCreate({
-                              paternalLastName: sanitizeLettersSpacesLive(
+                              paternalLastName: liveTitleCaseName(
                                 e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            setCreate({
-                              paternalLastName: normalizeLettersSpacesTitle(
-                                formCreate.paternalLastName,
                               ),
                             })
                           }
@@ -887,16 +985,7 @@ export default function BeneficiaryPage() {
                         value={formCreate.maternalLastName}
                         onChange={(e) =>
                           setCreate({
-                            maternalLastName: sanitizeLettersSpacesLive(
-                              e.target.value,
-                            ),
-                          })
-                        }
-                        onBlur={() =>
-                          setCreate({
-                            maternalLastName: normalizeLettersSpacesTitle(
-                              formCreate.maternalLastName,
-                            ),
+                            maternalLastName: liveTitleCaseName(e.target.value),
                           })
                         }
                         disabled={formDisabled}
@@ -984,7 +1073,11 @@ export default function BeneficiaryPage() {
                       <input
                         className={styles.floatingInput}
                         value={formCreate.street}
-                        onChange={(e) => setCreate({ street: e.target.value })}
+                        onChange={(e) =>
+                          setCreate({
+                            street: liveTitleCaseAddress(e.target.value),
+                          })
+                        }
                         disabled={formDisabled}
                         placeholder="Calle"
                       />
@@ -1028,7 +1121,9 @@ export default function BeneficiaryPage() {
                         className={styles.floatingInput}
                         value={formCreate.neighborhood}
                         onChange={(e) =>
-                          setCreate({ neighborhood: e.target.value })
+                          setCreate({
+                            neighborhood: liveTitleCaseAddress(e.target.value),
+                          })
                         }
                         disabled={formDisabled}
                         placeholder="Colonia"
@@ -1062,12 +1157,7 @@ export default function BeneficiaryPage() {
                           value={formCreate.city}
                           onChange={(e) =>
                             setCreate({
-                              city: sanitizeLettersSpacesLive(e.target.value),
-                            })
-                          }
-                          onBlur={() =>
-                            setCreate({
-                              city: normalizeLettersSpacesTitle(formCreate.city),
+                              city: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1084,16 +1174,7 @@ export default function BeneficiaryPage() {
                           value={formCreate.municipality}
                           onChange={(e) =>
                             setCreate({
-                              municipality: sanitizeLettersSpacesLive(
-                                e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            setCreate({
-                              municipality: normalizeLettersSpacesTitle(
-                                formCreate.municipality,
-                              ),
+                              municipality: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1108,14 +1189,7 @@ export default function BeneficiaryPage() {
                           value={formCreate.state}
                           onChange={(e) =>
                             setCreate({
-                              state: sanitizeLettersSpacesLive(e.target.value),
-                            })
-                          }
-                          onBlur={() =>
-                            setCreate({
-                              state: normalizeLettersSpacesTitle(
-                                formCreate.state,
-                              ),
+                              state: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1131,14 +1205,7 @@ export default function BeneficiaryPage() {
                         value={formCreate.country}
                         onChange={(e) =>
                           setCreate({
-                            country: sanitizeLettersSpacesLive(e.target.value),
-                          })
-                        }
-                        onBlur={() =>
-                          setCreate({
-                            country: normalizeLettersSpacesTitle(
-                              formCreate.country,
-                            ),
+                            country: liveTitleCaseName(e.target.value),
                           })
                         }
                         disabled={formDisabled}
@@ -1201,16 +1268,7 @@ export default function BeneficiaryPage() {
                           value={formEdit.firstName}
                           onChange={(e) =>
                             patchEdit({
-                              firstName: sanitizeLettersSpacesLive(
-                                e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            patchEdit({
-                              firstName: normalizeLettersSpacesTitle(
-                                formEdit.firstName,
-                              ),
+                              firstName: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1226,15 +1284,8 @@ export default function BeneficiaryPage() {
                           value={formEdit.paternalLastName}
                           onChange={(e) =>
                             patchEdit({
-                              paternalLastName: sanitizeLettersSpacesLive(
+                              paternalLastName: liveTitleCaseName(
                                 e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            patchEdit({
-                              paternalLastName: normalizeLettersSpacesTitle(
-                                formEdit.paternalLastName,
                               ),
                             })
                           }
@@ -1252,16 +1303,7 @@ export default function BeneficiaryPage() {
                         value={formEdit.maternalLastName}
                         onChange={(e) =>
                           patchEdit({
-                            maternalLastName: sanitizeLettersSpacesLive(
-                              e.target.value,
-                            ),
-                          })
-                        }
-                        onBlur={() =>
-                          patchEdit({
-                            maternalLastName: normalizeLettersSpacesTitle(
-                              formEdit.maternalLastName,
-                            ),
+                            maternalLastName: liveTitleCaseName(e.target.value),
                           })
                         }
                         disabled={formDisabled}
@@ -1344,7 +1386,11 @@ export default function BeneficiaryPage() {
                       <input
                         className={styles.floatingInput}
                         value={formEdit.street}
-                        onChange={(e) => patchEdit({ street: e.target.value })}
+                        onChange={(e) =>
+                          patchEdit({
+                            street: liveTitleCaseAddress(e.target.value),
+                          })
+                        }
                         disabled={formDisabled}
                       />
                     </div>
@@ -1385,7 +1431,9 @@ export default function BeneficiaryPage() {
                         className={styles.floatingInput}
                         value={formEdit.neighborhood}
                         onChange={(e) =>
-                          patchEdit({ neighborhood: e.target.value })
+                          patchEdit({
+                            neighborhood: liveTitleCaseAddress(e.target.value),
+                          })
                         }
                         disabled={formDisabled}
                       />
@@ -1417,12 +1465,7 @@ export default function BeneficiaryPage() {
                           value={formEdit.city}
                           onChange={(e) =>
                             patchEdit({
-                              city: sanitizeLettersSpacesLive(e.target.value),
-                            })
-                          }
-                          onBlur={() =>
-                            patchEdit({
-                              city: normalizeLettersSpacesTitle(formEdit.city),
+                              city: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1438,16 +1481,7 @@ export default function BeneficiaryPage() {
                           value={formEdit.municipality}
                           onChange={(e) =>
                             patchEdit({
-                              municipality: sanitizeLettersSpacesLive(
-                                e.target.value,
-                              ),
-                            })
-                          }
-                          onBlur={() =>
-                            patchEdit({
-                              municipality: normalizeLettersSpacesTitle(
-                                formEdit.municipality,
-                              ),
+                              municipality: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1461,12 +1495,7 @@ export default function BeneficiaryPage() {
                           value={formEdit.state}
                           onChange={(e) =>
                             patchEdit({
-                              state: sanitizeLettersSpacesLive(e.target.value),
-                            })
-                          }
-                          onBlur={() =>
-                            patchEdit({
-                              state: normalizeLettersSpacesTitle(formEdit.state),
+                              state: liveTitleCaseName(e.target.value),
                             })
                           }
                           disabled={formDisabled}
@@ -1481,14 +1510,7 @@ export default function BeneficiaryPage() {
                         value={formEdit.country}
                         onChange={(e) =>
                           patchEdit({
-                            country: sanitizeLettersSpacesLive(e.target.value),
-                          })
-                        }
-                        onBlur={() =>
-                          patchEdit({
-                            country: normalizeLettersSpacesTitle(
-                              formEdit.country,
-                            ),
+                            country: liveTitleCaseName(e.target.value),
                           })
                         }
                         disabled={formDisabled}
@@ -1585,14 +1607,36 @@ export default function BeneficiaryPage() {
                     <div className={styles.floatingField}>
                       <span className={styles.floatingLabel}>Municipio</span>
                       <div className={styles.floatingValue}>
-                        {String(getMunicipality(selected) ?? "—")}
+                        {normalizeLettersSpacesTitle(
+                          getMunicipality(selected) ?? "",
+                        ) || "—"}
                       </div>
                     </div>
 
                     <div className={styles.floatingField}>
                       <span className={styles.floatingLabel}>Estado</span>
                       <div className={styles.floatingValue}>
-                        {String(getState(selected) ?? "—")}
+                        {normalizeLettersSpacesTitle(getState(selected) ?? "") ||
+                          "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.doubleRow}>
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>Ciudad</span>
+                      <div className={styles.floatingValue}>
+                        {normalizeLettersSpacesTitle(getCity(selected) ?? "") ||
+                          "—"}
+                      </div>
+                    </div>
+
+                    <div className={styles.floatingField}>
+                      <span className={styles.floatingLabel}>País</span>
+                      <div className={styles.floatingValue}>
+                        {normalizeLettersSpacesTitle(
+                          getCountry(selected) ?? "",
+                        ) || "—"}
                       </div>
                     </div>
                   </div>
@@ -1806,16 +1850,17 @@ function getActive(b: Beneficiary | null): boolean | null {
 }
 
 function formatFullName(b: Beneficiary): string {
-  const n = getFirstName(b) ?? "";
-  const p = getPaternal(b) ?? "";
-  const m = getMaternal(b) ?? "";
+  const n = normalizeNameForView(getFirstName(b) ?? "");
+  const p = normalizeNameForView(getPaternal(b) ?? "");
+  const m = normalizeNameForView(getMaternal(b) ?? "");
   return `${n} ${p} ${m}`.replace(/\s+/g, " ").trim();
 }
+
 function formatAddress(b: Beneficiary): string {
-  const street = getStreet(b) ?? "";
+  const street = normalizeAddressForView(getStreet(b) ?? "");
   const ext = getExternalNumber(b) ?? "";
   const intr = getInternalNumber(b) ?? "";
-  const neigh = getNeighborhood(b) ?? "";
+  const neigh = normalizeAddressForView(getNeighborhood(b) ?? "");
   const pc = getPostalCode(b) ?? "";
 
   const nums = [ext ? `Ext. ${ext}` : "", intr ? `Int. ${intr}` : ""]
@@ -1827,6 +1872,65 @@ function formatAddress(b: Beneficiary): string {
     .join(", ");
 
   return [part1, part2].filter(Boolean).join(" • ").trim();
+}
+
+function normalizeNameForView(v: string): string {
+  const raw = String(v ?? "").trim();
+  if (!raw) return "";
+
+  const lowerWords = new Set([
+    "de",
+    "del",
+    "la",
+    "las",
+    "el",
+    "los",
+    "y",
+    "e",
+    "o",
+    "u",
+  ]);
+
+  return raw
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((w, i) => {
+      if (i > 0 && lowerWords.has(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
+
+function normalizeAddressForView(v: string): string {
+  const raw = String(v ?? "").trim();
+  if (!raw) return "";
+
+  const lowerWords = new Set([
+    "de",
+    "del",
+    "la",
+    "las",
+    "el",
+    "los",
+    "y",
+    "e",
+    "o",
+    "u",
+  ]);
+
+  return raw
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((w, i) => {
+      if (/^\d+[A-Za-z0-9-]*$/.test(w)) return w.toUpperCase();
+      if (i > 0 && lowerWords.has(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
 }
 
 function limitWords(text: string | null, maxWords: number): string | null {

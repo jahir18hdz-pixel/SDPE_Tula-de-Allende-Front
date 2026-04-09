@@ -526,12 +526,10 @@ export default function NotificationsView() {
         <section className={styles.content}>
           {loading ? (
             <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>🔄</div>
               <p className={styles.emptyTitle}>Cargando notificaciones...</p>
             </div>
           ) : filteredNotifications.length === 0 ? (
             <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>🔔</div>
               <p className={styles.emptyTitle}>
                 No hay notificaciones para mostrar
               </p>

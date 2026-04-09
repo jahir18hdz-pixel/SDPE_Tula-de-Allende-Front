@@ -356,7 +356,7 @@ export default function Cog() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerText}>
-            <h1 className={styles.h1}>COG</h1>
+            <h1 className={styles.h1}>Clasificador Objeto Gasto</h1>
             <p className={styles.sub}>
               {asTrim(search)
                 ? "Buscando en activos e inactivos."

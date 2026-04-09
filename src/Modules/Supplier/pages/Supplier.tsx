@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import styles from "../styles/Suplier.module.css";
 
@@ -149,7 +143,9 @@ function normalizeGeneralTextInput(v: string): string {
 }
 
 function normalizeHumanTextForSave(v: string): string {
-  return capitalizeWordsLoose(collapseSpaces(onlyLettersSpaces(v)).toLowerCase());
+  return capitalizeWordsLoose(
+    collapseSpaces(onlyLettersSpaces(v)).toLowerCase(),
+  );
 }
 
 function normalizeGeneralTextForSave(v: string): string {
@@ -235,7 +231,10 @@ export default function SupplierPage() {
 
   function extractList(payload: unknown): Supplier[] {
     if (Array.isArray(payload)) return payload as Supplier[];
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
+    if (
+      isRecord(payload) &&
+      Array.isArray((payload as UnknownRecord).$values)
+    ) {
       return (payload as UnknownRecord).$values as Supplier[];
     }
 
@@ -517,8 +516,6 @@ export default function SupplierPage() {
     }
   }
 
-  
-
   async function onSearchByRfc() {
     const q = normalizeRfc(search);
     if (!q) return;
@@ -658,8 +655,6 @@ export default function SupplierPage() {
           </div>
 
           <div className={styles.headerActions}>
-            
-
             <button
               className={styles.btnGhost}
               type="button"
@@ -733,6 +728,7 @@ export default function SupplierPage() {
                 <tr>
                   <th style={{ width: 150 }}>RFC</th>
                   <th>Razón social</th>
+                  <th style={{ width: 180 }}>Tipo de persona</th>
                   <th style={{ width: 170 }}>Activo</th>
                 </tr>
               </thead>
@@ -740,13 +736,13 @@ export default function SupplierPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={4} className={styles.empty}>
                       Cargando proveedores...
                     </td>
                   </tr>
                 ) : displayedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className={styles.empty}>
+                    <td colSpan={4} className={styles.empty}>
                       {asTrim(search)
                         ? "No se encontraron proveedores con esos criterios (en la página actual)."
                         : showInactive
@@ -763,6 +759,7 @@ export default function SupplierPage() {
                       !!rfc &&
                       selectedRfc.toUpperCase() === rfc.toUpperCase();
                     const active = getActive(r) ?? false;
+                    const supplierType = inferSupplierTypeFromSupplier(r);
 
                     return (
                       <tr
@@ -771,9 +768,17 @@ export default function SupplierPage() {
                         onClick={() => onRowClick(r)}
                       >
                         <td className={styles.mono}>{rfc ?? "—"}</td>
+
                         <td title={getBusinessName(r) ?? ""}>
                           {limitWords(getBusinessName(r), 10) ?? "—"}
                         </td>
+
+                        <td>
+                          {supplierType === "moral"
+                            ? "Persona moral"
+                            : "Persona física"}
+                        </td>
+
                         <td>
                           <Switch
                             checked={active}
@@ -876,7 +881,9 @@ export default function SupplierPage() {
               <div className={styles.detailBox}>
                 <div className={styles.detailCard}>
                   <div className={styles.floatingField}>
-                    <span className={styles.floatingLabel}>Tipo de persona</span>
+                    <span className={styles.floatingLabel}>
+                      Tipo de persona
+                    </span>
                     <div className={styles.floatingValue}>
                       {inferSupplierTypeFromSupplier(selected) === "moral"
                         ? "Persona moral"
@@ -963,8 +970,6 @@ export default function SupplierPage() {
                   >
                     Editar
                   </button>
-
-                  
                 </div>
               </div>
             )}
@@ -1042,7 +1047,9 @@ function SupplierFormFields({
               }))
             }
             disabled={formDisabled}
-            placeholder={isFisica ? "RFC de 13 caracteres" : "RFC de 12 caracteres"}
+            placeholder={
+              isFisica ? "RFC de 13 caracteres" : "RFC de 12 caracteres"
+            }
             maxLength={rfcMax}
           />
         </div>
@@ -1293,9 +1300,7 @@ function SupplierFormFields({
             checked={form.active}
             disabled={formDisabled}
             label={form.active ? "Activo" : "Inactivo"}
-            onChange={(next) =>
-              setForm((p) => ({ ...p, active: next }))
-            }
+            onChange={(next) => setForm((p) => ({ ...p, active: next }))}
           />
         </div>
       </div>
@@ -1337,7 +1342,7 @@ function formFromSupplier(s: Supplier): FormDto {
     supplierType,
     rfc: getRfc(s) ?? "",
     businessName:
-      supplierType === "fisica" ? "No aplica" : getBusinessName(s) ?? "",
+      supplierType === "fisica" ? "No aplica" : (getBusinessName(s) ?? ""),
 
     street: getStreet(s) ?? "",
     externalNumber: getExternalNumber(s) ?? "",
