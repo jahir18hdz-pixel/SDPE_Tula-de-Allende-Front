@@ -92,7 +92,6 @@ type CfdiTarget = {
 
 const API_BASE = "/api/AcquisitionRequest";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy/policies";
-const UPDATE_CFDI_API = `${API_BASE}/update-cfdi`;
 
 function getDaysUntil(dateValue?: string | null) {
   if (!dateValue) return null;
@@ -454,14 +453,16 @@ export default function Home() {
   }, []);
 
   const openCfdiPanel = useCallback((row: Row) => {
+    const currentCfdi = hasCfdi(row.cfdi) ? row.cfdi : "";
+
     setCfdiTarget({
       idRequest: row.idRequest,
       folio: row.folio,
-      cfdiActual: row.cfdi,
+      cfdiActual: currentCfdi,
     });
 
     setCfdiForm({
-      cfdi: hasCfdi(row.cfdi) ? row.cfdi : "",
+      cfdi: currentCfdi,
     });
 
     setCfdiPanelOpen(true);
@@ -470,8 +471,8 @@ export default function Home() {
   const closeCfdiPanel = useCallback(() => {
     if (savingCfdi) return;
     setCfdiPanelOpen(false);
-    setCfdiTarget(null);
     setCfdiForm({ cfdi: "" });
+    setCfdiTarget(null);
   }, [savingCfdi]);
 
   const onSaveMaxDate = useCallback(async () => {
@@ -523,43 +524,45 @@ export default function Home() {
   ]);
 
   const onSaveCfdi = useCallback(async () => {
-    if (!cfdiTarget) return;
+    if (!cfdiTarget?.idRequest) {
+      showAppToast("No se encontró la solicitud para actualizar el CFDI.", "error");
+      return;
+    }
 
-    const cfdiValue = cfdiForm.cfdi.trim();
+    if (!cfdiForm.cfdi.trim()) {
+      showAppToast("Captura el CFDI.", "error");
+      return;
+    }
 
     setSavingCfdi(true);
 
     try {
-      const res = (await requestJson(UPDATE_CFDI_API, {
-        method: "PATCH",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          requestId: cfdiTarget.idRequest,
-          cfdi: cfdiValue,
-        }),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${API_BASE}/${cfdiTarget.idRequest}/CFDI`,
+        {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(cfdiForm.cfdi.trim()),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
-        showAppToast(res.error || "No se pudo actualizar el CFDI.", "error");
+        showAppToast(res.error || "No se pudo guardar el CFDI.", "error");
         return;
       }
 
-      showAppToast(
-        cfdiValue
-          ? "CFDI actualizado correctamente."
-          : "CFDI eliminado correctamente.",
-        "success",
-      );
+      showAppToast("CFDI guardado correctamente.", "success");
       closeCfdiPanel();
       await fetchData();
-    } catch {
+    } catch (error) {
+      console.error("Error al actualizar CFDI:", error);
       showAppToast("Error inesperado al actualizar el CFDI.", "error");
     } finally {
       setSavingCfdi(false);
     }
-  }, [cfdiTarget, cfdiForm, closeCfdiPanel, fetchData, showAppToast]);
+  }, [cfdiTarget, cfdiForm.cfdi, closeCfdiPanel, fetchData, showAppToast]);
 
   const openUrl = useCallback((u: string) => {
     const url = normalizeUrlMaybe(u);

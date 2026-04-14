@@ -120,9 +120,25 @@ function toStringSafe(v: unknown): string {
   return "";
 }
 
+function toBooleanActive(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const value = v.trim().toLowerCase();
+    return (
+      value === "true" ||
+      value === "1" ||
+      value === "activo" ||
+      value === "active"
+    );
+  }
+  return false;
+}
+
 type NormalizeOpts = {
   idKeys?: readonly string[];
   nameKeys?: readonly string[];
+  activeKeys?: readonly string[];
 };
 
 function normalizeCatalog(
@@ -136,9 +152,20 @@ function normalizeCatalog(
     "description",
     "Description",
   ];
+  const defaultActiveKeys: readonly string[] = [
+    "active",
+    "Active",
+    "isActive",
+    "IsActive",
+    "status",
+    "Status",
+  ];
 
   const idKeys = opts?.idKeys?.length ? opts.idKeys : defaultIdKeys;
   const nameKeys = opts?.nameKeys?.length ? opts.nameKeys : defaultNameKeys;
+  const activeKeys = opts?.activeKeys?.length
+    ? opts.activeKeys
+    : defaultActiveKeys;
 
   let list: unknown[] = [];
 
@@ -164,6 +191,11 @@ function normalizeCatalog(
 
       const name = toStringSafe(getValue(raw, nameKeys)).trim();
       if (!name) return null;
+
+      const hasActiveField = activeKeys.some((key) => key in raw);
+      const activeRaw = getValue(raw, activeKeys);
+
+      if (hasActiveField && !toBooleanActive(activeRaw)) return null;
 
       return { id, name };
     })
@@ -423,6 +455,7 @@ export default function AcquisitionRequest() {
     return normalizeCatalog(result.data, {
       idKeys: ["idProyect", "IdProyect", "id", "Id"],
       nameKeys: ["description", "Description", "name", "Name"],
+      activeKeys: ["active", "Active", "isActive", "IsActive", "status", "Status"],
     });
   }, []);
 
@@ -452,6 +485,25 @@ export default function AcquisitionRequest() {
     return list
       .map((raw): CatalogItem | null => {
         if (!isRecord(raw)) return null;
+
+        const hasActiveField =
+          "active" in raw ||
+          "Active" in raw ||
+          "isActive" in raw ||
+          "IsActive" in raw ||
+          "status" in raw ||
+          "Status" in raw;
+
+        const activeRaw = getValue(raw, [
+          "active",
+          "Active",
+          "isActive",
+          "IsActive",
+          "status",
+          "Status",
+        ]);
+
+        if (hasActiveField && !toBooleanActive(activeRaw)) return null;
 
         const id = toNumber(
           getValue(raw, ["idBeneficiary", "IdBeneficiary", "id", "Id"]),
@@ -504,6 +556,14 @@ export default function AcquisitionRequest() {
                   "Id",
                 ],
                 nameKeys: ["description", "Description", "name", "Name"],
+                activeKeys: [
+                  "active",
+                  "Active",
+                  "isActive",
+                  "IsActive",
+                  "status",
+                  "Status",
+                ],
               },
             ),
         },
@@ -523,6 +583,14 @@ export default function AcquisitionRequest() {
                   "Name",
                   "typeName",
                   "TypeName",
+                ],
+                activeKeys: [
+                  "active",
+                  "Active",
+                  "isActive",
+                  "IsActive",
+                  "status",
+                  "Status",
                 ],
               },
             ),
@@ -558,12 +626,30 @@ export default function AcquisitionRequest() {
               .map((raw): CatalogItem | null => {
                 if (!isRecord(raw)) return null;
 
+                const hasActiveField =
+                  "active" in raw ||
+                  "Active" in raw ||
+                  "isActive" in raw ||
+                  "IsActive" in raw ||
+                  "status" in raw ||
+                  "Status" in raw;
+
+                const activeRaw = getValue(raw, [
+                  "active",
+                  "Active",
+                  "isActive",
+                  "IsActive",
+                  "status",
+                  "Status",
+                ]);
+
+                if (hasActiveField && !toBooleanActive(activeRaw)) return null;
+
                 const id = toNumber(
                   getValue(raw, ["idSupplier", "IdSupplier", "id", "Id"]),
                 );
                 if (!id || id <= 0) return null;
 
-                // 🔥 CAMPOS
                 const businessName = toStringSafe(
                   getValue(raw, ["businessName", "BusinessName"]),
                 ).trim();
@@ -572,7 +658,6 @@ export default function AcquisitionRequest() {
                   getValue(raw, ["contactName", "ContactName"]),
                 ).trim();
 
-                // 🎯 LÓGICA FINAL
                 let name = "";
 
                 if (
@@ -607,6 +692,14 @@ export default function AcquisitionRequest() {
                   "sourceName",
                   "SourceName",
                 ],
+                activeKeys: [
+                  "active",
+                  "Active",
+                  "isActive",
+                  "IsActive",
+                  "status",
+                  "Status",
+                ],
               },
             ),
         },
@@ -631,6 +724,14 @@ export default function AcquisitionRequest() {
                   "name",
                   "Name",
                 ],
+                activeKeys: [
+                  "active",
+                  "Active",
+                  "isActive",
+                  "IsActive",
+                  "status",
+                  "Status",
+                ],
               },
             ),
         },
@@ -654,6 +755,14 @@ export default function AcquisitionRequest() {
                 "name",
                 "Name",
               ],
+              activeKeys: [
+                "active",
+                "Active",
+                "isActive",
+                "IsActive",
+                "status",
+                "Status",
+              ],
             }),
         },
         {
@@ -669,6 +778,14 @@ export default function AcquisitionRequest() {
                 "name",
                 "Name",
               ],
+              activeKeys: [
+                "active",
+                "Active",
+                "isActive",
+                "IsActive",
+                "status",
+                "Status",
+              ],
             }),
         },
         { key: "beneficiaries", run: () => loadBeneficiaries() },
@@ -678,6 +795,14 @@ export default function AcquisitionRequest() {
             loadCatalogGeneric(CATALOG_ENDPOINTS.cogs, "COG", {
               idKeys: ["idCog", "IdCog", "id", "Id"],
               nameKeys: ["description", "Description", "name", "Name"],
+              activeKeys: [
+                "active",
+                "Active",
+                "isActive",
+                "IsActive",
+                "status",
+                "Status",
+              ],
             }),
         },
       ] as const;
@@ -769,35 +894,31 @@ export default function AcquisitionRequest() {
   }
 
   function validateCreate(): string {
-    const detailsWithContent = create.details.filter((d) => !isDetailEmpty(d));
+  const detailsWithContent = create.details.filter((d) => !isDetailEmpty(d));
 
-    for (let i = 0; i < detailsWithContent.length; i++) {
-      const d = detailsWithContent[i];
-      const row = create.details.findIndex((x) => x === d) + 1;
+  for (let i = 0; i < detailsWithContent.length; i++) {
+    const d = detailsWithContent[i];
+    const row = create.details.findIndex((x) => x === d) + 1;
 
-      if (!d.idCog) return `Selecciona el COG del detalle ${row}.`;
+    if (!d.idCog) return `Selecciona el COG del detalle ${row}.`;
 
-      const quantity = toPositiveNumber(d.quantity);
-      if (!quantity) {
-        return `La cantidad del detalle ${row} debe ser mayor a 0.`;
-      }
-
-      if (!d.unitMeasure.trim()) {
-        return `La unidad de medida del detalle ${row} es obligatoria si capturas ese detalle.`;
-      }
-
-      if (!d.description.trim()) {
-        return `La descripción del detalle ${row} es obligatoria si capturas ese detalle.`;
-      }
-
-      const unitAmount = toPositiveNumber(d.unitAmount);
-      if (!unitAmount) {
-        return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
-      }
+    const quantity = toPositiveNumber(d.quantity);
+    if (!quantity) {
+      return `La cantidad del detalle ${row} debe ser mayor a 0.`;
     }
 
-    return "";
+    if (!d.description.trim()) {
+      return `La descripción del detalle ${row} es obligatoria si capturas ese detalle.`;
+    }
+
+    const unitAmount = toPositiveNumber(d.unitAmount);
+    if (!unitAmount) {
+      return `El importe unitario del detalle ${row} debe ser mayor a 0.`;
+    }
   }
+
+  return "";
+}
 
   async function onCreate() {
     const msg = validateCreate();

@@ -4,7 +4,7 @@ import { useAuth } from "../context/useAuth";
 import { getJwtExpMs, isJwtExpired } from "../services/jwtExpiry";
 
 export default function RequireAuth() {
-  const { isAuthenticated, logout, token } = useAuth(); // 👈 usa token del contexto
+  const { isAuthenticated, logout, token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const timerRef = useRef<number | null>(null);

@@ -75,8 +75,16 @@ type Props = {
   showToast: (type: ToastType, msg: string) => void;
 };
 
-const DOCUMENT_TYPE_API = "/api/DocumentType/paged?pageNumber=1&pageSize=1000";
+type PagedResult = {
+  items: DocumentTypeRow[];
+  totalCount: number | null;
+  page: number | null;
+  pageSize: number | null;
+};
+
+const DOCUMENT_TYPE_BASE = "/api/DocumentType/paged";
 const ASSIGNMENT_API = "/api/ClasificationDocumentType";
+const PAGE_SIZE = 100;
 
 export default function ClassificationDocumentsModal({
   open,
@@ -102,28 +110,13 @@ export default function ClassificationDocumentsModal({
 
     setLoading(true);
     try {
-      const [allDocsResult, assignedDocsResult] = await Promise.all([
-        requestJson(DOCUMENT_TYPE_API, {
-          method: "GET",
-          headers: authHeaders(),
-        }),
+      const [allDocs, assignedDocsResult] = await Promise.all([
+        loadAllActiveDocumentTypes(),
         requestJson(`${ASSIGNMENT_API}/by-classification/${classificationId}`, {
           method: "GET",
           headers: authHeaders(),
         }),
       ]);
-
-      if (!allDocsResult.ok) {
-        showToast(
-          "error",
-          allDocsResult.error ||
-            "No se pudieron cargar los tipos de documento.",
-        );
-        setRows([]);
-        return;
-      }
-
-      const allDocs = extractDocumentTypeList(allDocsResult.data);
 
       const assignedDocs =
         assignedDocsResult.ok && assignedDocsResult.status !== 404
@@ -157,7 +150,6 @@ export default function ClassificationDocumentsModal({
           const id = getDocumentTypeId(doc);
           if (id == null) return null;
 
-          const activeDoc = getDocumentTypeActive(doc);
           const assigned = assignedMap.get(id);
 
           return {
@@ -170,7 +162,7 @@ export default function ClassificationDocumentsModal({
               getDocumentTypeDescription(doc) ?? assigned?.description ?? "",
             checked: Boolean(assigned),
             isRequired: assigned?.isRequired ?? false,
-            active: assigned?.active ?? activeDoc ?? true,
+            active: assigned?.active ?? true,
           };
         })
         .filter((x): x is AssignFormRow => x !== null)
@@ -184,6 +176,57 @@ export default function ClassificationDocumentsModal({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadAllActiveDocumentTypes(): Promise<DocumentTypeRow[]> {
+    const collected: DocumentTypeRow[] = [];
+    let currentPage = 1;
+
+    while (true) {
+      const result = await requestJson(
+        `${DOCUMENT_TYPE_BASE}?pageNumber=${currentPage}&pageSize=${PAGE_SIZE}`,
+        {
+          method: "GET",
+          headers: authHeaders(),
+        },
+      );
+
+      if (!result.ok) {
+        throw new Error(
+          result.error || "No se pudieron cargar los tipos de documento.",
+        );
+      }
+
+      const norm = normalizePagedDocumentTypes(result.data);
+      const pageItems = norm.items ?? [];
+
+      if (pageItems.length === 0) {
+        break;
+      }
+
+      collected.push(...pageItems);
+
+      if (pageItems.length < PAGE_SIZE) {
+        break;
+      }
+
+      currentPage += 1;
+    }
+
+    const unique = new Map<number, DocumentTypeRow>();
+
+    for (const doc of collected) {
+      const id = getDocumentTypeId(doc);
+      if (id == null) continue;
+
+      if (!unique.has(id)) {
+        unique.set(id, doc);
+      }
+    }
+
+    return Array.from(unique.values()).filter(
+      (doc) => getDocumentTypeActive(doc) === true,
+    );
   }
 
   async function onSave() {
@@ -388,7 +431,7 @@ export default function ClassificationDocumentsModal({
                     <div className={styles.emptyState}>
                       {search.trim()
                         ? "No se encontraron tipos de documento con esa búsqueda."
-                        : "No hay tipos de documento disponibles."}
+                        : "No hay tipos de documento activos disponibles."}
                     </div>
                   ) : (
                     filteredRows.map((row) => (
@@ -462,17 +505,19 @@ export default function ClassificationDocumentsModal({
   );
 }
 
-function extractDocumentTypeList(payload: unknown): DocumentTypeRow[] {
-  if (Array.isArray(payload)) return payload as DocumentTypeRow[];
-
-  if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
-    return (payload as UnknownRecord).$values as DocumentTypeRow[];
+function normalizePagedDocumentTypes(payload: unknown): PagedResult {
+  if (Array.isArray(payload)) {
+    return {
+      items: payload as DocumentTypeRow[],
+      totalCount: null,
+      page: null,
+      pageSize: null,
+    };
   }
 
-  const obj = isRecord(payload) ? (payload as UnknownRecord) : null;
-  if (!obj) return [];
+  const obj = isRecord(payload) ? payload : {};
 
-  const possible =
+  const itemsRaw =
     obj.items ??
     obj.Items ??
     obj.data ??
@@ -486,10 +531,37 @@ function extractDocumentTypeList(payload: unknown): DocumentTypeRow[] {
     obj.values ??
     obj.Values;
 
-  if (Array.isArray(possible)) return possible as DocumentTypeRow[];
+  let items: DocumentTypeRow[] = [];
+  if (Array.isArray(itemsRaw)) {
+    items = itemsRaw as DocumentTypeRow[];
+  } else {
+    const deep = findArrayDeep(payload, 0);
+    items = deep ? (deep as DocumentTypeRow[]) : [];
+  }
 
-  const deep = findArrayDeep(payload, 0);
-  return deep ? (deep as DocumentTypeRow[]) : [];
+  const totalCountRaw =
+    obj.totalCount ?? obj.TotalCount ?? obj.total ?? obj.Total ?? null;
+
+  const pageRaw =
+    obj.pageNumber ?? obj.PageNumber ?? obj.page ?? obj.Page ?? null;
+
+  const pageSizeRaw = obj.pageSize ?? obj.PageSize ?? null;
+
+  return {
+    items,
+    totalCount:
+      totalCountRaw != null && Number.isFinite(Number(totalCountRaw))
+        ? Number(totalCountRaw)
+        : null,
+    page:
+      pageRaw != null && Number.isFinite(Number(pageRaw))
+        ? Number(pageRaw)
+        : null,
+    pageSize:
+      pageSizeRaw != null && Number.isFinite(Number(pageSizeRaw))
+        ? Number(pageSizeRaw)
+        : null,
+  };
 }
 
 function extractAssignedList(payload: unknown): AssignedDocumentRow[] {
@@ -540,6 +612,8 @@ function findArrayDeep(payload: unknown, depth: number): unknown[] | null {
     "Data",
     "Result",
     "DocumentTypes",
+    "Values",
+    "Value",
   ];
 
   for (const k of keys) {
