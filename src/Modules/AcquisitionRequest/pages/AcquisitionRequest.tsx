@@ -219,7 +219,7 @@ function toPositiveNumber(s: string): number | null {
 function toNullableIsoDate(yyyyMmDd: string): string | null {
   const t = String(yyyyMmDd ?? "").trim();
   if (!t) return null;
-  return `${t}T00:00:00.000Z`;
+  return `${t}T00:00:00`;
 }
 
 function toNullableString(value: string): string | null {

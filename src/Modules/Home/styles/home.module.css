@@ -1382,3 +1382,20 @@
 .dateWrapper:hover .dateCustomIcon {
   transform: translateY(-50%) scale(1.1);
 }
+.searchWide {
+  flex: 1 1 420px;
+  min-width: 280px;
+}
+
+.classificationControl {
+  min-width: 190px;
+  max-width: 220px;
+}
+
+.classificationControl select {
+  width: 100%;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

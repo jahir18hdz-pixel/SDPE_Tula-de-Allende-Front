@@ -54,7 +54,8 @@ export function toBool(v: unknown): boolean {
 }
 
 export function toNumber(v: unknown): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  const n =
+    typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
   return Number.isFinite(n) ? n : null;
 }
 
@@ -75,7 +76,16 @@ export function getPreviewType(
   const combined = `${fileName ?? ""} ${url}`.toLowerCase();
   const ext = getExtensionFromSource(combined);
 
-  const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"];
+  const imageExts = [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "bmp",
+    "svg",
+    "avif",
+  ];
 
   if (imageExts.includes(ext)) return "image";
   if (ext === "pdf") return "pdf";
@@ -96,6 +106,52 @@ export function getPreviewType(
   if (combined.includes(".pdf")) return "pdf";
 
   return "other";
+}
+
+export function formatMexicoDateTime(value?: string | null): string {
+  if (!value) return "";
+
+  const original = new Date(value);
+
+  if (Number.isNaN(original.getTime())) {
+    return String(value);
+  }
+
+  const adjusted = new Date(
+    original.getTime() - 6 * 60 * 60 * 1000,
+  );
+
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(adjusted);
+}
+
+export function formatMexicoDate(value?: string | null): string {
+  if (!value) return "";
+
+  const original = new Date(value);
+
+  if (Number.isNaN(original.getTime())) {
+    return String(value);
+  }
+
+  const adjusted = new Date(
+    original.getTime() - 6 * 60 * 60 * 1000,
+  );
+
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(adjusted);
 }
 
 export function normalizeChecklist(payload: unknown): ChecklistRow[] {
@@ -152,6 +208,12 @@ export function normalizeChecklist(payload: unknown): ChecklistRow[] {
                 ? status["description"] ?? status["Description"]
                 : "",
             ).trim(),
+            createdAt:
+              toStringSafe(f["createdAt"] ?? f["CreatedAt"]).trim() || null,
+            updatedAt:
+              toStringSafe(f["updatedAt"] ?? f["UpdatedAt"]).trim() || null,
+            reviewedAt:
+              toStringSafe(f["reviewedAt"] ?? f["ReviewedAt"]).trim() || null,
           };
         })
         .filter((x): x is ChecklistFileItem => x !== null);

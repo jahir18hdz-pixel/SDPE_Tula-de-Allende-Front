@@ -21,6 +21,9 @@ export default function CfdiPanel({
   onClose,
   onSave,
 }: Props) {
+  const currentCfdi = cfdiForm.cfdi.trim();
+  const isEditing = Boolean(cfdi?.trim());
+
   return (
     <div
       className={`${styles.uploadOverlay} ${
@@ -33,7 +36,7 @@ export default function CfdiPanel({
           <div className={styles.uploadSheetTitleWrap}>
             <div className={styles.uploadHandle} />
             <div className={styles.uploadSheetTitle}>
-              {cfdi?.trim() ? "Editar CFDI" : "Agregar CFDI"}
+              {isEditing ? "Editar CFDI" : "Agregar CFDI"}
             </div>
             <div className={styles.uploadSheetNote}>
               Captura el folio o valor del CFDI para asociarlo a esta solicitud
@@ -72,11 +75,9 @@ export default function CfdiPanel({
                 />
               </div>
 
-              {cfdiForm.cfdi.trim() && (
+              {currentCfdi && (
                 <div className={styles.cfdiPreviewCard}>
-                  <div className={styles.cfdiPreviewCode}>
-                    {cfdiForm.cfdi.trim()}
-                  </div>
+                  <div className={styles.cfdiPreviewCode}>{currentCfdi}</div>
                   <div className={styles.cfdiPreviewDesc}>
                     CFDI que se asociará a esta solicitud.
                   </div>

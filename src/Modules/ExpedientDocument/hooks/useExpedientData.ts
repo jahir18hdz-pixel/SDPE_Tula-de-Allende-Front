@@ -22,6 +22,7 @@ import type {
 } from "../types/expedient.types";
 
 import {
+  formatMexicoDateTime,
   getPreviewType,
   getManagerDisplayName,
   isRecord,
@@ -94,9 +95,10 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
             url: normalizeUrlMaybe(
               toStringSafe(file["fileUrl"] ?? file["FileUrl"]),
             ),
-            previewUrl: normalizeUrlMaybe(
-              toStringSafe(file["previewUrl"] ?? file["PreviewUrl"]),
-            ),
+            previewUrl:
+              normalizeUrlMaybe(
+                toStringSafe(file["previewUrl"] ?? file["PreviewUrl"]),
+              ) || null,
             observation: toStringSafe(
               file["observation"] ?? file["Observation"],
             ).trim(),
@@ -106,6 +108,15 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
             status: toStringSafe(
               statusRaw?.["description"] ?? statusRaw?.["Description"],
             ).trim(),
+            createdAt:
+              toStringSafe(file["createdAt"] ?? file["CreatedAt"]).trim() ||
+              null,
+            updatedAt:
+              toStringSafe(file["updatedAt"] ?? file["UpdatedAt"]).trim() ||
+              null,
+            reviewedAt:
+              toStringSafe(file["reviewedAt"] ?? file["ReviewedAt"]).trim() ||
+              null,
           };
         })
         .filter((file): file is ChecklistRow["files"][number] => file !== null);
@@ -559,6 +570,9 @@ export function useExpedientData({
             type: getPreviewType(viewUrl, name),
             reviewObservation: file.reviewObservation ?? null,
             reviewStatus: file.status ?? null,
+            createdAt: file.createdAt ?? null,
+            updatedAt: file.updatedAt ?? null,
+            reviewedAt: file.reviewedAt ?? null,
           };
         })
         .filter((x) => x.url);
@@ -694,6 +708,7 @@ export function useExpedientData({
                 : null,
           }),
         })) as RequestResult;
+
         if (!res.ok) {
           showToast("error", res.error || "No se pudo revisar el documento.");
           return;
@@ -1240,13 +1255,10 @@ export function useExpedientData({
         fd.append("observations", u.observations ?? "");
       });
 
-      const resp = await requestFormData(
-        `${EXPEDIENT_API}/upload-massive`,
-        {
-          method: "POST",
-          body: fd,
-        },
-      );
+      const resp = await requestFormData(`${EXPEDIENT_API}/upload-massive`, {
+        method: "POST",
+        body: fd,
+      });
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -1376,6 +1388,7 @@ export function useExpedientData({
 
     dropHandlers,
     getManagerDisplayName,
+    formatMexicoDateTime,
     DOCUMENT_STATUS_APPROVED,
     DOCUMENT_STATUS_REJECTED,
   };

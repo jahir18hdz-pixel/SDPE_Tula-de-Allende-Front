@@ -45,6 +45,7 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
       base64.length + ((4 - (base64.length % 4)) % 4),
       "=",
     );
+
     const json = atob(padded);
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
@@ -178,37 +179,37 @@ export default function NotificationsView() {
   }, [showAppToast, userId]);
 
   const markAsRead = useCallback(
-  async (notificationId: number) => {
-    try {
-      setProcessingId(notificationId);
+    async (notificationId: number) => {
+      try {
+        setProcessingId(notificationId);
 
-      const response = await requestJson(
-        `/api/notifications/${notificationId}/read`,
-        {
-          method: "PUT",
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          response.error || "No se pudo marcar la notificación como leída.",
+        const response = await requestJson(
+          `/api/notifications/${notificationId}/read`,
+          {
+            method: "PUT",
+          },
         );
-      }
 
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, isRead: true } : n,
-        ),
-      );
-    } catch (error) {
-      console.error(error);
-      showAppToast("No se pudo marcar la notificación como leída.", "error");
-    } finally {
-      setProcessingId(null);
-    }
-  },
-  [showAppToast],
-);
+        if (!response.ok) {
+          throw new Error(
+            response.error || "No se pudo marcar la notificación como leída.",
+          );
+        }
+
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, isRead: true } : n,
+          ),
+        );
+      } catch (error) {
+        console.error(error);
+        showAppToast("No se pudo marcar la notificación como leída.", "error");
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [showAppToast],
+  );
 
   const markAllAsRead = useCallback(async () => {
     if (!userId) {
@@ -348,7 +349,6 @@ export default function NotificationsView() {
       );
 
       await connection.start();
-
       connectionRef.current = connection;
     } catch (error) {
       console.error("Error conectando a SignalR:", error);
@@ -402,18 +402,32 @@ export default function NotificationsView() {
   );
 
   const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
+    const original = new Date(dateString);
+
+    if (Number.isNaN(original.getTime())) return dateString;
+
+    const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
+
+    return adjusted.toLocaleString("es-MX", {
+      timeZone: "America/Mexico_City",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
     });
   }, []);
 
   const getRelativeTime = useCallback((dateString: string) => {
-    const now = new Date().getTime();
-    const value = new Date(dateString).getTime();
-    const diffMs = value - now;
+    const now = Date.now();
+    const original = new Date(dateString);
 
+    if (Number.isNaN(original.getTime())) return "";
+
+    const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
+    const diffMs = adjusted.getTime() - now;
     const rtf = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 
     const minutes = Math.round(diffMs / (1000 * 60));
@@ -550,7 +564,7 @@ export default function NotificationsView() {
                     } ${notification.requestId ? styles.clickableCard : ""}`}
                     onClick={() =>
                       notification.requestId
-                        ? handleNotificationClick(notification)
+                        ? void handleNotificationClick(notification)
                         : undefined
                     }
                     role={notification.requestId ? "button" : undefined}

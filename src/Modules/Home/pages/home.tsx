@@ -130,9 +130,7 @@ function toInputDate(iso?: string | null) {
 }
 
 function normalizeText(v: unknown) {
-  return String(v ?? "")
-    .trim()
-    .toLowerCase();
+  return String(v ?? "").trim().toLowerCase();
 }
 
 function getItemsFromUnknown<T>(value: unknown): T[] {
@@ -144,7 +142,12 @@ function getItemsFromUnknown<T>(value: unknown): T[] {
   return [];
 }
 
-type StatusFilter = "Todos" | "Completo" | "Incompleto";
+type StatusFilter =
+  | "Todos"
+  | "Completo"
+  | "Incompleto"
+  | "Observados"
+  | "En revisión";
 
 function hasValidClassification(label: string) {
   const t = (label ?? "").trim().toLowerCase();
@@ -163,6 +166,46 @@ function hasPolicy(value: string) {
 function hasCfdi(value: string) {
   const t = (value ?? "").trim().toLowerCase();
   return !!t && t !== "—" && t !== "sin cfdi";
+}
+
+function matchesObservedStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("observado") ||
+    estado.includes("observada") ||
+    estado.includes("observacion") ||
+    estado.includes("observación") ||
+    estado.includes("con observaciones")
+  );
+}
+
+function matchesReviewStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("revision") ||
+    estado.includes("revisión") ||
+    estado.includes("en revision") ||
+    estado.includes("en revisión")
+  );
+}
+
+function matchesStatusFilter(estado: string, filter: StatusFilter) {
+  const value = normalizeText(estado);
+
+  switch (filter) {
+    case "Todos":
+      return true;
+    case "Completo":
+      return value === "completo";
+    case "Incompleto":
+      return value === "incompleto";
+    case "Observados":
+      return matchesObservedStatus(value);
+    case "En revisión":
+      return matchesReviewStatus(value);
+    default:
+      return false;
+  }
 }
 
 function getExtensionFromSource(source: string) {
@@ -226,11 +269,11 @@ function truncateClassification(text: string, maxWords = 3) {
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
+  const [classificationFilter, setClassificationFilter] = useState("Todas");
 
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -270,14 +313,10 @@ export default function Home() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const [classificationModalText, setClassificationModalText] = useState<
-    string | null
-  >(null);
+  const [classificationModalText, setClassificationModalText] = useState<string | null>(null);
 
   const [editDateModalOpen, setEditDateModalOpen] = useState(false);
-  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(
-    null,
-  );
+  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(null);
   const [editDateValue, setEditDateValue] = useState("");
   const [savingDate, setSavingDate] = useState(false);
 
@@ -430,6 +469,10 @@ export default function Home() {
     };
   }, [connectToHub]);
 
+  useEffect(() => {
+    setPageNumber(1);
+  }, [query, statusFilter, classificationFilter]);
+
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
     setPreviewItem(null);
@@ -515,13 +558,7 @@ export default function Home() {
     } finally {
       setSavingDate(false);
     }
-  }, [
-    editDateTarget,
-    editDateValue,
-    closeEditDateModal,
-    fetchData,
-    showAppToast,
-  ]);
+  }, [editDateTarget, editDateValue, closeEditDateModal, fetchData, showAppToast]);
 
   const onSaveCfdi = useCallback(async () => {
     if (!cfdiTarget?.idRequest) {
@@ -537,16 +574,13 @@ export default function Home() {
     setSavingCfdi(true);
 
     try {
-      const res = (await requestJson(
-        `${API_BASE}/${cfdiTarget.idRequest}/CFDI`,
-        {
-          method: "PATCH",
-          headers: authHeaders({
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify(cfdiForm.cfdi.trim()),
-        },
-      )) as RequestResult;
+      const res = (await requestJson(`${API_BASE}/${cfdiTarget.idRequest}/CFDI`, {
+        method: "PATCH",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(cfdiForm.cfdi.trim()),
+      })) as RequestResult;
 
       if (!res.ok) {
         showAppToast(res.error || "No se pudo guardar el CFDI.", "error");
@@ -737,12 +771,31 @@ export default function Home() {
     closePreview,
   ]);
 
+  const classificationOptions = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        rows
+          .map((r) => r.adquisicion?.trim())
+          .filter((value): value is string => !!value && value !== "—"),
+      ),
+    );
+
+    unique.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+    return ["Todas", ...unique];
+  }, [rows]);
+
   const filtered = useMemo(() => {
     let list = [...rows];
 
     if (statusFilter !== "Todos") {
+      list = list.filter((r) => matchesStatusFilter(r.estado, statusFilter));
+    }
+
+    if (classificationFilter !== "Todas") {
       list = list.filter(
-        (r) => normalizeText(r.estado) === normalizeText(statusFilter),
+        (r) =>
+          normalizeText(r.adquisicion) === normalizeText(classificationFilter),
       );
     }
 
@@ -782,7 +835,7 @@ export default function Home() {
     });
 
     return list;
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, classificationFilter]);
 
   const kpiTotal = filtered.length;
 
@@ -794,20 +847,13 @@ export default function Home() {
     (r) => normalizeText(r.estado) === "incompleto",
   ).length;
 
-  const kpiObservados = filtered.filter((r) => {
-    const estado = normalizeText(r.estado);
-    return estado.includes("observado");
-  }).length;
+  const kpiObservados = filtered.filter((r) =>
+    matchesObservedStatus(r.estado),
+  ).length;
 
-  const kpiRevision = filtered.filter((r) => {
-    const estado = normalizeText(r.estado);
-    return (
-      estado.includes("revision") ||
-      estado.includes("revisión") ||
-      estado.includes("en revision") ||
-      estado.includes("en revisión")
-    );
-  }).length;
+  const kpiRevision = filtered.filter((r) =>
+    matchesReviewStatus(r.estado),
+  ).length;
 
   function goRegister() {
     navigate("/adquisiciones/registrar");
@@ -833,9 +879,7 @@ export default function Home() {
     cfdiPanelOpen;
 
   return (
-    <div
-      className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}
-    >
+    <div className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}>
       <Toast
         open={toast.open}
         type={toast.type}
@@ -850,9 +894,7 @@ export default function Home() {
         onClose={closeNotificationToast}
         onView={() => {
           if (notificationToast.requestId) {
-            navigate(
-              `/adquisiciones/${notificationToast.requestId}/expediente`,
-            );
+            navigate(`/adquisiciones/${notificationToast.requestId}/expediente`);
             closeNotificationToast();
           }
         }}
@@ -887,12 +929,12 @@ export default function Home() {
               <span className={styles.kpiValue}>{kpiIncompleto}</span>
             </div>
 
-            <div className={`${styles.kpiObserved} ${styles.kpiObserved}`}>
+            <div className={styles.kpiObserved}>
               <span className={styles.kpiLabel}>Observados</span>
               <span className={styles.kpiValue}>{kpiObservados}</span>
             </div>
 
-            <div className={`${styles.kpiReview} ${styles.kpiReview}`}>
+            <div className={styles.kpiReview}>
               <span className={styles.kpiLabel}>En revisión</span>
               <span className={styles.kpiValue}>{kpiRevision}</span>
             </div>
@@ -900,12 +942,12 @@ export default function Home() {
         </div>
 
         <div className={styles.toolbar}>
-          <div className={styles.search}>
+          <div className={`${styles.search} ${styles.searchWide}`}>
             <FiSearch className={styles.searchIcon} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por folio, póliza, CFDI, clasificación, estado, fecha límite…"
+              placeholder="Buscar por folio, póliza o CFDI"
               aria-label="Buscar adquisición"
             />
           </div>
@@ -915,13 +957,27 @@ export default function Home() {
               <span>Estado</span>
               <select
                 value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value as StatusFilter)
-                }
+                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               >
                 <option value="Todos">Todos</option>
                 <option value="Completo">Completo</option>
                 <option value="Incompleto">Incompleto</option>
+                <option value="Observados">Observados</option>
+                <option value="En revisión">En revisión</option>
+              </select>
+            </label>
+
+            <label className={`${styles.control} ${styles.classificationControl}`}>
+              <span>Clasificación</span>
+              <select
+                value={classificationFilter}
+                onChange={(e) => setClassificationFilter(e.target.value)}
+              >
+                {classificationOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -953,9 +1009,7 @@ export default function Home() {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardTitle}>Registros</div>
-            <div className={styles.cardNote}>
-              Ordenado por fecha más reciente
-            </div>
+            <div className={styles.cardNote}>Ordenado por fecha más reciente</div>
           </div>
 
           <div className={styles.tableWrap}>
@@ -995,9 +1049,9 @@ export default function Home() {
                         ? styles.badgeOk
                         : st === "incompleto"
                           ? styles.badgeBad
-                          : st.includes("revision") || st.includes("revisión")
+                          : matchesReviewStatus(st)
                             ? styles.badgeReview
-                            : st.includes("observado")
+                            : matchesObservedStatus(st)
                               ? styles.badgeObserved
                               : styles.badgeNeutral;
 
@@ -1043,11 +1097,7 @@ export default function Home() {
                                 ? styles.policyBadgeOk
                                 : styles.policyBadgeEmpty
                             } ${styles.policyBadgeButton}`}
-                            title={
-                              cfdiExists
-                                ? `Editar CFDI ${r.cfdi}`
-                                : "Agregar CFDI"
-                            }
+                            title={cfdiExists ? `Editar CFDI ${r.cfdi}` : "Agregar CFDI"}
                             onClick={() => openCfdiPanel(r)}
                           >
                             {cfdiExists ? r.cfdi : "Sin CFDI"}
@@ -1059,18 +1109,13 @@ export default function Home() {
                             <button
                               type="button"
                               className={styles.classificationBtn}
-                              onClick={() =>
-                                setClassificationModalText(r.adquisicion)
-                              }
+                              onClick={() => setClassificationModalText(r.adquisicion)}
                               title={r.adquisicion}
                             >
                               {truncateClassification(r.adquisicion, 3)}
                             </button>
                           ) : (
-                            <span
-                              title={r.adquisicion}
-                              className={styles.ellipsis}
-                            >
+                            <span title={r.adquisicion} className={styles.ellipsis}>
                               {r.adquisicion}
                             </span>
                           )}
@@ -1098,9 +1143,7 @@ export default function Home() {
                             <button
                               type="button"
                               className={styles.linkBtn}
-                              onClick={() =>
-                                goDetail(r.idRequest, r.adquisicion)
-                              }
+                              onClick={() => goDetail(r.idRequest, r.adquisicion)}
                               title={`Abrir expediente de solicitud ${r.folio}`}
                             >
                               Ver expediente
@@ -1292,9 +1335,7 @@ export default function Home() {
             <div className={styles.deleteConfirmBody}>
               <div className={styles.deleteFileCard}>
                 <div className={styles.deleteFileLabel}>Solicitud</div>
-                <div className={styles.deleteFileName}>
-                  {editDateTarget.folio}
-                </div>
+                <div className={styles.deleteFileName}>{editDateTarget.folio}</div>
               </div>
 
               <div className={styles.deleteFormField}>
@@ -1307,7 +1348,6 @@ export default function Home() {
                     onChange={(e) => setEditDateValue(e.target.value)}
                     disabled={savingDate}
                   />
-
                   <FiCalendar className={styles.dateCustomIcon} />
                 </div>
               </div>
