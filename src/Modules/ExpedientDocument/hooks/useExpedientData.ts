@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  BASE_URL,
   authHeaders,
   requestJson,
   requestFormData,
@@ -60,6 +61,7 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
       const documentTypeId = toNumber(
         raw["documentTypeId"] ?? raw["DocumentTypeId"],
       );
+
       const documentName = toStringSafe(
         raw["documentName"] ?? raw["DocumentName"],
       ).trim();
@@ -69,8 +71,10 @@ function normalizeChecklistWithGlobalStatus(payload: unknown): ChecklistRow[] {
       const requiredByRule = Boolean(
         raw["requiredByRule"] ?? raw["RequiredByRule"],
       );
+
       const noApplies = Boolean(raw["noApplies"] ?? raw["NoApplies"]);
       const uploaded = Boolean(raw["uploaded"] ?? raw["Uploaded"]);
+
       const globalStatus = toStringSafe(
         raw["globalStatus"] ?? raw["GlobalStatus"],
       ).trim();
@@ -168,6 +172,8 @@ export function useExpedientData({
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectObservations, setRejectObservations] = useState("");
 
+  const [downloadingChecklistPdf, setDownloadingChecklistPdf] = useState(false);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PreviewItem | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
@@ -182,6 +188,7 @@ export function useExpedientData({
   const [administrativeUnits, setAdministrativeUnits] = useState<
     AdministrativeUnitOption[]
   >([]);
+
   const [managerForm, setManagerForm] = useState<ManagerFormState>({
     idRequestManager: null,
     idAdministrativeUnit: null,
@@ -197,6 +204,7 @@ export function useExpedientData({
   const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>(
     [],
   );
+
   const [policyForm, setPolicyForm] = useState<PolicyFormState>({
     idPaymentPolicy: null,
   });
@@ -214,14 +222,62 @@ export function useExpedientData({
   const openUrl = useCallback(
     (u: string) => {
       const url = normalizeUrlMaybe(u);
+
       if (!url) {
         showToast("error", "No hay archivo para abrir.");
         return;
       }
+
       window.open(url, "_blank", "noopener,noreferrer");
     },
     [showToast],
   );
+
+  const onDownloadChecklistPdf = useCallback(async () => {
+    if (!canUse || !requestId) {
+      showToast("error", "Solicitud inválida.");
+      return;
+    }
+
+    setDownloadingChecklistPdf(true);
+
+    try {
+      const base = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+
+      const resp = await fetch(`${base}/api/Pdf/checklist/${requestId}`, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        throw new Error(text || "No se pudo descargar el PDF del checklist.");
+      }
+
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Checklist_${requestId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      showToast("success", "PDF del checklist descargado correctamente.");
+    } catch (e: unknown) {
+      showToast(
+        "error",
+        e instanceof Error
+          ? e.message
+          : "Error inesperado al descargar el PDF del checklist.",
+      );
+    } finally {
+      setDownloadingChecklistPdf(false);
+    }
+  }, [canUse, requestId, showToast]);
 
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
@@ -237,6 +293,7 @@ export function useExpedientData({
 
   const closeDeleteModal = useCallback(() => {
     if (deletingPreview) return;
+
     setDeleteModalOpen(false);
     setDeleteTarget(null);
     setDeletePassword("");
@@ -327,6 +384,7 @@ export function useExpedientData({
     if (!canUse) return;
 
     setLoadingManager(true);
+
     try {
       const res = (await requestJson(MANAGER_API, {
         method: "GET",
@@ -435,6 +493,7 @@ export function useExpedientData({
     if (!canUse) return;
 
     setLoadingChecklist(true);
+
     try {
       const res = (await requestJson(
         `${EXPEDIENT_API}/requests/${requestId}/checklist`,
@@ -457,8 +516,10 @@ export function useExpedientData({
         const bRequiredApplies = b.requiredByRule && !b.noApplies;
 
         if (a.noApplies !== b.noApplies) return a.noApplies ? 1 : -1;
-        if (aRequiredApplies !== bRequiredApplies)
+
+        if (aRequiredApplies !== bRequiredApplies) {
           return aRequiredApplies ? -1 : 1;
+        }
 
         if (aRequiredApplies && bRequiredApplies && a.uploaded !== b.uploaded) {
           return a.uploaded ? 1 : -1;
@@ -531,7 +592,9 @@ export function useExpedientData({
 
   const filteredChecklist = useMemo(() => {
     const q = searchText.trim().toLowerCase();
+
     if (!q) return checklist;
+
     return checklist.filter((c) => c.documentName.toLowerCase().includes(q));
   }, [checklist, searchText]);
 
@@ -647,10 +710,13 @@ export function useExpedientData({
           closePreview();
         } else {
           const removedIndex = previewItems.findIndex((x) => x.id === item.id);
+
           setPreviewItems(nextItems);
+
           setPreviewIndex((prev) => {
             const safePrev =
               removedIndex >= 0 ? Math.min(prev, removedIndex) : prev;
+
             return Math.max(0, Math.min(safePrev, nextItems.length - 1));
           });
         }
@@ -723,6 +789,7 @@ export function useExpedientData({
 
         setShowRejectBox(false);
         setRejectObservations("");
+
         await loadChecklist();
         closePreview();
       } catch {
@@ -743,22 +810,27 @@ export function useExpedientData({
           closeDeleteModal();
           return;
         }
+
         if (showRejectBox) {
           setShowRejectBox(false);
           setRejectObservations("");
           return;
         }
+
         closePreview();
       }
+
       if (e.key === "ArrowLeft" && canMovePreview && !deleteModalOpen) {
         goPrevPreview();
       }
+
       if (e.key === "ArrowRight" && canMovePreview && !deleteModalOpen) {
         goNextPreview();
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
+
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     previewOpen,
@@ -797,6 +869,7 @@ export function useExpedientData({
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files);
+
     if (arr.length === 0) return;
 
     setUploads((prev) => [
@@ -895,6 +968,7 @@ export function useExpedientData({
 
       showToast("success", "Checklist actualizado correctamente.");
       setActivePanel(null);
+
       await loadChecklist();
     } catch {
       showToast(
@@ -913,6 +987,7 @@ export function useExpedientData({
 
     if (units.length === 0) {
       setLoadingAdministrativeUnits(true);
+
       try {
         const res = (await requestJson(ADMIN_UNIT_API, {
           method: "GET",
@@ -996,6 +1071,7 @@ export function useExpedientData({
 
     if (policies.length === 0) {
       setLoadingPolicies(true);
+
       try {
         const res = (await requestJson(
           `${PAYMENT_POLICY_API}/available-policies`,
@@ -1094,6 +1170,7 @@ export function useExpedientData({
     }
 
     setSavingManager(true);
+
     try {
       const payloadBase = {
         idAdministrativeUnit: managerForm.idAdministrativeUnit,
@@ -1140,6 +1217,7 @@ export function useExpedientData({
       );
 
       setActivePanel(null);
+
       await loadManager();
     } catch {
       showToast("error", "Error inesperado al guardar el responsable.");
@@ -1178,6 +1256,7 @@ export function useExpedientData({
 
       showToast("success", "Póliza asignada correctamente.");
       setActivePanel(null);
+
       await loadRequestDetail();
     } catch {
       showToast("error", "Error inesperado al guardar la póliza.");
@@ -1216,6 +1295,7 @@ export function useExpedientData({
 
       showToast("success", "CFDI guardado correctamente.");
       setActivePanel(null);
+
       await loadRequestDetail();
     } catch {
       showToast("error", "Error inesperado al guardar el CFDI.");
@@ -1236,6 +1316,7 @@ export function useExpedientData({
     }
 
     const unassigned = uploads.filter((u) => !u.documentTypeId).length;
+
     if (unassigned > 0) {
       showToast(
         "error",
@@ -1245,8 +1326,10 @@ export function useExpedientData({
     }
 
     setUploading(true);
+
     try {
       const fd = new FormData();
+
       fd.append("requestId", String(requestId));
 
       uploads.forEach((u) => {
@@ -1290,6 +1373,7 @@ export function useExpedientData({
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         addFiles(e.dataTransfer.files);
       }
@@ -1329,6 +1413,8 @@ export function useExpedientData({
     setShowRejectBox,
     rejectObservations,
     setRejectObservations,
+
+    downloadingChecklistPdf,
 
     deleteModalOpen,
     deleteTarget,
@@ -1378,6 +1464,7 @@ export function useExpedientData({
     openManagerPanel,
     openPolicyPanel,
     openCfdiPanel,
+    onDownloadChecklistPdf,
     onSaveChecklistExceptions,
     onSaveManager,
     onSavePolicy,

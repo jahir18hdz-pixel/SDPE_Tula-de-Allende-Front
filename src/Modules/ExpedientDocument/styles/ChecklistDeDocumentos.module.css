@@ -244,3 +244,91 @@
   transform: none;
   box-shadow: none;
 }
+.headerActions {
+  margin-left: auto;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerPdfCheckBtn,
+.headerEditChecklistBtn {
+  height: 40px;
+  padding: 0 14px;
+
+  border-radius: 12px;
+
+  font-size: 13px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.15s ease;
+}
+
+.headerPdfCheckBtn {
+  border: 1.5px solid rgba(117, 14, 14, 0.6);
+
+  background: linear-gradient(
+    180deg,
+    rgba(117, 14, 14, 0.6),
+    rgba(255, 255, 255, 0.95)
+  );
+
+  color: #671010;
+}
+
+.headerPdfCheckBtn:hover:not(:disabled) {
+  background: rgba(117, 14, 14, 0.6);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.headerEditChecklistBtn {
+  border: 1.5px solid rgba(101, 0, 31, 0.6);
+
+  background: linear-gradient(
+    180deg,
+    rgba(101, 0, 31, 0.12),
+    rgba(255, 255, 255, 0.95)
+  );
+
+  color: #65001f;
+}
+
+.headerEditChecklistBtn:hover:not(:disabled) {
+  background: rgba(101, 0, 31, 0.9);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(101, 0, 31, 0.2);
+}
+
+.headerPdfCheckBtn:active,
+.headerEditChecklistBtn:active {
+  transform: scale(0.96);
+}
+
+.headerPdfCheckBtn:disabled,
+.headerEditChecklistBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .headerActions {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+  }
+
+  .headerPdfCheckBtn,
+  .headerEditChecklistBtn {
+    flex: 1;
+  }
+}
