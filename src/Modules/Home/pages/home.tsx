@@ -2,11 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
-import { FiSearch, FiTrash2, FiCalendar } from "react-icons/fi";
+import { FiSearch, FiTrash2, FiCalendar, FiRefreshCw } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import NotificationToast from "../../../Components/layout/NotificationToast";
 import CfdiPanel from "../../ExpedientDocument/components/CfdiPanel";
+import PolicyPanel from "../../ExpedientDocument/components/PolicyPanel";
+import type {
+  PaymentPolicyOption,
+  PolicyFormState,
+} from "../../ExpedientDocument/types/expedient.types";
 import {
   BASE_URL,
   readToken,
@@ -90,6 +95,12 @@ type CfdiTarget = {
   cfdiActual: string;
 };
 
+type PolicyTarget = {
+  idRequest: number;
+  folio: string;
+  policyNumberActual: string;
+};
+
 const API_BASE = "/api/AcquisitionRequest";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy/policies";
 
@@ -130,7 +141,9 @@ function toInputDate(iso?: string | null) {
 }
 
 function normalizeText(v: unknown) {
-  return String(v ?? "").trim().toLowerCase();
+  return String(v ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function getItemsFromUnknown<T>(value: unknown): T[] {
@@ -313,10 +326,14 @@ export default function Home() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const [classificationModalText, setClassificationModalText] = useState<string | null>(null);
+  const [classificationModalText, setClassificationModalText] = useState<
+    string | null
+  >(null);
 
   const [editDateModalOpen, setEditDateModalOpen] = useState(false);
-  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(null);
+  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(
+    null,
+  );
   const [editDateValue, setEditDateValue] = useState("");
   const [savingDate, setSavingDate] = useState(false);
 
@@ -324,6 +341,17 @@ export default function Home() {
   const [cfdiTarget, setCfdiTarget] = useState<CfdiTarget | null>(null);
   const [cfdiForm, setCfdiForm] = useState<CfdiFormState>({ cfdi: "" });
   const [savingCfdi, setSavingCfdi] = useState(false);
+
+  const [policyPanelOpen, setPolicyPanelOpen] = useState(false);
+  const [policyTarget, setPolicyTarget] = useState<PolicyTarget | null>(null);
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>({
+    idPaymentPolicy: null,
+  });
+  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>(
+    [],
+  );
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -414,6 +442,10 @@ export default function Home() {
       setLoading(false);
     }
   }, [pageNumber, pageSize, showAppToast]);
+
+  const handleRefreshTable = useCallback(async () => {
+    await fetchData();
+  }, [fetchData]);
 
   const connectToHub = useCallback(async () => {
     try {
@@ -518,6 +550,74 @@ export default function Home() {
     setCfdiTarget(null);
   }, [savingCfdi]);
 
+  const fetchPaymentPolicies = useCallback(async () => {
+    setLoadingPolicies(true);
+
+    try {
+      const res = (await requestJson(PAYMENT_POLICY_API, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setPaymentPolicies([]);
+        showAppToast(
+          res.error || "No se pudieron cargar las pólizas disponibles.",
+          "error",
+        );
+        return;
+      }
+
+      const items = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+      const mapped: PaymentPolicyOption[] = items
+        .map((item) => ({
+          idPaymentPolicy: item.idPaymentPolicy ?? item.IdPaymentPolicy ?? 0,
+          policyCode: (item.policyCode ?? item.PolicyCode ?? "").trim(),
+          description: item.description ?? item.Description ?? "",
+        }))
+        .filter((item) => item.idPaymentPolicy > 0 && !!item.policyCode);
+
+      mapped.sort((a, b) =>
+        a.policyCode.localeCompare(b.policyCode, "es", { sensitivity: "base" }),
+      );
+
+      setPaymentPolicies(mapped);
+    } catch {
+      setPaymentPolicies([]);
+      showAppToast("Error inesperado al cargar las pólizas.", "error");
+    } finally {
+      setLoadingPolicies(false);
+    }
+  }, [showAppToast]);
+
+  const openPolicyPanel = useCallback(
+    async (row: Row) => {
+      const currentPolicy = hasPolicy(row.poliza) ? row.poliza : "";
+
+      setPolicyTarget({
+        idRequest: row.idRequest,
+        folio: row.folio,
+        policyNumberActual: currentPolicy,
+      });
+
+      setPolicyForm({
+        idPaymentPolicy: null,
+      });
+
+      setPolicyPanelOpen(true);
+      await fetchPaymentPolicies();
+    },
+    [fetchPaymentPolicies],
+  );
+
+  const closePolicyPanel = useCallback(() => {
+    if (savingPolicy) return;
+    setPolicyPanelOpen(false);
+    setPolicyForm({ idPaymentPolicy: null });
+    setPolicyTarget(null);
+  }, [savingPolicy]);
+
   const onSaveMaxDate = useCallback(async () => {
     if (!editDateTarget) return;
 
@@ -558,11 +658,20 @@ export default function Home() {
     } finally {
       setSavingDate(false);
     }
-  }, [editDateTarget, editDateValue, closeEditDateModal, fetchData, showAppToast]);
+  }, [
+    editDateTarget,
+    editDateValue,
+    closeEditDateModal,
+    fetchData,
+    showAppToast,
+  ]);
 
   const onSaveCfdi = useCallback(async () => {
     if (!cfdiTarget?.idRequest) {
-      showAppToast("No se encontró la solicitud para actualizar el CFDI.", "error");
+      showAppToast(
+        "No se encontró la solicitud para actualizar el CFDI.",
+        "error",
+      );
       return;
     }
 
@@ -574,13 +683,16 @@ export default function Home() {
     setSavingCfdi(true);
 
     try {
-      const res = (await requestJson(`${API_BASE}/${cfdiTarget.idRequest}/CFDI`, {
-        method: "PATCH",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify(cfdiForm.cfdi.trim()),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${API_BASE}/${cfdiTarget.idRequest}/CFDI`,
+        {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(cfdiForm.cfdi.trim()),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
         showAppToast(res.error || "No se pudo guardar el CFDI.", "error");
@@ -597,6 +709,80 @@ export default function Home() {
       setSavingCfdi(false);
     }
   }, [cfdiTarget, cfdiForm.cfdi, closeCfdiPanel, fetchData, showAppToast]);
+
+  const onSavePolicy = useCallback(async () => {
+    if (!policyTarget?.idRequest) {
+      showAppToast(
+        "No se encontró la solicitud para asignar la póliza.",
+        "error",
+      );
+      return;
+    }
+
+    if (!policyForm.idPaymentPolicy) {
+      showAppToast("Selecciona una póliza.", "error");
+      return;
+    }
+
+    setSavingPolicy(true);
+
+    const payload = {
+      requestId: policyTarget.idRequest,
+      idRequest: policyTarget.idRequest,
+      idPaymentPolicy: policyForm.idPaymentPolicy,
+    };
+
+    const requests = [
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/PaymentPolicy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/payment-policy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/update-payment-policy`,
+        body: JSON.stringify(payload),
+      },
+    ];
+
+    try {
+      let lastError = "No se pudo guardar la póliza.";
+
+      for (const request of requests) {
+        const res = (await requestJson(request.url, {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: request.body,
+        })) as RequestResult;
+
+        if (res.ok) {
+          showAppToast("Póliza guardada correctamente.", "success");
+          closePolicyPanel();
+          await fetchData();
+          return;
+        }
+
+        lastError = res.error || lastError;
+      }
+
+      showAppToast(lastError, "error");
+    } catch (error) {
+      console.error("Error al guardar póliza:", error);
+      showAppToast("Error inesperado al guardar la póliza.", "error");
+    } finally {
+      setSavingPolicy(false);
+    }
+  }, [
+    policyTarget,
+    policyForm.idPaymentPolicy,
+    closePolicyPanel,
+    fetchData,
+    showAppToast,
+  ]);
 
   const openUrl = useCallback((u: string) => {
     const url = normalizeUrlMaybe(u);
@@ -724,7 +910,8 @@ export default function Home() {
       !deleteModalOpen &&
       !classificationModalText &&
       !editDateModalOpen &&
-      !cfdiPanelOpen
+      !cfdiPanelOpen &&
+      !policyPanelOpen
     ) {
       return;
     }
@@ -747,6 +934,11 @@ export default function Home() {
         return;
       }
 
+      if (policyPanelOpen) {
+        closePolicyPanel();
+        return;
+      }
+
       if (classificationModalText) {
         setClassificationModalText(null);
         return;
@@ -765,9 +957,11 @@ export default function Home() {
     classificationModalText,
     editDateModalOpen,
     cfdiPanelOpen,
+    policyPanelOpen,
     closeDeleteModal,
     closeEditDateModal,
     closeCfdiPanel,
+    closePolicyPanel,
     closePreview,
   ]);
 
@@ -876,10 +1070,13 @@ export default function Home() {
     deleteModalOpen ||
     !!classificationModalText ||
     editDateModalOpen ||
-    cfdiPanelOpen;
+    cfdiPanelOpen ||
+    policyPanelOpen;
 
   return (
-    <div className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}>
+    <div
+      className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}
+    >
       <Toast
         open={toast.open}
         type={toast.type}
@@ -894,7 +1091,9 @@ export default function Home() {
         onClose={closeNotificationToast}
         onView={() => {
           if (notificationToast.requestId) {
-            navigate(`/adquisiciones/${notificationToast.requestId}/expediente`);
+            navigate(
+              `/adquisiciones/${notificationToast.requestId}/expediente`,
+            );
             closeNotificationToast();
           }
         }}
@@ -914,6 +1113,23 @@ export default function Home() {
           </div>
 
           <div className={styles.kpis}>
+            <button
+              type="button"
+              className={`${styles.kpiChip} ${styles.refreshChip}`}
+              onClick={handleRefreshTable}
+              disabled={loading}
+              title="Actualizar tabla"
+            >
+              <span className={styles.kpiLabel}>
+                {loading ? "Actualizando" : "Actualizar"}
+              </span>
+
+              <FiRefreshCw
+                className={
+                  loading ? styles.refreshIconSpin : styles.refreshIcon
+                }
+              />
+            </button>
             <div className={styles.kpiChip}>
               <span className={styles.kpiLabel}>Total</span>
               <span className={styles.kpiValue}>{kpiTotal}</span>
@@ -957,7 +1173,9 @@ export default function Home() {
               <span>Estado</span>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
               >
                 <option value="Todos">Todos</option>
                 <option value="Completo">Completo</option>
@@ -967,7 +1185,9 @@ export default function Home() {
               </select>
             </label>
 
-            <label className={`${styles.control} ${styles.classificationControl}`}>
+            <label
+              className={`${styles.control} ${styles.classificationControl}`}
+            >
               <span>Clasificación</span>
               <select
                 value={classificationFilter}
@@ -1009,20 +1229,22 @@ export default function Home() {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardTitle}>Registros</div>
-            <div className={styles.cardNote}>Ordenado por fecha más reciente</div>
+            <div className={styles.cardNote}>
+              Ordenado por fecha más reciente
+            </div>
           </div>
 
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Folio</th>
-                  <th>Póliza</th>
-                  <th>CFDI</th>
-                  <th>Clasificación</th>
-                  <th>Fecha límite</th>
-                  <th>Estado</th>
-                  <th className={styles.thRight}>Acciones</th>
+                  <th className={styles.thCenter}>Folio</th>
+                  <th className={styles.thCenter}>Póliza</th>
+                  <th className={styles.thCenter}>CFDI</th>
+                  <th className={styles.thCenter}>Clasificación</th>
+                  <th className={styles.thCenter}>Fecha límite</th>
+                  <th className={styles.thCenter}>Estado</th>
+                  <th className={styles.thCenter}>Acciones</th>
                 </tr>
               </thead>
 
@@ -1066,30 +1288,44 @@ export default function Home() {
 
                     return (
                       <tr key={r.idRequest}>
-                        <td className={styles.mono}>{r.folio}</td>
-
-                        <td>
-                          {policyExists ? (
-                            <button
-                              type="button"
-                              className={`${styles.policyBadge} ${styles.policyBadgeOk} ${styles.policyBadgeButton}`}
-                              title={`Ver póliza ${r.poliza}`}
-                              onClick={() => void openPolicyPreview(r.poliza)}
-                              disabled={loadingPreview}
-                            >
-                              {r.poliza}
-                            </button>
-                          ) : (
-                            <span
-                              className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
-                              title="Sin póliza asignada"
-                            >
-                              Sin póliza
-                            </span>
-                          )}
+                        <td className={`${styles.mono} ${styles.tdCenter}`}>
+                          {r.folio}
                         </td>
 
-                        <td>
+                        <td className={styles.tdCenter}>
+                          <div className={styles.cellStack}>
+                            <button
+                              type="button"
+                              className={`${styles.policyBadge} ${
+                                policyExists
+                                  ? styles.policyBadgeOk
+                                  : styles.policyBadgeEmpty
+                              } ${styles.policyBadgeButton}`}
+                              title={
+                                policyExists
+                                  ? `Editar póliza ${r.poliza}`
+                                  : "Agregar póliza"
+                              }
+                              onClick={() => void openPolicyPanel(r)}
+                            >
+                              {policyExists ? r.poliza : "Sin póliza"}
+                            </button>
+
+                            {policyExists && (
+                              <button
+                                type="button"
+                                className={styles.linkBtn}
+                                title={`Ver archivo de póliza ${r.poliza}`}
+                                onClick={() => void openPolicyPreview(r.poliza)}
+                                disabled={loadingPreview}
+                              >
+                                Vista previa
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={styles.tdCenter}>
                           <button
                             type="button"
                             className={`${styles.policyBadge} ${
@@ -1097,31 +1333,42 @@ export default function Home() {
                                 ? styles.policyBadgeOk
                                 : styles.policyBadgeEmpty
                             } ${styles.policyBadgeButton}`}
-                            title={cfdiExists ? `Editar CFDI ${r.cfdi}` : "Agregar CFDI"}
+                            title={
+                              cfdiExists
+                                ? `Editar CFDI ${r.cfdi}`
+                                : "Agregar CFDI"
+                            }
                             onClick={() => openCfdiPanel(r)}
                           >
                             {cfdiExists ? r.cfdi : "Sin CFDI"}
                           </button>
                         </td>
 
-                        <td>
+                        <td className={styles.tdCenter}>
                           {getWordCount(r.adquisicion) > 3 ? (
                             <button
                               type="button"
                               className={styles.classificationBtn}
-                              onClick={() => setClassificationModalText(r.adquisicion)}
+                              onClick={() =>
+                                setClassificationModalText(r.adquisicion)
+                              }
                               title={r.adquisicion}
                             >
                               {truncateClassification(r.adquisicion, 3)}
                             </button>
                           ) : (
-                            <span title={r.adquisicion} className={styles.ellipsis}>
+                            <span
+                              title={r.adquisicion}
+                              className={styles.ellipsis}
+                            >
                               {r.adquisicion}
                             </span>
                           )}
                         </td>
 
-                        <td className={styles.statusCell}>
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
                           <button
                             type="button"
                             className={`${styles.badge} ${deadlineClass} ${styles.deadlineButton}`}
@@ -1132,18 +1379,22 @@ export default function Home() {
                           </button>
                         </td>
 
-                        <td className={styles.statusCell}>
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
                           <span className={`${styles.badge} ${badgeClass}`}>
                             {shownEstado}
                           </span>
                         </td>
 
-                        <td className={styles.tdRight}>
+                        <td className={styles.tdCenter}>
                           <div className={styles.actionsCell}>
                             <button
                               type="button"
                               className={styles.linkBtn}
-                              onClick={() => goDetail(r.idRequest, r.adquisicion)}
+                              onClick={() =>
+                                goDetail(r.idRequest, r.adquisicion)
+                              }
                               title={`Abrir expediente de solicitud ${r.folio}`}
                             >
                               Ver expediente
@@ -1335,7 +1586,9 @@ export default function Home() {
             <div className={styles.deleteConfirmBody}>
               <div className={styles.deleteFileCard}>
                 <div className={styles.deleteFileLabel}>Solicitud</div>
-                <div className={styles.deleteFileName}>{editDateTarget.folio}</div>
+                <div className={styles.deleteFileName}>
+                  {editDateTarget.folio}
+                </div>
               </div>
 
               <div className={styles.deleteFormField}>
@@ -1388,6 +1641,18 @@ export default function Home() {
         setCfdiForm={setCfdiForm}
         onClose={closeCfdiPanel}
         onSave={() => void onSaveCfdi()}
+      />
+
+      <PolicyPanel
+        open={policyPanelOpen}
+        savingPolicy={savingPolicy}
+        loadingPolicies={loadingPolicies}
+        paymentPolicies={paymentPolicies}
+        policyForm={policyForm}
+        setPolicyForm={setPolicyForm}
+        policyNumber={policyTarget?.policyNumberActual ?? ""}
+        onClose={closePolicyPanel}
+        onSave={() => void onSavePolicy()}
       />
 
       {deleteModalOpen && deleteTarget && (

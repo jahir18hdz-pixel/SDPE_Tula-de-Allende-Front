@@ -582,10 +582,21 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 12px; /* ⬅️ más separación entre botones */
   flex-wrap: nowrap;
   width: 100%;
   min-width: 0;
+  padding-right: 6px; /* ⬅️ ligero espacio del borde */
+}
+
+/* mejora visual de todos los botones dentro */
+.actionsCell button {
+  margin: 0 2px;
+}
+
+/* opcional: mejora hover para que se sienta más suave */
+.actionsCell button:hover {
+  transform: translateY(-1px);
 }
 
 .deleteIconBtn {
@@ -1398,4 +1409,47 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.refreshChip {
+  border: none;
+  cursor: pointer;
+  background: #ffffff;
+
+  display: flex;
+  flex-direction: column; /* 👈 esto pone texto arriba e icono abajo */
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.refreshChip:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.refreshChip:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.refreshIcon {
+  font-size: 18px;
+  color: #000000;
+}
+
+.refreshIconSpin {
+  font-size: 18px;
+  color: #000000; 
+  animation: spinRefresh 0.8s linear infinite;
+}
+
+@keyframes spinRefresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

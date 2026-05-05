@@ -35,6 +35,14 @@ type NotificationSignalRPayload = {
 
 type FilterType = "all" | "unread" | "read";
 
+type NotificationCategory =
+  | "all"
+  | "acceptance"
+  | "denial"
+  | "observed"
+  | "uploaded"
+  | "edited";
+
 function parseJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
@@ -98,9 +106,11 @@ function buildNotificationTitle(item: {
 }
 
 function sortNotifications(list: NotificationItem[]) {
-  return [...list].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  return [...list].sort((a, b) => {
+    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 export default function NotificationsView() {
@@ -109,7 +119,12 @@ export default function NotificationsView() {
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [filter, setFilter] = useState<FilterType>("all");
+  const [categoryFilter, setCategoryFilter] =
+    useState<NotificationCategory>("all");
+
+  const [showCategoryFilters, setShowCategoryFilters] = useState(false);
 
   const [markingAll, setMarkingAll] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
@@ -122,12 +137,106 @@ export default function NotificationsView() {
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   const connectionRef = useRef<signalR.HubConnection | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const showAppToast = useCallback((message: string, type: ToastType) => {
     setToastMessage(message);
     setToastType(type);
     setShowToast(true);
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!dropdownRef.current) return;
+
+      if (!dropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryFilters(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const normalizeText = useCallback((value: string) => {
+    return value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }, []);
+
+  const getNotificationCategory = useCallback(
+    (notification: NotificationItem): NotificationCategory => {
+      const text = normalizeText(
+        `${notification.title} ${notification.message}`,
+      );
+
+      if (text.includes("acept") || text.includes("aprob")) {
+        return "acceptance";
+      }
+
+      if (text.includes("deneg") || text.includes("rechaz")) {
+        return "denial";
+      }
+
+      if (text.includes("observ")) {
+        return "observed";
+      }
+
+      if (
+        text.includes("subid") ||
+        text.includes("cargad") ||
+        text.includes("cargo") ||
+        text.includes("nuevo documento")
+      ) {
+        return "uploaded";
+      }
+
+      if (
+        text.includes("edit") ||
+        text.includes("actualiz") ||
+        text.includes("modific")
+      ) {
+        return "edited";
+      }
+
+      return "all";
+    },
+    [normalizeText],
+  );
+
+  const categoryOptions: {
+    value: NotificationCategory;
+    label: string;
+  }[] = useMemo(
+    () => [
+      { value: "all", label: "Todas" },
+      { value: "acceptance", label: "Aceptación" },
+      { value: "denial", label: "Denegación" },
+      { value: "observed", label: "Observados" },
+      { value: "uploaded", label: "Subidos" },
+      { value: "edited", label: "Editados" },
+    ],
+    [],
+  );
+
+  const getCategoryCount = useCallback(
+    (category: NotificationCategory) => {
+      if (category === "all") return notifications.length;
+
+      return notifications.filter(
+        (notification) => getNotificationCategory(notification) === category,
+      ).length;
+    },
+    [getNotificationCategory, notifications],
+  );
+
+  const selectedCategoryLabel =
+    categoryOptions.find((option) => option.value === categoryFilter)?.label ??
+    "Todas";
 
   const fetchNotifications = useCallback(async () => {
     if (!userId) {
@@ -197,8 +306,10 @@ export default function NotificationsView() {
         }
 
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n,
+          sortNotifications(
+            prev.map((n) =>
+              n.id === notificationId ? { ...n, isRead: true } : n,
+            ),
           ),
         );
       } catch (error) {
@@ -233,7 +344,10 @@ export default function NotificationsView() {
         );
       }
 
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotifications((prev) =>
+        sortNotifications(prev.map((n) => ({ ...n, isRead: true }))),
+      );
+
       showAppToast(
         "Todas las notificaciones se marcaron como leídas.",
         "success",
@@ -296,7 +410,11 @@ export default function NotificationsView() {
       }
 
       setNotifications([]);
+      setFilter("all");
+      setCategoryFilter("all");
+      setShowCategoryFilters(false);
       setShowDeleteAllConfirm(false);
+
       showAppToast("Se eliminaron todas las notificaciones.", "success");
     } catch (error) {
       console.error(error);
@@ -383,10 +501,43 @@ export default function NotificationsView() {
   );
 
   const filteredNotifications = useMemo(() => {
-    if (filter === "unread") return notifications.filter((n) => !n.isRead);
-    if (filter === "read") return notifications.filter((n) => n.isRead);
-    return notifications;
-  }, [filter, notifications]);
+    let result = notifications;
+
+    if (filter === "unread") {
+      result = result.filter((n) => !n.isRead);
+    }
+
+    if (filter === "read") {
+      result = result.filter((n) => n.isRead);
+    }
+
+    if (categoryFilter !== "all") {
+      result = result.filter(
+        (notification) =>
+          getNotificationCategory(notification) === categoryFilter,
+      );
+    }
+
+    return sortNotifications(result);
+  }, [categoryFilter, filter, getNotificationCategory, notifications]);
+
+  const handleCategoryChange = useCallback((category: NotificationCategory) => {
+    setCategoryFilter(category);
+    setFilter("all");
+    setShowCategoryFilters(false);
+  }, []);
+
+  const handleUnreadFilter = useCallback(() => {
+    setFilter("unread");
+    setCategoryFilter("all");
+    setShowCategoryFilters(false);
+  }, []);
+
+  const handleReadFilter = useCallback(() => {
+    setFilter("read");
+    setCategoryFilter("all");
+    setShowCategoryFilters(false);
+  }, []);
 
   const handleNotificationClick = useCallback(
     async (notification: NotificationItem) => {
@@ -491,23 +642,50 @@ export default function NotificationsView() {
 
         <section className={styles.toolbar}>
           <div className={styles.filters}>
-            <button
-              type="button"
-              className={`${styles.filterButton} ${
-                filter === "all" ? styles.activeFilter : ""
-              }`}
-              onClick={() => setFilter("all")}
-            >
-              Todas
-              <span className={styles.filterCount}>{notifications.length}</span>
-            </button>
+            <div className={styles.dropdownFilter} ref={dropdownRef}>
+              <button
+                type="button"
+                className={`${styles.filterButton} ${
+                  filter === "all" ? styles.activeFilter : ""
+                }`}
+                onClick={() => setShowCategoryFilters((prev) => !prev)}
+              >
+                {selectedCategoryLabel}
+                <span className={styles.filterCount}>
+                  {getCategoryCount(categoryFilter)}
+                </span>
+                <span className={styles.dropdownArrow}>
+                  {showCategoryFilters ? "▲" : "▼"}
+                </span>
+              </button>
+
+              {showCategoryFilters && (
+                <div className={styles.dropdownMenu}>
+                  {categoryOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`${styles.dropdownItem} ${
+                        categoryFilter === option.value
+                          ? styles.activeDropdownItem
+                          : ""
+                      }`}
+                      onClick={() => handleCategoryChange(option.value)}
+                    >
+                      <span>{option.label}</span>
+                      <span>{getCategoryCount(option.value)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
               className={`${styles.filterButton} ${
                 filter === "unread" ? styles.activeFilter : ""
               }`}
-              onClick={() => setFilter("unread")}
+              onClick={handleUnreadFilter}
             >
               No leídas
               <span className={styles.filterCount}>{unreadCount}</span>
@@ -518,7 +696,7 @@ export default function NotificationsView() {
               className={`${styles.filterButton} ${
                 filter === "read" ? styles.activeFilter : ""
               }`}
-              onClick={() => setFilter("read")}
+              onClick={handleReadFilter}
             >
               Leídas
               <span className={styles.filterCount}>{readCount}</span>
@@ -591,7 +769,9 @@ export default function NotificationsView() {
                               Nueva
                             </span>
                           ) : (
-                            <span className={styles.statusChipRead}>Leída</span>
+                            <span className={styles.statusChipRead}>
+                              Leída
+                            </span>
                           )}
                         </div>
                       </div>
