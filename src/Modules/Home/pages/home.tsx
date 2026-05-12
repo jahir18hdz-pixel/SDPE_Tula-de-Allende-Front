@@ -287,6 +287,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
   const [classificationFilter, setClassificationFilter] = useState("Todas");
+  const [authorizationDateFilter, setAuthorizationDateFilter] = useState("");
 
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -503,7 +504,7 @@ export default function Home() {
 
   useEffect(() => {
     setPageNumber(1);
-  }, [query, statusFilter, classificationFilter]);
+  }, [query, statusFilter, classificationFilter, authorizationDateFilter]);
 
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
@@ -993,6 +994,12 @@ export default function Home() {
       );
     }
 
+    if (authorizationDateFilter) {
+      list = list.filter(
+        (r) => toInputDate(r.requestDateRaw) === authorizationDateFilter,
+      );
+    }
+
     const q = normalizeText(query);
 
     if (q) {
@@ -1029,7 +1036,7 @@ export default function Home() {
     });
 
     return list;
-  }, [rows, query, statusFilter, classificationFilter]);
+  }, [rows, query, statusFilter, classificationFilter, authorizationDateFilter]);
 
   const kpiTotal = filtered.length;
 
@@ -1201,19 +1208,30 @@ export default function Home() {
               </select>
             </label>
 
-            <label className={styles.control}>
-              <span>Tamaño</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageNumber(1);
-                  setPageSize(Number(e.target.value));
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
+            <label className={`${styles.control} ${styles.dateFilterControl}`}>
+              <span>Fecha autorización</span>
+
+              <div className={styles.dateFilterWrapper}>
+                <input
+                  type="date"
+                  value={authorizationDateFilter}
+                  onChange={(e) => setAuthorizationDateFilter(e.target.value)}
+                  className={styles.dateFilterInput}
+                  aria-label="Filtrar por fecha de autorización"
+                />
+                <FiCalendar className={styles.dateFilterIcon} />
+              </div>
+
+              {authorizationDateFilter && (
+                <button
+                  type="button"
+                  className={styles.clearDateBtn}
+                  onClick={() => setAuthorizationDateFilter("")}
+                  title="Limpiar fecha"
+                >
+                  Limpiar
+                </button>
+              )}
             </label>
 
             <button
@@ -1420,6 +1438,21 @@ export default function Home() {
           </div>
 
           <div className={styles.pagination}>
+            <label className={styles.paginationSize}>
+              <span>Mostrar</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageNumber(1);
+                  setPageSize(Number(e.target.value));
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+
             <span className={styles.pageInfo}>Página {pageNumber}</span>
 
             <button

@@ -46,16 +46,19 @@ export function toStringSafe(v: unknown): string {
 export function toBool(v: unknown): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v === "number") return v !== 0;
+
   if (typeof v === "string") {
     const t = v.trim().toLowerCase();
     return t === "true" || t === "1" || t === "si" || t === "sí";
   }
+
   return false;
 }
 
 export function toNumber(v: unknown): number | null {
   const n =
     typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+
   return Number.isFinite(n) ? n : null;
 }
 
@@ -117,9 +120,7 @@ export function formatMexicoDateTime(value?: string | null): string {
     return String(value);
   }
 
-  const adjusted = new Date(
-    original.getTime() - 6 * 60 * 60 * 1000,
-  );
+  const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
 
   return new Intl.DateTimeFormat("es-MX", {
     timeZone: "America/Mexico_City",
@@ -142,9 +143,7 @@ export function formatMexicoDate(value?: string | null): string {
     return String(value);
   }
 
-  const adjusted = new Date(
-    original.getTime() - 6 * 60 * 60 * 1000,
-  );
+  const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
 
   return new Intl.DateTimeFormat("es-MX", {
     timeZone: "America/Mexico_City",
@@ -164,6 +163,7 @@ export function normalizeChecklist(payload: unknown): ChecklistRow[] {
       const documentTypeId = toNumber(
         raw["documentTypeId"] ?? raw["DocumentTypeId"],
       );
+
       const documentName = toStringSafe(
         raw["documentName"] ?? raw["DocumentName"],
       ).trim();
@@ -173,6 +173,7 @@ export function normalizeChecklist(payload: unknown): ChecklistRow[] {
       const requiredByRule = toBool(
         raw["requiredByRule"] ?? raw["RequiredByRule"],
       );
+
       const noApplies = toBool(raw["noApplies"] ?? raw["NoApplies"]);
       const uploaded = toBool(raw["uploaded"] ?? raw["Uploaded"]);
 
@@ -251,4 +252,71 @@ export function bytesToHuman(bytes: number) {
   }
 
   return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/* =========================
+   FILE COMPRESSION
+========================= */
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function getCompressedFileName(fileName: string) {
+  if (/\.(png|jpg|jpeg|webp)$/i.test(fileName)) {
+    return fileName.replace(/\.(png|jpg|jpeg|webp)$/i, ".jpg");
+  }
+
+  return `${fileName}.jpg`;
+}
+
+export async function compressFileBeforeUpload(file: File): Promise<File> {
+  const maxSizeMB = 1.2;
+  const maxWidth = 1600;
+  const quality = 0.72;
+
+  if (!IMAGE_TYPES.includes(file.type)) {
+    return file;
+  }
+
+  const currentSizeMB = file.size / 1024 / 1024;
+
+  if (currentSizeMB <= maxSizeMB) {
+    return file;
+  }
+
+  try {
+    const imageBitmap = await createImageBitmap(file);
+
+    const scale =
+      imageBitmap.width > maxWidth ? maxWidth / imageBitmap.width : 1;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(imageBitmap.width * scale);
+    canvas.height = Math.round(imageBitmap.height * scale);
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      imageBitmap.close();
+      return file;
+    }
+
+    ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+    imageBitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", quality);
+    });
+
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+
+    return new File([blob], getCompressedFileName(file.name), {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error al comprimir archivo:", error);
+    return file;
+  }
 }

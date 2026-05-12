@@ -23,6 +23,7 @@ import type {
 } from "../types/expedient.types";
 
 import {
+  compressFileBeforeUpload,
   formatMexicoDateTime,
   getPreviewType,
   getManagerDisplayName,
@@ -254,12 +255,29 @@ export function useExpedientData({
         throw new Error(text || "No se pudo descargar el PDF del checklist.");
       }
 
+      const contentDisposition = resp.headers.get("Content-Disposition");
+
+      let fileName = `Checklist_${requestId}.pdf`;
+
+      if (contentDisposition) {
+        const match = contentDisposition.match(
+          /filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/,
+        );
+
+        const encodedFileName = match?.[1];
+        const normalFileName = match?.[2];
+
+        fileName = encodedFileName
+          ? decodeURIComponent(encodedFileName)
+          : normalFileName || fileName;
+      }
+
       const blob = await resp.blob();
       const url = window.URL.createObjectURL(blob);
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Checklist_${requestId}.pdf`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1332,11 +1350,13 @@ export function useExpedientData({
 
       fd.append("requestId", String(requestId));
 
-      uploads.forEach((u) => {
-        fd.append("files", u.file);
+      for (const u of uploads) {
+        const compressedFile = await compressFileBeforeUpload(u.file);
+
+        fd.append("files", compressedFile);
         fd.append("documentTypeId", String(u.documentTypeId ?? ""));
         fd.append("observations", u.observations ?? "");
-      });
+      }
 
       const resp = await requestFormData(`${EXPEDIENT_API}/upload-massive`, {
         method: "POST",
