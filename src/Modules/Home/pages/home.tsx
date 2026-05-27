@@ -1,114 +1,1790 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FiSearch, FiFilter } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as signalR from "@microsoft/signalr";
+import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
+import { FiSearch, FiTrash2, FiCalendar, FiRefreshCw } from "react-icons/fi";
+import Toast from "../../../Components/layout/Toast";
+import type { ToastType } from "../../../Components/layout/Toast";
+import NotificationToast from "../../../Components/layout/NotificationToast";
+import CfdiPanel from "../../ExpedientDocument/components/CfdiPanel";
+import PolicyPanel from "../../ExpedientDocument/components/PolicyPanel";
+import type {
+  PaymentPolicyOption,
+  PolicyFormState,
+} from "../../ExpedientDocument/types/expedient.types";
+import {
+  BASE_URL,
+  readToken,
+  requestJson,
+  authHeaders,
+} from "../../../services/api";
 
-type Estado = "Completo" | "Incompleto";
-
-type Row = {
-  folio: string;
-  poliza: string;
-  adquisicion: string;
-  area: string;
-  fecha: string;
-  estado: Estado;
+type ApiRow = {
+  folio?: string | null;
+  idRequest?: number;
+  IdRequest?: number;
+  acquisitionClassification?: string | null;
+  AcquisitionClassification?: string | null;
+  requestDate?: string | null;
+  RequestDate?: string | null;
+  completeMaximeDate?: string | null;
+  CompleteMaximeDate?: string | null;
+  status?: string | null;
+  Status?: string | null;
+  policyNumber?: string | null;
+  PolicyNumber?: string | null;
+  cfdi?: string | null;
+  CFDI?: string | null;
 };
 
-export default function Home() {
-  const [query, setQuery] = useState("");
-  const navigate = useNavigate();
+type RequestOk = { ok: true; data: unknown; status: number };
+type RequestErr = { ok: false; error: string; status: number };
+type RequestResult = RequestOk | RequestErr;
 
-  const data: Row[] = [
-    { folio: "808595", poliza: "458769", adquisicion: "Camioneta", area: "Planeación", fecha: "12/01/2025", estado: "Completo" },
-    { folio: "808597", poliza: "458770", adquisicion: "Botellas de agua", area: "Planeación", fecha: "15/01/2025", estado: "Incompleto" },
-  ];
+type Row = {
+  idRequest: number;
+  folio: string;
+  poliza: string;
+  cfdi: string;
+  adquisicion: string;
+  fecha: string;
+  fechaLimite: string;
+  estado: string;
+  requestDateRaw?: string | null;
+  maxDateRaw?: string | null;
+};
+
+type PaymentPolicyPreviewRow = {
+  idPaymentPolicy?: number;
+  IdPaymentPolicy?: number;
+  policyCode?: string | null;
+  PolicyCode?: string | null;
+  description?: string | null;
+  Description?: string | null;
+  previewUrl?: string | null;
+  PreviewUrl?: string | null;
+};
+
+type PreviewItem = {
+  url: string;
+  name: string;
+  type: "pdf" | "image" | "other";
+};
+
+type NotificationSignalRPayload = {
+  id: number;
+  title?: string | null;
+  message: string;
+  requestId?: number | null;
+  createdAt: string;
+};
+
+type EditDateTarget = {
+  idRequest: number;
+  folio: string;
+  fechaActual: string | null;
+};
+
+type CfdiFormState = {
+  cfdi: string;
+};
+
+type CfdiTarget = {
+  idRequest: number;
+  folio: string;
+  cfdiActual: string;
+};
+
+type PolicyTarget = {
+  idRequest: number;
+  folio: string;
+  policyNumberActual: string;
+};
+
+const API_BASE = "/api/AcquisitionRequest";
+const PAYMENT_POLICY_API = "/api/PaymentPolicy/policies";
+
+function getDaysUntil(dateValue?: string | null) {
+  if (!dateValue) return null;
+
+  const target = new Date(dateValue);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const limit = new Date(target);
+  limit.setHours(0, 0, 0, 0);
+
+  const diffMs = limit.getTime() - today.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function toInputDate(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeText(v: unknown) {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function getItemsFromUnknown<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === "object" && "items" in value) {
+    const maybe = (value as { items?: unknown }).items;
+    if (Array.isArray(maybe)) return maybe as T[];
+  }
+  return [];
+}
+
+type StatusFilter =
+  | "Todos"
+  | "Completo"
+  | "Incompleto"
+  | "Observados"
+  | "En revisión";
+
+function hasValidClassification(label: string) {
+  const t = (label ?? "").trim().toLowerCase();
+  if (!t) return false;
+  if (t === "—") return false;
+  if (t === "sin clasificación") return false;
+  if (t === "sin clasificacion") return false;
+  return true;
+}
+
+function hasPolicy(value: string) {
+  const t = (value ?? "").trim().toLowerCase();
+  return !!t && t !== "—" && t !== "sin póliza" && t !== "sin poliza";
+}
+
+function hasCfdi(value: string) {
+  const t = (value ?? "").trim().toLowerCase();
+  return !!t && t !== "—" && t !== "sin cfdi";
+}
+
+function matchesObservedStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("observado") ||
+    estado.includes("observada") ||
+    estado.includes("observacion") ||
+    estado.includes("observación") ||
+    estado.includes("con observaciones")
+  );
+}
+
+function matchesReviewStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("revision") ||
+    estado.includes("revisión") ||
+    estado.includes("en revision") ||
+    estado.includes("en revisión")
+  );
+}
+
+function matchesStatusFilter(estado: string, filter: StatusFilter) {
+  const value = normalizeText(estado);
+
+  switch (filter) {
+    case "Todos":
+      return true;
+    case "Completo":
+      return value === "completo";
+    case "Incompleto":
+      return value === "incompleto";
+    case "Observados":
+      return matchesObservedStatus(value);
+    case "En revisión":
+      return matchesReviewStatus(value);
+    default:
+      return false;
+  }
+}
+
+function getExtensionFromSource(source: string) {
+  const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
+  const parts = clean.split(".");
+  return parts.length > 1 ? (parts.pop() ?? "") : "";
+}
+
+function getPreviewType(
+  url: string,
+  fileName?: string | null,
+): "image" | "pdf" | "other" {
+  const combined = `${fileName ?? ""} ${url}`.toLowerCase();
+  const ext = getExtensionFromSource(combined);
+
+  const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"];
+
+  if (imageExts.includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+
+  if (
+    combined.includes(".jpg") ||
+    combined.includes(".jpeg") ||
+    combined.includes(".png") ||
+    combined.includes(".gif") ||
+    combined.includes(".webp") ||
+    combined.includes(".bmp") ||
+    combined.includes(".svg") ||
+    combined.includes(".avif")
+  ) {
+    return "image";
+  }
+
+  if (combined.includes(".pdf")) return "pdf";
+
+  return "other";
+}
+
+function normalizeUrlMaybe(u: string) {
+  return (u ?? "").trim();
+}
+
+function buildNotificationTitle(item: {
+  requestId?: number | null;
+  message: string;
+}) {
+  if (item.requestId) return `Solicitud #${item.requestId}`;
+  return "Notificación";
+}
+
+function getWordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function truncateClassification(text: string, maxWords = 3) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+export default function Home() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const connectionRef = useRef<signalR.HubConnection | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
+  const [classificationFilter, setClassificationFilter] = useState("Todas");
+  const [authorizationDateFilter, setAuthorizationDateFilter] = useState("");
+
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasNext, setHasNext] = useState(false);
+
+  const [toast, setToast] = useState<{
+    open: boolean;
+    type: ToastType;
+    message: string;
+  }>({
+    open: false,
+    type: "error",
+    message: "",
+  });
+
+  const [notificationToast, setNotificationToast] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    requestId?: number | null;
+  }>({
+    open: false,
+    title: "",
+    message: "",
+    requestId: null,
+  });
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const [classificationModalText, setClassificationModalText] = useState<
+    string | null
+  >(null);
+
+  const [editDateModalOpen, setEditDateModalOpen] = useState(false);
+  const [editDateTarget, setEditDateTarget] = useState<EditDateTarget | null>(
+    null,
+  );
+  const [editDateValue, setEditDateValue] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
+
+  const [cfdiPanelOpen, setCfdiPanelOpen] = useState(false);
+  const [cfdiTarget, setCfdiTarget] = useState<CfdiTarget | null>(null);
+  const [cfdiForm, setCfdiForm] = useState<CfdiFormState>({ cfdi: "" });
+  const [savingCfdi, setSavingCfdi] = useState(false);
+
+  const [policyPanelOpen, setPolicyPanelOpen] = useState(false);
+  const [policyTarget, setPolicyTarget] = useState<PolicyTarget | null>(null);
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>({
+    idPaymentPolicy: null,
+  });
+  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>(
+    [],
+  );
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
+  const closeToast = () => setToast((t) => ({ ...t, open: false }));
+
+  const closeNotificationToast = () =>
+    setNotificationToast((prev) => ({
+      ...prev,
+      open: false,
+    }));
+
+  const showAppToast = useCallback((message: string, type: ToastType) => {
+    setToast({
+      open: true,
+      type,
+      message,
+    });
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const url = `${API_BASE}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+
+      const res = (await requestJson(url, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setRows([]);
+        setHasNext(false);
+        showAppToast(res.error || "Error al cargar adquisiciones.", "error");
+        return;
+      }
+
+      const list = getItemsFromUnknown<ApiRow>(res.data);
+
+      const mapped: Row[] = list
+        .map((x) => {
+          const idRequest = x.idRequest ?? x.IdRequest ?? 0;
+          const folio = x.folio ?? "—";
+
+          const rawPoliza = (x.policyNumber ?? x.PolicyNumber ?? "").trim();
+          const poliza = rawPoliza || "Sin póliza";
+
+          const rawCfdi = (x.cfdi ?? x.CFDI ?? "").trim();
+          const cfdi = rawCfdi || "Sin CFDI";
+
+          const adquisicion =
+            x.acquisitionClassification ??
+            x.AcquisitionClassification ??
+            "Sin clasificación";
+
+          const requestDate = x.requestDate ?? x.RequestDate ?? null;
+          const completeMaximeDate =
+            x.completeMaximeDate ?? x.CompleteMaximeDate ?? null;
+
+          const estado = (x.status ?? x.Status ?? "").trim() || "Sin estatus";
+
+          return {
+            idRequest,
+            folio,
+            poliza,
+            cfdi,
+            adquisicion,
+            fecha: formatDate(requestDate),
+            fechaLimite: formatDate(completeMaximeDate),
+            estado,
+            requestDateRaw: requestDate,
+            maxDateRaw: completeMaximeDate,
+          };
+        })
+        .filter((x) => x.idRequest > 0);
+
+      mapped.sort((a, b) => {
+        const ta = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
+        const tb = b.requestDateRaw ? new Date(b.requestDateRaw).getTime() : 0;
+        return tb - ta;
+      });
+
+      setHasNext(mapped.length === pageSize);
+      setRows(mapped);
+    } catch {
+      setRows([]);
+      setHasNext(false);
+      showAppToast("Error inesperado al cargar adquisiciones.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [pageNumber, pageSize, showAppToast]);
+
+  const handleRefreshTable = useCallback(async () => {
+    await fetchData();
+  }, [fetchData]);
+
+  const connectToHub = useCallback(async () => {
+    try {
+      if (connectionRef.current) return;
+
+      const token = readToken();
+
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl(`${BASE_URL}/notifications`, {
+          accessTokenFactory: () => token,
+        })
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on(
+        "ReceiveNotification",
+        (notification: NotificationSignalRPayload) => {
+          setNotificationToast({
+            open: true,
+            title:
+              notification.title ??
+              buildNotificationTitle({
+                requestId: notification.requestId ?? null,
+                message: notification.message,
+              }),
+            message: notification.message,
+            requestId: notification.requestId ?? null,
+          });
+        },
+      );
+
+      await connection.start();
+      connectionRef.current = connection;
+    } catch (error) {
+      console.error("Error conectando a SignalR:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData, location.key]);
+
+  useEffect(() => {
+    void connectToHub();
+
+    return () => {
+      const connection = connectionRef.current;
+      connectionRef.current = null;
+
+      if (connection) {
+        connection.stop().catch(() => undefined);
+      }
+    };
+  }, [connectToHub]);
+
+  useEffect(() => {
+    setPageNumber(1);
+  }, [query, statusFilter, classificationFilter, authorizationDateFilter]);
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewItem(null);
+  }, []);
+
+  const closeEditDateModal = useCallback(() => {
+    if (savingDate) return;
+    setEditDateModalOpen(false);
+    setEditDateTarget(null);
+    setEditDateValue("");
+  }, [savingDate]);
+
+  const openEditDateModal = useCallback((row: Row) => {
+    setEditDateTarget({
+      idRequest: row.idRequest,
+      folio: row.folio,
+      fechaActual: row.maxDateRaw ?? null,
+    });
+    setEditDateValue(toInputDate(row.maxDateRaw));
+    setEditDateModalOpen(true);
+  }, []);
+
+  const openCfdiPanel = useCallback((row: Row) => {
+    const currentCfdi = hasCfdi(row.cfdi) ? row.cfdi : "";
+
+    setCfdiTarget({
+      idRequest: row.idRequest,
+      folio: row.folio,
+      cfdiActual: currentCfdi,
+    });
+
+    setCfdiForm({
+      cfdi: currentCfdi,
+    });
+
+    setCfdiPanelOpen(true);
+  }, []);
+
+  const closeCfdiPanel = useCallback(() => {
+    if (savingCfdi) return;
+    setCfdiPanelOpen(false);
+    setCfdiForm({ cfdi: "" });
+    setCfdiTarget(null);
+  }, [savingCfdi]);
+
+  const fetchPaymentPolicies = useCallback(async () => {
+    setLoadingPolicies(true);
+
+    try {
+      const res = (await requestJson(PAYMENT_POLICY_API, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setPaymentPolicies([]);
+        showAppToast(
+          res.error || "No se pudieron cargar las pólizas disponibles.",
+          "error",
+        );
+        return;
+      }
+
+      const items = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+      const mapped: PaymentPolicyOption[] = items
+        .map((item) => ({
+          idPaymentPolicy: item.idPaymentPolicy ?? item.IdPaymentPolicy ?? 0,
+          policyCode: (item.policyCode ?? item.PolicyCode ?? "").trim(),
+          description: item.description ?? item.Description ?? "",
+        }))
+        .filter((item) => item.idPaymentPolicy > 0 && !!item.policyCode);
+
+      mapped.sort((a, b) =>
+        a.policyCode.localeCompare(b.policyCode, "es", { sensitivity: "base" }),
+      );
+
+      setPaymentPolicies(mapped);
+    } catch {
+      setPaymentPolicies([]);
+      showAppToast("Error inesperado al cargar las pólizas.", "error");
+    } finally {
+      setLoadingPolicies(false);
+    }
+  }, [showAppToast]);
+
+  const openPolicyPanel = useCallback(
+    async (row: Row) => {
+      const currentPolicy = hasPolicy(row.poliza) ? row.poliza : "";
+
+      setPolicyTarget({
+        idRequest: row.idRequest,
+        folio: row.folio,
+        policyNumberActual: currentPolicy,
+      });
+
+      setPolicyForm({
+        idPaymentPolicy: null,
+      });
+
+      setPolicyPanelOpen(true);
+      await fetchPaymentPolicies();
+    },
+    [fetchPaymentPolicies],
+  );
+
+  const closePolicyPanel = useCallback(() => {
+    if (savingPolicy) return;
+    setPolicyPanelOpen(false);
+    setPolicyForm({ idPaymentPolicy: null });
+    setPolicyTarget(null);
+  }, [savingPolicy]);
+
+  const onSaveMaxDate = useCallback(async () => {
+    if (!editDateTarget) return;
+
+    if (!editDateValue) {
+      showAppToast("Selecciona una fecha límite.", "error");
+      return;
+    }
+
+    setSavingDate(true);
+
+    try {
+      const newMaxDate = new Date(`${editDateValue}T00:00:00`).toISOString();
+
+      const res = (await requestJson(`${API_BASE}/update-max-date`, {
+        method: "PATCH",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          requestId: editDateTarget.idRequest,
+          newMaxDate,
+        }),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showAppToast(
+          res.error || "No se pudo actualizar la fecha límite.",
+          "error",
+        );
+        return;
+      }
+
+      showAppToast("Fecha límite actualizada correctamente.", "success");
+      closeEditDateModal();
+      await fetchData();
+    } catch {
+      showAppToast("Error inesperado al actualizar la fecha límite.", "error");
+    } finally {
+      setSavingDate(false);
+    }
+  }, [
+    editDateTarget,
+    editDateValue,
+    closeEditDateModal,
+    fetchData,
+    showAppToast,
+  ]);
+
+  const onSaveCfdi = useCallback(async () => {
+    if (!cfdiTarget?.idRequest) {
+      showAppToast(
+        "No se encontró la solicitud para actualizar el CFDI.",
+        "error",
+      );
+      return;
+    }
+
+    if (!cfdiForm.cfdi.trim()) {
+      showAppToast("Captura el CFDI.", "error");
+      return;
+    }
+
+    setSavingCfdi(true);
+
+    try {
+      const res = (await requestJson(
+        `${API_BASE}/${cfdiTarget.idRequest}/CFDI`,
+        {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(cfdiForm.cfdi.trim()),
+        },
+      )) as RequestResult;
+
+      if (!res.ok) {
+        showAppToast(res.error || "No se pudo guardar el CFDI.", "error");
+        return;
+      }
+
+      showAppToast("CFDI guardado correctamente.", "success");
+      closeCfdiPanel();
+      await fetchData();
+    } catch (error) {
+      console.error("Error al actualizar CFDI:", error);
+      showAppToast("Error inesperado al actualizar el CFDI.", "error");
+    } finally {
+      setSavingCfdi(false);
+    }
+  }, [cfdiTarget, cfdiForm.cfdi, closeCfdiPanel, fetchData, showAppToast]);
+
+  const onSavePolicy = useCallback(async () => {
+    if (!policyTarget?.idRequest) {
+      showAppToast(
+        "No se encontró la solicitud para asignar la póliza.",
+        "error",
+      );
+      return;
+    }
+
+    if (!policyForm.idPaymentPolicy) {
+      showAppToast("Selecciona una póliza.", "error");
+      return;
+    }
+
+    setSavingPolicy(true);
+
+    const payload = {
+      requestId: policyTarget.idRequest,
+      idRequest: policyTarget.idRequest,
+      idPaymentPolicy: policyForm.idPaymentPolicy,
+    };
+
+    const requests = [
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/PaymentPolicy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/payment-policy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/update-payment-policy`,
+        body: JSON.stringify(payload),
+      },
+    ];
+
+    try {
+      let lastError = "No se pudo guardar la póliza.";
+
+      for (const request of requests) {
+        const res = (await requestJson(request.url, {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: request.body,
+        })) as RequestResult;
+
+        if (res.ok) {
+          showAppToast("Póliza guardada correctamente.", "success");
+          closePolicyPanel();
+          await fetchData();
+          return;
+        }
+
+        lastError = res.error || lastError;
+      }
+
+      showAppToast(lastError, "error");
+    } catch (error) {
+      console.error("Error al guardar póliza:", error);
+      showAppToast("Error inesperado al guardar la póliza.", "error");
+    } finally {
+      setSavingPolicy(false);
+    }
+  }, [
+    policyTarget,
+    policyForm.idPaymentPolicy,
+    closePolicyPanel,
+    fetchData,
+    showAppToast,
+  ]);
+
+  const openUrl = useCallback((u: string) => {
+    const url = normalizeUrlMaybe(u);
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const openPolicyPreview = useCallback(
+    async (policyCode: string) => {
+      const code = policyCode.trim();
+
+      if (
+        !code ||
+        code.toLowerCase() === "sin póliza" ||
+        code.toLowerCase() === "sin poliza"
+      ) {
+        showAppToast("Esta adquisición no tiene póliza asignada.", "error");
+        return;
+      }
+
+      setLoadingPreview(true);
+
+      try {
+        const res = (await requestJson(PAYMENT_POLICY_API, {
+          method: "GET",
+          headers: authHeaders(),
+        })) as RequestResult;
+
+        if (!res.ok) {
+          showAppToast(
+            res.error || "No se pudo consultar la póliza seleccionada.",
+            "error",
+          );
+          return;
+        }
+
+        const items = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+        const found = items.find((item) => {
+          const currentCode = (item.policyCode ?? item.PolicyCode ?? "").trim();
+          return normalizeText(currentCode) === normalizeText(code);
+        });
+
+        const previewUrl = normalizeUrlMaybe(
+          found?.previewUrl ?? found?.PreviewUrl ?? "",
+        );
+
+        if (!previewUrl) {
+          showAppToast(
+            "La póliza seleccionada no tiene archivo de vista previa.",
+            "error",
+          );
+          return;
+        }
+
+        setPreviewItem({
+          url: previewUrl,
+          name: code,
+          type: getPreviewType(previewUrl, code),
+        });
+        setPreviewOpen(true);
+      } catch {
+        showAppToast("Error inesperado al consultar la póliza.", "error");
+      } finally {
+        setLoadingPreview(false);
+      }
+    },
+    [showAppToast],
+  );
+
+  const openDeleteModal = useCallback((row: Row) => {
+    setDeleteTarget(row);
+    setDeletePassword("");
+    setDeleteModalOpen(true);
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    if (deleting) return;
+    setDeleteModalOpen(false);
+    setDeleteTarget(null);
+    setDeletePassword("");
+  }, [deleting]);
+
+  const onDeleteRequest = useCallback(async () => {
+    if (!deleteTarget) return;
+
+    const password = deletePassword.trim();
+
+    if (!password) {
+      showAppToast("Ingresa tu contraseña para eliminar.", "error");
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const res = (await requestJson(`${API_BASE}/${deleteTarget.idRequest}`, {
+        method: "DELETE",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          password,
+        }),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        showAppToast(res.error || "No se pudo eliminar la solicitud.", "error");
+        return;
+      }
+
+      showAppToast("Solicitud eliminada correctamente.", "success");
+      closeDeleteModal();
+      await fetchData();
+    } catch {
+      showAppToast("Error inesperado al eliminar la solicitud.", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }, [deletePassword, deleteTarget, closeDeleteModal, fetchData, showAppToast]);
+
+  useEffect(() => {
+    if (
+      !previewOpen &&
+      !deleteModalOpen &&
+      !classificationModalText &&
+      !editDateModalOpen &&
+      !cfdiPanelOpen &&
+      !policyPanelOpen
+    ) {
+      return;
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+
+      if (deleteModalOpen) {
+        closeDeleteModal();
+        return;
+      }
+
+      if (editDateModalOpen) {
+        closeEditDateModal();
+        return;
+      }
+
+      if (cfdiPanelOpen) {
+        closeCfdiPanel();
+        return;
+      }
+
+      if (policyPanelOpen) {
+        closePolicyPanel();
+        return;
+      }
+
+      if (classificationModalText) {
+        setClassificationModalText(null);
+        return;
+      }
+
+      if (previewOpen) {
+        closePreview();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    previewOpen,
+    deleteModalOpen,
+    classificationModalText,
+    editDateModalOpen,
+    cfdiPanelOpen,
+    policyPanelOpen,
+    closeDeleteModal,
+    closeEditDateModal,
+    closeCfdiPanel,
+    closePolicyPanel,
+    closePreview,
+  ]);
+
+  const classificationOptions = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        rows
+          .map((r) => r.adquisicion?.trim())
+          .filter((value): value is string => !!value && value !== "—"),
+      ),
+    );
+
+    unique.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+    return ["Todas", ...unique];
+  }, [rows]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter((r) => r.folio.toLowerCase().includes(q));
-  }, [query]);
+    let list = [...rows];
+
+    if (statusFilter !== "Todos") {
+      list = list.filter((r) => matchesStatusFilter(r.estado, statusFilter));
+    }
+
+    if (classificationFilter !== "Todas") {
+      list = list.filter(
+        (r) =>
+          normalizeText(r.adquisicion) === normalizeText(classificationFilter),
+      );
+    }
+
+    if (authorizationDateFilter) {
+      list = list.filter(
+        (r) => toInputDate(r.requestDateRaw) === authorizationDateFilter,
+      );
+    }
+
+    const q = normalizeText(query);
+
+    if (q) {
+      list = list.filter((r) => {
+        const real = r.estado;
+
+        return (
+          normalizeText(r.folio).includes(q) ||
+          normalizeText(r.poliza).includes(q) ||
+          normalizeText(r.cfdi).includes(q) ||
+          normalizeText(r.adquisicion).includes(q) ||
+          normalizeText(r.fecha).includes(q) ||
+          normalizeText(r.fechaLimite).includes(q) ||
+          normalizeText(real).includes(q)
+        );
+      });
+    }
+
+    list.sort((a, b) => {
+      const statusA = normalizeText(a.estado);
+      const statusB = normalizeText(b.estado);
+
+      const aIsComplete = statusA === "completo";
+      const bIsComplete = statusB === "completo";
+
+      if (aIsComplete !== bIsComplete) {
+        return aIsComplete ? 1 : -1;
+      }
+
+      const dateA = a.requestDateRaw ? new Date(a.requestDateRaw).getTime() : 0;
+      const dateB = b.requestDateRaw ? new Date(b.requestDateRaw).getTime() : 0;
+
+      return dateB - dateA;
+    });
+
+    return list;
+  }, [rows, query, statusFilter, classificationFilter, authorizationDateFilter]);
+
+  const kpiTotal = filtered.length;
+
+  const kpiCompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "completo",
+  ).length;
+
+  const kpiIncompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "incompleto",
+  ).length;
+
+  const kpiObservados = filtered.filter((r) =>
+    matchesObservedStatus(r.estado),
+  ).length;
+
+  const kpiRevision = filtered.filter((r) =>
+    matchesReviewStatus(r.estado),
+  ).length;
+
+  function goRegister() {
+    navigate("/adquisiciones/registrar");
+  }
+
+  function goDetail(idRequest: number, classificationLabel: string) {
+    if (!hasValidClassification(classificationLabel)) {
+      showAppToast(
+        "Esta solicitud no tiene clasificación asignada. No se puede generar el checklist del expediente.",
+        "error",
+      );
+      return;
+    }
+
+    navigate(`/adquisiciones/${idRequest}/expediente`);
+  }
+
+  const isAnyModalOpen =
+    previewOpen ||
+    deleteModalOpen ||
+    !!classificationModalText ||
+    editDateModalOpen ||
+    cfdiPanelOpen ||
+    policyPanelOpen;
 
   return (
-    <div className={styles.page}>
+    <div
+      className={`${styles.page} ${isAnyModalOpen ? styles.pageLocked : ""}`}
+    >
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
 
-      {/* Acciones + KPI */}
-      <div className={styles.actionsRow}>
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>Adquisiciones</div>
-          <div className={styles.kpiValue}>{filtered.length}</div>
+      <NotificationToast
+        open={notificationToast.open}
+        title={notificationToast.title}
+        message={notificationToast.message}
+        onClose={closeNotificationToast}
+        onView={() => {
+          if (notificationToast.requestId) {
+            navigate(
+              `/adquisiciones/${notificationToast.requestId}/expediente`,
+            );
+            closeNotificationToast();
+          }
+        }}
+      />
+
+      <div
+        className={`${styles.mainContent} ${
+          isAnyModalOpen ? styles.mainContentBlurred : ""
+        }`}
+      >
+        <div className={styles.topbar}>
+          <div className={styles.topbarLeft}>
+            <h1 className={styles.title}>Adquisiciones</h1>
+            <p className={styles.subtitle}>
+              Consulta y gestiona solicitudes registradas.
+            </p>
+          </div>
+
+          <div className={styles.kpis}>
+            <button
+              type="button"
+              className={`${styles.kpiChip} ${styles.refreshChip}`}
+              onClick={handleRefreshTable}
+              disabled={loading}
+              title="Actualizar tabla"
+            >
+              <span className={styles.kpiLabel}>
+                {loading ? "Actualizando" : "Actualizar"}
+              </span>
+
+              <FiRefreshCw
+                className={
+                  loading ? styles.refreshIconSpin : styles.refreshIcon
+                }
+              />
+            </button>
+            <div className={styles.kpiChip}>
+              <span className={styles.kpiLabel}>Total</span>
+              <span className={styles.kpiValue}>{kpiTotal}</span>
+            </div>
+
+            <div className={`${styles.kpiChip} ${styles.kpiOk}`}>
+              <span className={styles.kpiLabel}>Completo</span>
+              <span className={styles.kpiValue}>{kpiCompleto}</span>
+            </div>
+
+            <div className={`${styles.kpiChip} ${styles.kpiBad}`}>
+              <span className={styles.kpiLabel}>Incompleto</span>
+              <span className={styles.kpiValue}>{kpiIncompleto}</span>
+            </div>
+
+            <div className={styles.kpiObserved}>
+              <span className={styles.kpiLabel}>Observados</span>
+              <span className={styles.kpiValue}>{kpiObservados}</span>
+            </div>
+
+            <div className={styles.kpiReview}>
+              <span className={styles.kpiLabel}>En revisión</span>
+              <span className={styles.kpiValue}>{kpiRevision}</span>
+            </div>
+          </div>
         </div>
 
-        <div className={styles.searchBar}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar adquisición por folio"
-          />
-          <button type="button" className={styles.iconBtn}>
-            <FiSearch />
-          </button>
-          <button type="button" className={styles.iconBtn}>
-            <FiFilter />
-          </button>
+        <div className={styles.toolbar}>
+          <div className={`${styles.search} ${styles.searchWide}`}>
+            <FiSearch className={styles.searchIcon} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por folio, póliza o CFDI"
+              aria-label="Buscar adquisición"
+            />
+          </div>
+
+          <div className={styles.controls}>
+            <label className={styles.control}>
+              <span>Estado</span>
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
+              >
+                <option value="Todos">Todos</option>
+                <option value="Completo">Completo</option>
+                <option value="Incompleto">Incompleto</option>
+                <option value="Observados">Observados</option>
+                <option value="En revisión">En revisión</option>
+              </select>
+            </label>
+
+            <label
+              className={`${styles.control} ${styles.classificationControl}`}
+            >
+              <span>Clasificación</span>
+              <select
+                value={classificationFilter}
+                onChange={(e) => setClassificationFilter(e.target.value)}
+              >
+                {classificationOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className={`${styles.control} ${styles.dateFilterControl}`}>
+              <span>Fecha autorización</span>
+
+              <div className={styles.dateFilterWrapper}>
+                <input
+                  type="date"
+                  value={authorizationDateFilter}
+                  onChange={(e) => setAuthorizationDateFilter(e.target.value)}
+                  className={styles.dateFilterInput}
+                  aria-label="Filtrar por fecha de autorización"
+                />
+                <FiCalendar className={styles.dateFilterIcon} />
+              </div>
+
+              {authorizationDateFilter && (
+                <button
+                  type="button"
+                  className={styles.clearDateBtn}
+                  onClick={() => setAuthorizationDateFilter("")}
+                  title="Limpiar fecha"
+                >
+                  Limpiar
+                </button>
+              )}
+            </label>
+
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={goRegister}
+            >
+              Registrar adquisición
+            </button>
+          </div>
         </div>
 
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          onClick={() => navigate("/adquisiciones/registrar")}
-        >
-          Registrar Adquisición
-        </button>
-      </div>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardTitle}>Registros</div>
+            <div className={styles.cardNote}>
+              Ordenado por fecha más reciente
+            </div>
+          </div>
 
-      {/* Tabla */}
-      <div className={styles.sectionTitleRow}>
-        <h2>Registros de adquisiciones</h2>
-        <span className={styles.sectionNote}>(por fecha más reciente)</span>
-      </div>
-
-      <div className={styles.tableCard}>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Folio</th>
-                <th>Póliza</th>
-                <th>Adquisición</th>
-                <th>Área</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th>Información</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.folio}>
-                  <td>{r.folio}</td>
-                  <td>{r.poliza}</td>
-                  <td>{r.adquisicion}</td>
-                  <td>{r.area}</td>
-                  <td>{r.fecha}</td>
-                  <td>
-                    <span className={r.estado === "Completo" ? styles.badgeOk : styles.badgeBad}>
-                      {r.estado}
-                    </span>
-                  </td>
-                  <td>
-                    <button type="button" className={styles.secondaryBtn}>
-                      Ver más
-                    </button>
-                  </td>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thCenter}>Folio</th>
+                  <th className={styles.thCenter}>Póliza</th>
+                  <th className={styles.thCenter}>CFDI</th>
+                  <th className={styles.thCenter}>Clasificación</th>
+                  <th className={styles.thCenter}>Fecha límite</th>
+                  <th className={styles.thCenter}>Estado</th>
+                  <th className={styles.thCenter}>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
 
-        <div className={styles.pagination}>Paginación</div>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className={styles.empty}>
+                      Cargando registros...
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className={styles.empty}>
+                      No se encontraron registros con esos criterios.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((r) => {
+                    const shownEstado = r.estado || "Sin estatus";
+                    const st = normalizeText(shownEstado);
+
+                    const badgeClass =
+                      st === "completo"
+                        ? styles.badgeOk
+                        : st === "incompleto"
+                          ? styles.badgeBad
+                          : matchesReviewStatus(st)
+                            ? styles.badgeReview
+                            : matchesObservedStatus(st)
+                              ? styles.badgeObserved
+                              : styles.badgeNeutral;
+
+                    const policyExists = hasPolicy(r.poliza);
+                    const cfdiExists = hasCfdi(r.cfdi);
+                    const daysUntilLimit = getDaysUntil(r.maxDateRaw);
+
+                    const deadlineClass =
+                      daysUntilLimit !== null && daysUntilLimit <= 3
+                        ? styles.badgeDeadlineUrgent
+                        : styles.badgeDeadline;
+
+                    return (
+                      <tr key={r.idRequest}>
+                        <td className={`${styles.mono} ${styles.tdCenter}`}>
+                          {r.folio}
+                        </td>
+
+                        <td className={styles.tdCenter}>
+                          <div className={styles.cellStack}>
+                            <button
+                              type="button"
+                              className={`${styles.policyBadge} ${
+                                policyExists
+                                  ? styles.policyBadgeOk
+                                  : styles.policyBadgeEmpty
+                              } ${styles.policyBadgeButton}`}
+                              title={
+                                policyExists
+                                  ? `Editar póliza ${r.poliza}`
+                                  : "Agregar póliza"
+                              }
+                              onClick={() => void openPolicyPanel(r)}
+                            >
+                              {policyExists ? r.poliza : "Sin póliza"}
+                            </button>
+
+                            {policyExists && (
+                              <button
+                                type="button"
+                                className={styles.linkBtn}
+                                title={`Ver archivo de póliza ${r.poliza}`}
+                                onClick={() => void openPolicyPreview(r.poliza)}
+                                disabled={loadingPreview}
+                              >
+                                Vista previa
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={styles.tdCenter}>
+                          <button
+                            type="button"
+                            className={`${styles.policyBadge} ${
+                              cfdiExists
+                                ? styles.policyBadgeOk
+                                : styles.policyBadgeEmpty
+                            } ${styles.policyBadgeButton}`}
+                            title={
+                              cfdiExists
+                                ? `Editar CFDI ${r.cfdi}`
+                                : "Agregar CFDI"
+                            }
+                            onClick={() => openCfdiPanel(r)}
+                          >
+                            {cfdiExists ? r.cfdi : "Sin CFDI"}
+                          </button>
+                        </td>
+
+                        <td className={styles.tdCenter}>
+                          {getWordCount(r.adquisicion) > 3 ? (
+                            <button
+                              type="button"
+                              className={styles.classificationBtn}
+                              onClick={() =>
+                                setClassificationModalText(r.adquisicion)
+                              }
+                              title={r.adquisicion}
+                            >
+                              {truncateClassification(r.adquisicion, 3)}
+                            </button>
+                          ) : (
+                            <span
+                              title={r.adquisicion}
+                              className={styles.ellipsis}
+                            >
+                              {r.adquisicion}
+                            </span>
+                          )}
+                        </td>
+
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
+                          <button
+                            type="button"
+                            className={`${styles.badge} ${deadlineClass} ${styles.deadlineButton}`}
+                            onClick={() => openEditDateModal(r)}
+                            title={`Editar fecha límite de ${r.folio}`}
+                          >
+                            <span>{r.fechaLimite}</span>
+                          </button>
+                        </td>
+
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
+                          <span className={`${styles.badge} ${badgeClass}`}>
+                            {shownEstado}
+                          </span>
+                        </td>
+
+                        <td className={styles.tdCenter}>
+                          <div className={styles.actionsCell}>
+                            <button
+                              type="button"
+                              className={styles.linkBtn}
+                              onClick={() =>
+                                goDetail(r.idRequest, r.adquisicion)
+                              }
+                              title={`Abrir expediente de solicitud ${r.folio}`}
+                            >
+                              Ver expediente
+                            </button>
+
+                            <button
+                              type="button"
+                              className={styles.deleteIconBtn}
+                              onClick={() => openDeleteModal(r)}
+                              title={`Eliminar solicitud ${r.folio}`}
+                              aria-label={`Eliminar solicitud ${r.folio}`}
+                            >
+                              <FiTrash2 />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={styles.pagination}>
+            <label className={styles.paginationSize}>
+              <span>Mostrar</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageNumber(1);
+                  setPageSize(Number(e.target.value));
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+
+            <span className={styles.pageInfo}>Página {pageNumber}</span>
+
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber <= 1 || loading}
+            >
+              Anterior
+            </button>
+
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => setPageNumber((p) => p + 1)}
+              disabled={!hasNext || loading}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </div>
+
+      {classificationModalText && (
+        <div
+          className={styles.classificationOverlay}
+          onClick={() => setClassificationModalText(null)}
+        >
+          <div
+            className={styles.classificationModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.classificationModalHeader}>
+              <div className={styles.classificationModalTitle}>
+                Clasificación completa
+              </div>
+
+              <button
+                type="button"
+                className={styles.classificationCloseBtn}
+                onClick={() => setClassificationModalText(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className={styles.classificationModalBody}>
+              {classificationModalText}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewOpen && previewItem && (
+        <div
+          className={styles.previewOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Vista previa de póliza"
+          onClick={closePreview}
+        >
+          <div
+            className={styles.previewModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.previewHeader}>
+              <div className={styles.previewHeaderInfo}>
+                <div className={styles.previewTitle}>Vista previa</div>
+                <div className={styles.previewName} title={previewItem.name}>
+                  {previewItem.name}
+                </div>
+              </div>
+
+              <div className={styles.previewActions}>
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  onClick={closePreview}
+                >
+                  Cerrar
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  onClick={() => openUrl(previewItem.url)}
+                >
+                  Abrir aparte
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.previewBody}>
+              {previewItem.type === "image" && (
+                <div className={styles.previewImageStage}>
+                  <img
+                    src={previewItem.url}
+                    alt={previewItem.name}
+                    className={styles.previewImage}
+                  />
+                </div>
+              )}
+
+              {previewItem.type === "pdf" && (
+                <div className={styles.previewPdfWrap}>
+                  <iframe
+                    src={`${previewItem.url}#view=FitH`}
+                    title={previewItem.name}
+                    className={styles.previewFrame}
+                  />
+                </div>
+              )}
+
+              {previewItem.type === "other" && (
+                <div className={styles.previewFallback}>
+                  <div className={styles.previewFallbackTitle}>
+                    No se puede previsualizar este tipo de archivo aquí.
+                  </div>
+                  <div className={styles.previewFallbackText}>
+                    Puedes abrirlo en otra pestaña para verlo completo.
+                  </div>
+
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => openUrl(previewItem.url)}
+                  >
+                    Abrir archivo
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editDateModalOpen && editDateTarget && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar fecha límite"
+          onClick={closeEditDateModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <FiCalendar size={22} />
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>
+                  Editar fecha límite
+                </div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Modifica la fecha máxima de entrega de la adquisición.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Solicitud</div>
+                <div className={styles.deleteFileName}>
+                  {editDateTarget.folio}
+                </div>
+              </div>
+
+              <div className={styles.deleteFormField}>
+                <label className={styles.deleteFieldLabel}>Fecha límite</label>
+                <div className={styles.dateWrapper}>
+                  <input
+                    type="date"
+                    className={styles.deleteInput}
+                    value={editDateValue}
+                    onChange={(e) => setEditDateValue(e.target.value)}
+                    disabled={savingDate}
+                  />
+                  <FiCalendar className={styles.dateCustomIcon} />
+                </div>
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Fecha actual: {formatDate(editDateTarget.fechaActual)}
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeEditDateModal}
+                disabled={savingDate}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => void onSaveMaxDate()}
+                disabled={savingDate || !editDateValue}
+              >
+                {savingDate ? "Guardando..." : "Guardar fecha"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CfdiPanel
+        open={cfdiPanelOpen}
+        savingCfdi={savingCfdi}
+        cfdi={cfdiTarget?.cfdiActual ?? ""}
+        cfdiForm={cfdiForm}
+        setCfdiForm={setCfdiForm}
+        onClose={closeCfdiPanel}
+        onSave={() => void onSaveCfdi()}
+      />
+
+      <PolicyPanel
+        open={policyPanelOpen}
+        savingPolicy={savingPolicy}
+        loadingPolicies={loadingPolicies}
+        paymentPolicies={paymentPolicies}
+        policyForm={policyForm}
+        setPolicyForm={setPolicyForm}
+        policyNumber={policyTarget?.policyNumberActual ?? ""}
+        onClose={closePolicyPanel}
+        onSave={() => void onSavePolicy()}
+      />
+
+      {deleteModalOpen && deleteTarget && (
+        <div
+          className={styles.deleteConfirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminación"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.deleteConfirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.deleteConfirmHeader}>
+              <div className={styles.deleteConfirmIcon}>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12M10 11v6M14 11v6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div className={styles.deleteConfirmHeaderText}>
+                <div className={styles.deleteConfirmTitle}>
+                  Confirmar eliminación
+                </div>
+                <div className={styles.deleteConfirmSubtitle}>
+                  Esta acción eliminará la solicitud seleccionada.
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmBody}>
+              <div className={styles.deleteFileCard}>
+                <div className={styles.deleteFileLabel}>Solicitud</div>
+                <div
+                  className={styles.deleteFileName}
+                  title={`${deleteTarget.folio} - ${deleteTarget.adquisicion}`}
+                >
+                  {deleteTarget.folio} - {deleteTarget.adquisicion}
+                </div>
+              </div>
+
+              <div className={styles.deleteFormField}>
+                <label className={styles.deleteFieldLabel}>Contraseña</label>
+                <input
+                  type="password"
+                  className={styles.deleteInput}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  disabled={deleting}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !deleting) {
+                      void onDeleteRequest();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className={styles.deleteWarningBox}>
+                Esta acción no se puede deshacer.
+              </div>
+            </div>
+
+            <div className={styles.deleteConfirmFooter}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => void onDeleteRequest()}
+                disabled={deleting || !deletePassword.trim()}
+              >
+                {deleting ? "Eliminando..." : "Eliminar solicitud"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

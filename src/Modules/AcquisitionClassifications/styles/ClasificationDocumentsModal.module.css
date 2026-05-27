@@ -1,0 +1,668 @@
+:root {
+  --textSoft: rgba(17, 24, 39, 0.72);
+  --guinda2: #65001f;
+  --gold: #b68a2a;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  --shadowSoft: 0 10px 22px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================
+   BOTONES
+========================= */
+.ghostBtn,
+.saveBtn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.15px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.ghostBtn {
+  border: 1.5px solid rgba(66, 71, 81, 0.35);
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+}
+
+.ghostBtn:hover:not(:disabled) {
+  border-color: rgba(107, 114, 128, 0.72);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-1px);
+  box-shadow: var(--shadowSoft);
+}
+
+.saveBtn {
+  border: 2px solid rgba(22, 163, 74, 0.72);
+  background: rgba(22, 163, 74, 0.14);
+  color: #111827;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.92);
+  border-color: rgba(22, 163, 74, 0.98);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.ghostBtn:disabled,
+.saveBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================
+   OVERLAY / SHEET
+========================= */
+.uploadOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: rgba(17, 24, 39, 0.22);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 850ms ease;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.uploadOverlayOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.uploadOverlayClosed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploadSheet {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 244, 247, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transform: translateY(108%);
+  transition: transform 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.18);
+  border-radius: 14px;
+  will-change: transform;
+}
+
+.uploadOverlayOpen .uploadSheet {
+  transform: translateY(0);
+}
+
+.uploadOverlayClosed .uploadSheet {
+  transform: translateY(108%);
+}
+
+/* =========================
+   HEADER
+========================= */
+.uploadSheetHeader {
+  flex: 0 0 auto;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid rgba(230, 230, 234, 0.9);
+  background: linear-gradient(
+    90deg,
+    rgba(75, 0, 22, 0.12),
+    rgba(182, 138, 42, 0.12)
+  );
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.uploadSheetTitleWrap {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.uploadHandle {
+  width: 54px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.22);
+  margin-bottom: 2px;
+}
+
+.uploadSheetTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--guinda2);
+  line-height: 1.1;
+}
+
+.titleAccent {
+  color: #111827;
+}
+
+.uploadSheetNote {
+  font-size: 13px;
+  color: var(--textSoft);
+}
+
+.uploadSheetActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   BODY / FOOTER
+========================= */
+.uploadSheetBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 16px;
+}
+
+.uploadSheetFooter {
+  flex: 0 0 auto;
+  padding: 12px 16px 14px;
+  border-top: 1px solid rgba(230, 230, 234, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   GRID PRINCIPAL
+========================= */
+.sheetGrid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* =========================
+   TARJETAS DE COLUMNA
+========================= */
+.managerSectionCard {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(230, 230, 234, 0.95);
+  border-radius: 18px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* =========================
+   TITULO + CONTADOR
+========================= */
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.editorSectionTitleCompact {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(182, 138, 42, 0.28);
+  background: rgba(182, 138, 42, 0.08);
+  font-weight: 900;
+  letter-spacing: 0.25px;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #111827;
+}
+
+.counterBadge {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(75, 0, 22, 0.1);
+  border: 1px solid rgba(75, 0, 22, 0.18);
+  color: var(--guinda2);
+  font-weight: 900;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+/* =========================
+   ALINEACIÓN DE CONTENIDO
+========================= */
+.assignedContent {
+  display: flex;
+  flex-direction: column;
+  margin-top: 5px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.rightContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* =========================
+   BUSCADOR / FLOATING FIELD
+========================= */
+.editorFloatingField {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  min-height: 64px;
+  padding: 18px 16px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(215, 215, 221, 0.95);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.95),
+    rgba(255, 255, 255, 0.98)
+  );
+  box-sizing: border-box;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.editorFloatingField:focus-within {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 3px rgba(182, 138, 42, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.05);
+  background: #fffef8;
+  transform: translateY(-1px);
+}
+
+.editorFloatingLabel {
+  position: absolute;
+  top: -10px;
+  left: 18px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--guinda2);
+  background: linear-gradient(
+    180deg,
+    rgba(246, 246, 247, 0.98),
+    rgba(255, 255, 255, 0.98)
+  );
+  line-height: 1.2;
+}
+
+.editorFloatingInput {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  font-family: inherit;
+  color: #111827;
+  border-radius: 0 !important;
+  font-size: 14px;
+  min-height: 24px;
+  line-height: 1.45;
+}
+
+.editorFloatingInput:hover,
+.editorFloatingInput:focus,
+.editorFloatingInput:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  transform: none !important;
+}
+
+.editorFloatingInput:disabled {
+  background: transparent !important;
+  color: #111827;
+  opacity: 0.78;
+  cursor: not-allowed;
+}
+
+.editorFloatingInput::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+/* =========================
+   LISTAS
+========================= */
+.documentsList {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding-right: 4px;
+  scroll-behavior: smooth;
+}
+
+.emptyState {
+  padding: 18px;
+  border: 1px dashed rgba(215, 215, 221, 0.95);
+  border-radius: 14px;
+  background: #fff;
+  color: rgba(15, 23, 42, 0.72);
+  text-align: center;
+  font-weight: 600;
+}
+
+/* =========================
+   TARJETAS DE DOCUMENTOS
+========================= */
+.assignedCard,
+.documentCard {
+  position: relative;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 250, 252, 0.98)
+  );
+  padding: 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.assignedCard {
+  display: block;
+  padding-top: 18px;
+}
+
+.documentCard {
+  display: grid;
+  gap: 12px;
+}
+
+.assignedCard:hover,
+.documentCard:hover {
+  border-color: rgba(182, 138, 42, 0.55);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 251, 235, 0.9),
+    rgba(255, 255, 255, 1)
+  );
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+.removeAssignedBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 999px;
+  background: rgba(254, 242, 242, 0.95);
+  color: #b91c1c;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.removeAssignedBtn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.92);
+  color: #ffffff;
+  border-color: rgba(220, 38, 38, 1);
+  transform: scale(1.05);
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.22);
+}
+
+.removeAssignedBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.assignedInfo,
+.documentInfo {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.documentName {
+  font-size: 14px;
+  font-weight: 900;
+  color: #111827;
+  word-break: break-word;
+}
+
+.documentDesc {
+  font-size: 13px;
+  color: rgba(17, 24, 39, 0.76);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* =========================
+   BADGES
+========================= */
+.statusBadge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.statusBadgeRequired {
+  background: rgba(22, 163, 74, 0.14);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: #166534;
+}
+
+.statusBadgeOptional {
+  background: rgba(182, 138, 42, 0.14);
+  border: 1px solid rgba(182, 138, 42, 0.3);
+  color: #7c5b12;
+}
+
+/* =========================
+   CHECKS
+========================= */
+.checkRow {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.checkRow input,
+.requiredRow input {
+  accent-color: var(--guinda2);
+}
+
+.requiredRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: flex-start;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* =========================
+   SCROLLBAR
+========================= */
+.documentsList {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 0, 22, 0.35) rgba(0, 0, 0, 0.05);
+}
+
+.documentsList::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.documentsList::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+}
+
+.documentsList::-webkit-scrollbar-thumb {
+  background: rgba(75, 0, 22, 0.35);
+  border-radius: 999px;
+}
+
+.documentsList::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 0, 22, 0.55);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 1100px) {
+  .uploadSheetHeader {
+    padding: 16px 16px 12px;
+  }
+
+  .uploadSheetBody {
+    padding: 16px;
+    overflow: auto;
+  }
+
+  .uploadSheetFooter {
+    padding: 12px 16px 16px;
+  }
+
+  .sheetGrid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .managerSectionCard {
+    height: auto;
+  }
+
+  .assignedContent {
+    margin-top: 0;
+  }
+
+  .documentsList {
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 720px) {
+  .uploadSheetFooter {
+    justify-content: stretch;
+  }
+
+  .uploadSheetFooter > button {
+    width: 100%;
+  }
+
+  .uploadSheetTitle {
+    font-size: 18px;
+  }
+
+  .uploadSheetActions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .uploadSheetActions > button {
+    width: 100%;
+  }
+
+  .managerSectionCard {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .editorFloatingField {
+    min-height: 60px;
+    padding: 18px 14px 12px;
+  }
+
+  .editorFloatingLabel {
+    left: 14px;
+    font-size: 12px;
+  }
+
+  .assignedCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .assignedContent {
+    margin-top: 0;
+  }
+
+  .documentsList {
+    max-height: 260px;
+  }
+}

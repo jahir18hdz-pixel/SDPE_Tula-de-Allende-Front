@@ -177,11 +177,23 @@
   margin-bottom: 1.5rem;
 }
 
+/* Mantén el estilo aunque lo cambies a <button> */
 .forgotPass {
   font-size: 0.8rem;
   color: #555;
   text-decoration: none;
   border-bottom: 1px solid #c9980b;
+
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.forgotPass:hover {
+  color: #333;
 }
 
 /* ===== BOTÓN ===== */
@@ -223,4 +235,86 @@
     width: 30%;
     height: 20%;
   }
+}
+
+/* =========================================================
+   ✅ AGREGADO: ANIMACIÓN "RECUPERAR CONTRASEÑA" (MÍNIMO CAMBIO)
+   ========================================================= */
+
+/* Transiciones suaves */
+.leftPanel,
+.rightPanel,
+.logoCard,
+.formCard,
+.formIcon {
+  transition: transform 450ms ease, opacity 450ms ease, filter 450ms ease;
+  will-change: transform, opacity;
+}
+
+/* En modo forgot: el panel izquierdo se va desvaneciendo */
+.isForgot .leftPanel {
+  opacity: 0;
+  transform: translateX(-40px) scale(0.98);
+  pointer-events: none;
+}
+
+/* OJO: tu layout usa justify-content:center en el contenedor,
+   así que para que el form "ocupe el lugar" del logo,
+   movemos el panel derecho hacia la izquierda. */
+.isForgot .rightPanel {
+  transform: translateX(-25vw);
+}
+
+/* La card del logo también se desvanece (refuerza el efecto) */
+.isForgot .logoCard {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.98);
+}
+
+/* El ícono se queda y crece */
+.isForgot .formIcon {
+  transform: scale(1.35);
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+}
+
+/* Botón "volver" si lo agregas en el TSX */
+.backLink {
+  margin-top: 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: #555;
+  border-bottom: 1px solid #c9980b;
+  padding: 0;
+}
+
+.backLink:hover {
+  color: #333;
+}
+
+/* En pantallas donde ya ocultas leftPanel, no tiene sentido mover tanto */
+@media (max-width: 1366px) {
+  .isForgot .rightPanel {
+    transform: none;
+  }
+}
+
+.backLink {
+  margin-top: 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: #555;
+  border-bottom: 1px solid #c9980b;
+  padding: 0;
+}
+.backLink:hover {
+  color: #333;
+}
+.actionsContainer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
 }

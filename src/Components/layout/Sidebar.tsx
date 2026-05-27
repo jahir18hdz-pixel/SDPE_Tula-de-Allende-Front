@@ -1,25 +1,23 @@
-import { useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import styles from "./Sidebar.module.css";
 import {
   FiHome,
   FiFolder,
-  FiFileText,
   FiChevronDown,
   FiUser,
-  FiUserPlus,
   FiLogOut,
-  FiSun,
+  FiSettings,
+  FiBell,
 } from "react-icons/fi";
 
 import LogoPresi from "../../assets/images/logoRGB.png";
-
-type Role = "PRESIDENCIA" | "TESORERIA" | "ADQUISICIONES" | "ADMIN";
+import { useAuth } from "../../context/useAuth";
+import NotificationBadge from "./NotificationBadge";
 
 const getUser = () => {
-  const name = localStorage.getItem("user_name") || "Nombre de Usuario";
-  const role = (localStorage.getItem("role") as Role) || "PRESIDENCIA";
-  return { name, role };
+  const email = localStorage.getItem("userEmail") || "correo@ejemplo.com";
+  return { email };
 };
 
 type MenuItem = {
@@ -37,7 +35,7 @@ type SidebarProps = {
 
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
-  return !!target.closest("button, a");
+  return !!target.closest("button, a, input, textarea, select, label");
 }
 
 export default function Sidebar({
@@ -45,63 +43,172 @@ export default function Sidebar({
   onNavigate,
   onBackgroundToggle,
 }: SidebarProps) {
-  const navigate = useNavigate();
-  const { name } = getUser(); 
-  const [catalogsOpen, setCatalogsOpen] = useState(false);
+  const location = useLocation();
 
-  const menu: MenuItem[] = useMemo(() => {
-    const base: MenuItem[] = [
+  const { logout, allowedModules } = useAuth();
+  const { email } = getUser();
+
+  const [catalogsManualOpen, setCatalogsManualOpen] = useState(false);
+  const [adminManualOpen, setAdminManualOpen] = useState(false);
+
+  const isInCatalogsRoute = location.pathname.startsWith("/catalogos/");
+  const isInAdminRoute =
+    location.pathname.startsWith("/usuarios") ||
+    location.pathname.startsWith("/catalogos/roles") ||
+    location.pathname.startsWith("/catalogos/permisos") ||
+    location.pathname.startsWith("/catalogos/configuracion-sistema");
+
+  const menu: MenuItem[] = useMemo(
+    () => [
       { label: "Inicio", to: "/home", icon: <FiHome /> },
+      { label: "Notificaciones", to: "/notificaciones", icon: <FiBell /> },
+
       {
         label: "Catálogos",
         icon: <FiFolder />,
         children: [
+          {
+            label: "Unidades Administrativas",
+            to: "/catalogos/unidades-administrativas",
+          },
+          { label: "Clasificador Objeto Gasto", to: "/catalogos/cog" },
+          {
+            label: "Fondo de Financiamiento",
+            to: "/catalogos/fondo-financiamiento",
+          },
+          { label: "Pólizas de Pago", to: "/catalogos/polizas" },
+          { label: "Comunidades", to: "/catalogos/comunidades" },
+          { label: "Beneficiarios", to: "/catalogos/beneficiarios" },
           { label: "Proveedores", to: "/catalogos/proveedores" },
-          { label: "Partidas", to: "/catalogos/partidas" },
-          { label: "Áreas", to: "/catalogos/areas" },
+          { label: "PROG", to: "/catalogos/prog" },
+          { label: "Proyectos", to: "/catalogos/proyectos" },
+          {
+            label: "Clasificación de Adquisiciones",
+            to: "/catalogos/clasificacion-adquisiciones",
+          },
+          {
+            label: "Tipos de Adquisición",
+            to: "/catalogos/tipos-adquisicion",
+          },
+          {
+            label: "Tipos de Documento",
+            to: "/catalogos/tipos-documento",
+          },
         ],
       },
-      {
-        label: "Registrar Adquisición",
-        to: "/adquisiciones/registrar",
-        icon: <FiFileText />,
-      },
-      // Visible para TODOS
-      {
-        label: "Usuarios",
-        to: "/usuarios/nuevo",
-        icon: <FiUserPlus />,
-      },
-    ];
 
-    return base;
-  }, []);
+      {
+        label: "Administración",
+        icon: <FiSettings />,
+        children: [
+          { label: "Roles", to: "/catalogos/roles" },
+          { label: "Permisos", to: "/catalogos/permisos" },
+          { label: "Usuarios", to: "/usuarios/nuevo" },
+          {
+            label: "Configuración del sistema",
+            to: "/catalogos/configuracion-sistema",
+          },
+        ],
+      },
+    ],
+    []
+  );
+
+  const filteredMenu: MenuItem[] = useMemo(() => {
+    const canSee = (path?: string) => {
+      if (!path) return true;
+      return allowedModules?.has(path) ?? false;
+    };
+
+    return menu
+      .map((item) => {
+        if (!item.children) {
+          return canSee(item.to) ? item : null;
+        }
+
+        const kids = item.children.filter((child) => canSee(child.to));
+        if (kids.length === 0) return null;
+
+        return { ...item, children: kids };
+      })
+      .filter((item): item is MenuItem => !!item);
+  }, [menu, allowedModules]);
+
+  useEffect(() => {
+    if (!isInCatalogsRoute) return;
+
+    const catalogsGroup = filteredMenu.find((item) => item.label === "Catálogos");
+    const hasCatalogs =
+      Array.isArray(catalogsGroup?.children) &&
+      catalogsGroup.children.length > 0;
+
+    const id = window.setTimeout(() => {
+      setCatalogsManualOpen(hasCatalogs);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [isInCatalogsRoute, filteredMenu]);
+
+  useEffect(() => {
+    if (!isInAdminRoute) return;
+
+    const adminGroup = filteredMenu.find(
+      (item) => item.label === "Administración"
+    );
+    const hasAdmin =
+      Array.isArray(adminGroup?.children) && adminGroup.children.length > 0;
+
+    const id = window.setTimeout(() => {
+      setAdminManualOpen(hasAdmin);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [isInAdminRoute, filteredMenu]);
 
   const handleLogout = () => {
     onNavigate?.();
-    localStorage.clear();
-    navigate("/login", { replace: true });
+    logout();
+    window.location.replace("/login");
   };
 
-  const toggleTheme = () => {
-    document.body.classList.toggle("light-theme");
-  };
-
-  const handleCatalogClick = () => {
+  const handleGroupClick = (label: string) => {
     if (collapsed && onBackgroundToggle) onBackgroundToggle();
-    setCatalogsOpen((v) => !v);
+
+    if (label === "Catálogos") {
+      setCatalogsManualOpen((value) => !value);
+    }
+
+    if (label === "Administración") {
+      setAdminManualOpen((value) => !value);
+    }
+  };
+
+  const shouldShowSubmenu = (label: string) => {
+    if (collapsed) return false;
+    if (label === "Catálogos") return catalogsManualOpen;
+    if (label === "Administración") return adminManualOpen;
+    return false;
+  };
+
+  const isGroupOpen = (label: string) => {
+    if (label === "Catálogos") return catalogsManualOpen;
+    if (label === "Administración") return adminManualOpen;
+    return false;
   };
 
   return (
     <aside
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
-      onMouseDownCapture={(e) => {
+      onPointerDownCapture={(e) => {
         if (!onBackgroundToggle) return;
-        if (isInteractiveTarget(e.target)) return;
+
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        if (isInteractiveTarget(target)) return;
         onBackgroundToggle();
       }}
     >
-      {/* TOP */}
       <div className={styles.top}>
         {!collapsed && (
           <h1 className={styles.title}>
@@ -123,69 +230,64 @@ export default function Sidebar({
           <span className={styles.userIcon}>
             <FiUser />
           </span>
-          {!collapsed && <span className={styles.userName}>{name}</span>}
+          {!collapsed && <span className={styles.userName}>{email}</span>}
         </div>
 
         <div className={styles.goldLine} />
       </div>
 
-      {/* SCROLL SOLO MENÚ */}
       <div className={styles.scrollArea}>
         <nav className={styles.nav}>
-          {menu.map((item) => {
-            if (item.children) {
-              return (
-                <div key={item.label} className={styles.group}>
-                  <button
-                    type="button"
-                    className={styles.itemBtn}
-                    onClick={handleCatalogClick}
-                  >
-                    <span className={styles.left}>
-                      <span className={styles.icon}>{item.icon}</span>
-                      {!collapsed && (
-                        <span className={styles.label}>{item.label}</span>
-                      )}
-                    </span>
-
+          {filteredMenu.map((item) =>
+            item.children ? (
+              <div key={item.label} className={styles.group}>
+                <button
+                  type="button"
+                  className={styles.itemBtn}
+                  onClick={() => handleGroupClick(item.label)}
+                >
+                  <span className={styles.left}>
+                    <span className={styles.icon}>{item.icon}</span>
                     {!collapsed && (
-                      <span
-                        className={`${styles.chev} ${
-                          catalogsOpen ? styles.chevOpen : ""
-                        }`}
-                      >
-                        <FiChevronDown />
-                      </span>
+                      <span className={styles.label}>{item.label}</span>
                     )}
-                  </button>
+                  </span>
 
                   {!collapsed && (
-                    <div
-                      className={`${styles.submenu} ${
-                        catalogsOpen ? styles.submenuOpen : ""
+                    <span
+                      className={`${styles.chev} ${
+                        isGroupOpen(item.label) ? styles.chevOpen : ""
                       }`}
                     >
-                      {item.children.map((c) => (
-                        <NavLink
-                          key={c.to}
-                          to={c.to}
-                          onClick={() => onNavigate?.()}
-                          className={({ isActive }) =>
-                            isActive
-                              ? `${styles.subItem} ${styles.active}`
-                              : styles.subItem
-                          }
-                        >
-                          {c.label}
-                        </NavLink>
-                      ))}
-                    </div>
+                      <FiChevronDown />
+                    </span>
                   )}
-                </div>
-              );
-            }
+                </button>
 
-            return (
+                {shouldShowSubmenu(item.label) && (
+                  <div
+                    className={`${styles.submenu} ${
+                      isGroupOpen(item.label) ? styles.submenuOpen : ""
+                    }`}
+                  >
+                    {item.children.map((child) => (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        onClick={() => onNavigate?.()}
+                        className={({ isActive }) =>
+                          isActive
+                            ? `${styles.subItem} ${styles.active}`
+                            : styles.subItem
+                        }
+                      >
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
               <NavLink
                 key={item.to}
                 to={item.to!}
@@ -195,31 +297,20 @@ export default function Sidebar({
                 }
               >
                 <span className={styles.icon}>{item.icon}</span>
+
                 {!collapsed && <span className={styles.label}>{item.label}</span>}
+
+                {item.label === "Notificaciones" && (
+                  <NotificationBadge collapsed={collapsed} />
+                )}
               </NavLink>
-            );
-          })}
+            )
+          )}
         </nav>
       </div>
 
-      {/* BOTTOM FIJO */}
       <div className={styles.bottom}>
-        <button
-          type="button"
-          className={styles.bottomBtn}
-          onClick={toggleTheme}
-        >
-          <span className={styles.icon}>
-            <FiSun />
-          </span>
-          {!collapsed && <span className={styles.label}>Modo claro</span>}
-        </button>
-
-        <button
-          type="button"
-          className={styles.bottomBtn}
-          onClick={handleLogout}
-        >
+        <button type="button" className={styles.bottomBtn} onClick={handleLogout}>
           <span className={styles.icon}>
             <FiLogOut />
           </span>

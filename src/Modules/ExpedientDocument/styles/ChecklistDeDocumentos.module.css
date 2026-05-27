@@ -1,0 +1,334 @@
+/* =========================
+   CARD BASE
+========================= */
+.card {
+  background: linear-gradient(180deg, #f4f2f2, #fcfcfd);
+  border: 1px solid var(--border);
+  border-radius: var(--radiusCard);
+  box-shadow: var(--shadowSoft);
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+
+  min-height: 0;
+  height: 100%;
+}
+
+.cardHeader {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    90deg,
+    rgba(75, 0, 22, 0.11),
+    rgba(182, 138, 42, 0.12)
+  );
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.28px;
+  text-transform: uppercase;
+  color: #111827;
+}
+
+.cardNoteInline {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* =========================
+   HEADER INFO INLINE
+========================= */
+.inlineInfoGroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* =========================
+   RESPONSABLE / POLIZA / CFDI INLINE
+========================= */
+.managerBox,
+.policyBox,
+.cfdiBox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  min-height: 42px;
+  padding: 8px 12px;
+
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(4px);
+}
+
+.managerBox {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.policyBox {
+  border: 1px solid rgba(182, 138, 42, 0.35);
+  background: rgba(182, 138, 42, 0.12);
+}
+
+.cfdiBox {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.managerInlineLabel,
+.policyInlineLabel,
+.cfdiInlineLabel {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  opacity: 0.82;
+  white-space: nowrap;
+}
+
+.managerHeaderName,
+.policyHeaderName,
+.cfdiHeaderName {
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 26px;
+  padding: 0 12px;
+
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  font-family: inherit;
+}
+
+.managerHeaderName {
+  border-color: rgba(22, 163, 74, 0.45);
+}
+
+.policyHeaderName {
+  border-color: rgba(182, 138, 42, 0.45);
+}
+
+.cfdiHeaderName {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.managerHeaderName:hover:not(:disabled),
+.policyHeaderName:hover:not(:disabled),
+.cfdiHeaderName:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.managerHeaderName:hover:not(:disabled) {
+  border-color: rgba(22, 163, 74, 0.78);
+}
+
+.policyHeaderName:hover:not(:disabled) {
+  border-color: rgba(182, 138, 42, 0.78);
+}
+
+.cfdiHeaderName:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.78);
+}
+
+.managerHeaderName:focus-visible,
+.policyHeaderName:focus-visible,
+.cfdiHeaderName:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(182, 138, 42, 0.18);
+}
+
+.managerHeaderName:disabled,
+.policyHeaderName:disabled,
+.cfdiHeaderName:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================
+   CHECKLIST BUTTON
+========================= */
+.headerEditChecklistBtn {
+  min-height: 42px;
+  padding: 0 16px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(182, 138, 42, 0.65);
+
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.26),
+    rgba(182, 138, 42, 0.12)
+  );
+
+  color: #111827;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+
+  font-family: inherit;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+}
+
+.headerEditChecklistBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(
+    180deg,
+    rgba(182, 138, 42, 0.36),
+    rgba(182, 138, 42, 0.18)
+  );
+  border-color: rgba(182, 138, 42, 0.9);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.headerEditChecklistBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.headerActions {
+  margin-left: auto;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerPdfCheckBtn,
+.headerEditChecklistBtn {
+  height: 40px;
+  padding: 0 14px;
+
+  border-radius: 12px;
+
+  font-size: 13px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.15s ease;
+}
+
+.headerPdfCheckBtn {
+  border: 1.5px solid rgba(117, 14, 14, 0.6);
+
+  background: linear-gradient(
+    180deg,
+    rgba(117, 14, 14, 0.6),
+    rgba(255, 255, 255, 0.95)
+  );
+
+  color: #671010;
+}
+
+.headerPdfCheckBtn:hover:not(:disabled) {
+  background: rgba(117, 14, 14, 0.6);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.headerEditChecklistBtn {
+  border: 1.5px solid rgba(101, 0, 31, 0.6);
+
+  background: linear-gradient(
+    180deg,
+    rgba(101, 0, 31, 0.12),
+    rgba(255, 255, 255, 0.95)
+  );
+
+  color: #65001f;
+}
+
+.headerEditChecklistBtn:hover:not(:disabled) {
+  background: rgba(101, 0, 31, 0.9);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(101, 0, 31, 0.2);
+}
+
+.headerPdfCheckBtn:active,
+.headerEditChecklistBtn:active {
+  transform: scale(0.96);
+}
+
+.headerPdfCheckBtn:disabled,
+.headerEditChecklistBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .headerActions {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+  }
+
+  .headerPdfCheckBtn,
+  .headerEditChecklistBtn {
+    flex: 1;
+  }
+}

@@ -15,14 +15,7 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
 
   /*  DEGRADADO VINO → BLANCO */
-  background: linear-gradient(
-    90deg,
-    #4F071F 0%,
-    #6d142f 23%,
-    #9e3a58 40%,
-    #e6c1cc 75%,
-    #ffffff 100%
-  );
+  background: #4F071F
 }
 
 /* ===== LADO IZQUIERDO ===== */

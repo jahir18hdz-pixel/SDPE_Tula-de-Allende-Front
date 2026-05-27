@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import type { CSSProperties } from "react";
 
-import Sidebar from "../layout/Sidebar"; 
-import TopBar from "../layout/TopBar";  
+import Sidebar from "../layout/Sidebar";
 
 import styles from "./AppLayout.module.css";
 
@@ -15,17 +14,22 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const sidebarWidth = useMemo(() => (collapsed ? 88 : 280), [collapsed]);
+  const sidebarWidth = useMemo(
+    () =>
+      collapsed
+        ? "clamp(80px, 7.5vw, 112px)"
+        : "clamp(280px, 20vw, 380px)",
+    [collapsed]
+  );
 
   const closeMobile = () => setMobileOpen(false);
 
   const layoutStyle: LayoutVars = {
-    "--sidebar-w": `${sidebarWidth}px`,
+    "--sidebar-w": sidebarWidth,
   };
 
   return (
     <div className={styles.shell} style={layoutStyle}>
-      {/* Sidebar Desktop */}
       <aside className={styles.sidebarDesktop}>
         <Sidebar
           collapsed={collapsed}
@@ -33,14 +37,12 @@ export default function AppLayout() {
         />
       </aside>
 
-      {/* Overlay Mobile */}
       <div
         className={`${styles.overlay} ${mobileOpen ? styles.overlayOpen : ""}`}
         onClick={closeMobile}
         aria-hidden="true"
       />
 
-      {/* Sidebar Mobile */}
       <aside
         className={`${styles.sidebarMobile} ${
           mobileOpen ? styles.sidebarMobileOpen : ""
@@ -49,23 +51,15 @@ export default function AppLayout() {
         <Sidebar collapsed={false} onNavigate={closeMobile} />
       </aside>
 
-      {/* Content */}
       <div className={styles.content}>
-        {/* TopBar global con botón menú */}
-        <div className={styles.topbarRow}>
-          <button
-            type="button"
-            className={styles.menuBtn}
-            onClick={() => setMobileOpen(true)}
-            aria-label="Abrir menú"
-          >
-            ☰
-          </button>
-
-          <div className={styles.topbarGrow}>
-            <TopBar />
-          </div>
-        </div>
+        <button
+          type="button"
+          className={styles.menuBtn}
+          onClick={() => setMobileOpen(true)}
+          aria-label="Abrir menú"
+        >
+          ☰
+        </button>
 
         <main className={styles.main}>
           <Outlet />

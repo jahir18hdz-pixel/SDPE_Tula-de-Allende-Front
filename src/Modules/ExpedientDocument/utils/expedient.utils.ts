@@ -1,0 +1,322 @@
+import type {
+  ChecklistFileItem,
+  ChecklistRow,
+  ManagerInfo,
+  UnknownRecord,
+} from "../types/expedient.types";
+
+export function splitFullName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+
+  return {
+    firstName: parts[0] ?? "",
+    lastName: parts[1] ?? "",
+    secondLastName: parts.slice(2).join(" ") ?? "",
+  };
+}
+
+export function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null;
+}
+
+export function asArray(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+
+export function unwrapList(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  return asArray(
+    payload["items"] ??
+      payload["Items"] ??
+      payload["data"] ??
+      payload["Data"] ??
+      payload["result"] ??
+      payload["Result"],
+  );
+}
+
+export function toStringSafe(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+}
+
+export function toBool(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    return t === "true" || t === "1" || t === "si" || t === "sí";
+  }
+
+  return false;
+}
+
+export function toNumber(v: unknown): number | null {
+  const n =
+    typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+
+  return Number.isFinite(n) ? n : null;
+}
+
+export function normalizeUrlMaybe(u: string) {
+  return (u ?? "").trim();
+}
+
+export function getExtensionFromSource(source: string) {
+  const clean = source.split("?")[0].split("#")[0].trim().toLowerCase();
+  const parts = clean.split(".");
+  return parts.length > 1 ? (parts.pop() ?? "") : "";
+}
+
+export function getPreviewType(
+  url: string,
+  fileName?: string | null,
+): "image" | "pdf" | "other" {
+  const combined = `${fileName ?? ""} ${url}`.toLowerCase();
+  const ext = getExtensionFromSource(combined);
+
+  const imageExts = [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "bmp",
+    "svg",
+    "avif",
+  ];
+
+  if (imageExts.includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+
+  if (
+    combined.includes(".jpg") ||
+    combined.includes(".jpeg") ||
+    combined.includes(".png") ||
+    combined.includes(".gif") ||
+    combined.includes(".webp") ||
+    combined.includes(".bmp") ||
+    combined.includes(".svg") ||
+    combined.includes(".avif")
+  ) {
+    return "image";
+  }
+
+  if (combined.includes(".pdf")) return "pdf";
+
+  return "other";
+}
+
+export function formatMexicoDateTime(value?: string | null): string {
+  if (!value) return "";
+
+  const original = new Date(value);
+
+  if (Number.isNaN(original.getTime())) {
+    return String(value);
+  }
+
+  const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
+
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(adjusted);
+}
+
+export function formatMexicoDate(value?: string | null): string {
+  if (!value) return "";
+
+  const original = new Date(value);
+
+  if (Number.isNaN(original.getTime())) {
+    return String(value);
+  }
+
+  const adjusted = new Date(original.getTime() - 6 * 60 * 60 * 1000);
+
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(adjusted);
+}
+
+export function normalizeChecklist(payload: unknown): ChecklistRow[] {
+  const list = unwrapList(payload);
+
+  return list
+    .map((raw): ChecklistRow | null => {
+      if (!isRecord(raw)) return null;
+
+      const documentTypeId = toNumber(
+        raw["documentTypeId"] ?? raw["DocumentTypeId"],
+      );
+
+      const documentName = toStringSafe(
+        raw["documentName"] ?? raw["DocumentName"],
+      ).trim();
+
+      if (!documentTypeId || !documentName) return null;
+
+      const requiredByRule = toBool(
+        raw["requiredByRule"] ?? raw["RequiredByRule"],
+      );
+
+      const noApplies = toBool(raw["noApplies"] ?? raw["NoApplies"]);
+      const uploaded = toBool(raw["uploaded"] ?? raw["Uploaded"]);
+
+      const filesRaw = asArray(raw["files"] ?? raw["Files"]);
+
+      const files: ChecklistFileItem[] = filesRaw
+        .map((f): ChecklistFileItem | null => {
+          if (!isRecord(f)) return null;
+
+          const status = isRecord(f["status"] ?? f["Status"])
+            ? (f["status"] ?? f["Status"])
+            : null;
+
+          return {
+            id: toNumber(f["fileId"] ?? f["FileId"]),
+            name:
+              toStringSafe(f["fileName"] ?? f["FileName"]).trim() || "Archivo",
+            url: normalizeUrlMaybe(
+              toStringSafe(f["fileUrl"] ?? f["FileUrl"]),
+            ),
+            previewUrl:
+              normalizeUrlMaybe(
+                toStringSafe(f["previewUrl"] ?? f["PreviewUrl"]),
+              ) || null,
+            observation: toStringSafe(
+              f["observation"] ?? f["Observation"],
+            ).trim(),
+            reviewObservation: toStringSafe(
+              f["observationUpload"] ?? f["ObservationUpload"],
+            ).trim(),
+            status: toStringSafe(
+              isRecord(status)
+                ? status["description"] ?? status["Description"]
+                : "",
+            ).trim(),
+            createdAt:
+              toStringSafe(f["createdAt"] ?? f["CreatedAt"]).trim() || null,
+            updatedAt:
+              toStringSafe(f["updatedAt"] ?? f["UpdatedAt"]).trim() || null,
+            reviewedAt:
+              toStringSafe(f["reviewedAt"] ?? f["ReviewedAt"]).trim() || null,
+          };
+        })
+        .filter((x): x is ChecklistFileItem => x !== null);
+
+      return {
+        documentTypeId,
+        documentName,
+        requiredByRule,
+        noApplies,
+        uploaded,
+        globalStatus:
+          toStringSafe(raw["globalStatus"] ?? raw["GlobalStatus"]).trim() ||
+          (uploaded ? "Cargado" : "Pendiente"),
+        observations: [],
+        reviewObservations: [],
+        statusDescriptions: [],
+        files,
+      };
+    })
+    .filter((x): x is ChecklistRow => x !== null);
+}
+
+export function getManagerDisplayName(m: ManagerInfo | null) {
+  return m?.fullName?.trim() || "Sin responsable";
+}
+
+export function bytesToHuman(bytes: number) {
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let i = 0;
+
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024;
+    i++;
+  }
+
+  return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/* =========================
+   FILE COMPRESSION
+========================= */
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function getCompressedFileName(fileName: string) {
+  if (/\.(png|jpg|jpeg|webp)$/i.test(fileName)) {
+    return fileName.replace(/\.(png|jpg|jpeg|webp)$/i, ".jpg");
+  }
+
+  return `${fileName}.jpg`;
+}
+
+export async function compressFileBeforeUpload(file: File): Promise<File> {
+  const maxSizeMB = 1.2;
+  const maxWidth = 1600;
+  const quality = 0.72;
+
+  if (!IMAGE_TYPES.includes(file.type)) {
+    return file;
+  }
+
+  const currentSizeMB = file.size / 1024 / 1024;
+
+  if (currentSizeMB <= maxSizeMB) {
+    return file;
+  }
+
+  try {
+    const imageBitmap = await createImageBitmap(file);
+
+    const scale =
+      imageBitmap.width > maxWidth ? maxWidth / imageBitmap.width : 1;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(imageBitmap.width * scale);
+    canvas.height = Math.round(imageBitmap.height * scale);
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      imageBitmap.close();
+      return file;
+    }
+
+    ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+    imageBitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", quality);
+    });
+
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+
+    return new File([blob], getCompressedFileName(file.name), {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error al comprimir archivo:", error);
+    return file;
+  }
+}
