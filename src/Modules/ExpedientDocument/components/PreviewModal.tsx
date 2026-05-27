@@ -1,6 +1,7 @@
 import React from "react";
 import styles from "../styles/previewModal.module.css";
 import type { PreviewItem } from "../types/expedient.types";
+import { formatMexicoDateTime } from "../utils/expedient.utils";
 
 type Props = {
   open: boolean;
@@ -58,9 +59,7 @@ export default function PreviewModal({
   const isImagePreview = currentPreview.type === "image";
   const isPdfPreview = currentPreview.type === "pdf";
   const canMovePreview = previewItems.length > 1;
-  const hasReviewObservation = Boolean(
-    currentPreview.reviewObservation?.trim(),
-  );
+  const hasReviewObservation = Boolean(currentPreview.reviewObservation?.trim());
 
   const reviewStatus = (currentPreview.reviewStatus || "").toLowerCase();
 
@@ -395,6 +394,41 @@ export default function PreviewModal({
                   </div>
                 </div>
               </div>
+
+              {currentPreview.createdAt && (
+                <div className={styles.previewInfoBlock}>
+                  <div className={styles.previewInfoLabel}>Fecha de carga</div>
+                  <div className={`${styles.previewMetaCard} ${statusBlockClass}`}>
+                    <div className={styles.previewMetaValue}>
+                      {formatMexicoDateTime(currentPreview.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {currentPreview.updatedAt && (
+                <div className={styles.previewInfoBlock}>
+                  <div className={styles.previewInfoLabel}>
+                    Última actualización
+                  </div>
+                  <div className={`${styles.previewMetaCard} ${statusBlockClass}`}>
+                    <div className={styles.previewMetaValue}>
+                      {formatMexicoDateTime(currentPreview.updatedAt)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {currentPreview.reviewedAt && (
+                <div className={styles.previewInfoBlock}>
+                  <div className={styles.previewInfoLabel}>Fecha de revisión</div>
+                  <div className={`${styles.previewMetaCard} ${statusBlockClass}`}>
+                    <div className={styles.previewMetaValue}>
+                      {formatMexicoDateTime(currentPreview.reviewedAt)}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className={styles.previewInfoBlock}>
                 <div className={styles.previewInfoLabel}>Observaciones</div>

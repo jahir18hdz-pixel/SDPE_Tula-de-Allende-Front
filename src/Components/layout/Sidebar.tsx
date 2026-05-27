@@ -71,7 +71,7 @@ export default function Sidebar({
             label: "Unidades Administrativas",
             to: "/catalogos/unidades-administrativas",
           },
-          { label: "COG", to: "/catalogos/cog" },
+          { label: "Clasificador Objeto Gasto", to: "/catalogos/cog" },
           {
             label: "Fondo de Financiamiento",
             to: "/catalogos/fondo-financiamiento",

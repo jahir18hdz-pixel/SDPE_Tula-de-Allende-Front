@@ -1,6 +1,6 @@
 import React from "react";
 import styles from "../styles/uploadPanel.module.css";
-import type { UploadRow,  } from "../types/expedient.types";
+import type { UploadRow } from "../types/expedient.types";
 import { bytesToHuman } from "../utils/expedient.utils";
 
 type Props = {
@@ -57,7 +57,7 @@ export default function UploadPanel({
             <div className={styles.uploadSheetTitle}>Carga de archivos</div>
             <div className={styles.uploadSheetNote}>
               Selecciona varios archivos y asigna cada uno al documento
-              correspondiente
+              correspondiente.
             </div>
           </div>
 
@@ -103,6 +103,7 @@ export default function UploadPanel({
                     <div className={styles.fileName} title={u.file.name}>
                       {u.file.name}
                     </div>
+
                     <div className={styles.fileMeta}>
                       {bytesToHuman(u.file.size)}
                     </div>
@@ -145,6 +146,7 @@ export default function UploadPanel({
                       <span className={styles.editorFloatingLabel}>
                         Observaciones
                       </span>
+
                       <input
                         className={styles.editorFloatingInput}
                         value={u.observations}

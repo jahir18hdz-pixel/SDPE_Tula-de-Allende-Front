@@ -1,5 +1,6 @@
 export const BASE_URL =
-  (import.meta.env.VITE_API_URL as string) || "";
+  (import.meta.env.VITE_API_URL as string) ||
+  "https://sistemapolizasegresostulaallende.somee.com";
 
 type AuthStored = { token?: string; Token?: string };
 
@@ -78,11 +79,32 @@ export async function requestJson(
 
   if (!res.ok) {
     const apiMsg =
-      isRecord(parsed) && typeof parsed.message === "string" ? String(parsed.message) : "";
+      isRecord(parsed) && typeof parsed.message === "string"
+        ? String(parsed.message)
+        : "";
     const msg =
-      apiMsg || (typeof parsed === "string" ? parsed : "") || text || `HTTP ${res.status}`;
+      apiMsg ||
+      (typeof parsed === "string" ? parsed : "") ||
+      text ||
+      `HTTP ${res.status}`;
     return { ok: false, error: msg, status: res.status };
   }
 
   return { ok: true, data: parsed, status: res.status };
+}
+
+export async function requestFormData(
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const url = safeJoin(BASE_URL, path);
+
+  const headers = authHeaders(init?.headers) as Record<string, string>;
+  delete headers["Content-Type"];
+
+  return fetch(url, {
+    ...init,
+    credentials: "omit",
+    headers,
+  });
 }

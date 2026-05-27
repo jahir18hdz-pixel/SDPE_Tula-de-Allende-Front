@@ -6,6 +6,9 @@ export type ChecklistFileItem = {
   observation?: string;
   reviewObservation?: string;
   status?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  reviewedAt?: string | null;
 };
 
 export type ChecklistRow = {
@@ -18,15 +21,7 @@ export type ChecklistRow = {
   observations: string[];
   reviewObservations: string[];
   statusDescriptions: string[];
-  files: {
-    id: number | null;
-    name: string;
-    url: string;
-    previewUrl?: string | null;
-    observation?: string;
-    reviewObservation?: string;
-    status?: string;
-  }[];
+  files: ChecklistFileItem[];
 };
 
 export type UploadRow = {
@@ -35,8 +30,18 @@ export type UploadRow = {
   observations: string;
 };
 
-export type RequestOk = { ok: true; data: unknown; status: number };
-export type RequestErr = { ok: false; error: string; status: number };
+export type RequestOk = {
+  ok: true;
+  data: unknown;
+  status: number;
+};
+
+export type RequestErr = {
+  ok: false;
+  error: string;
+  status: number;
+};
+
 export type RequestResult = RequestOk | RequestErr;
 
 export type ManagerInfo = {
@@ -92,6 +97,9 @@ export type PreviewItem = {
   type: "image" | "pdf" | "other";
   reviewObservation?: string | null;
   reviewStatus?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  reviewedAt?: string | null;
 };
 
 export type UnknownRecord = Record<string, unknown>;

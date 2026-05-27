@@ -67,8 +67,7 @@ function hasModuleAction(modulePath: string, requiredAction: string): boolean {
     const actions = normalizeActions(permission.Action ?? permission.action);
 
     return (
-      currentModule === modulePath &&
-      actions.includes(normalizedRequiredAction)
+      currentModule === modulePath && actions.includes(normalizedRequiredAction)
     );
   });
 }
@@ -149,6 +148,8 @@ export default function ExpedientDocuments() {
     setShowRejectBox,
     rejectObservations,
     setRejectObservations,
+     downloadingChecklistPdf,
+    onDownloadChecklistPdf,
 
     deleteModalOpen,
     deleteTarget,
@@ -424,6 +425,7 @@ export default function ExpedientDocuments() {
 
                 <ExpedientHeaderInfo
                   canUse={canUse}
+                  requestId={requestId}
                   loadingManager={loadingManager}
                   manager={manager}
                   policyNumber={policyNumber}
@@ -432,10 +434,12 @@ export default function ExpedientDocuments() {
                   savingPolicy={savingPolicy}
                   savingCfdi={savingCfdi}
                   savingChecklist={savingChecklist}
-                  onOpenManager={() => void openManagerPanel()}
-                  onOpenPolicy={() => void openPolicyPanel()}
-                  onOpenCfdi={() => void openCfdiPanel()}
+                  downloadingChecklistPdf={downloadingChecklistPdf}
+                  onOpenManager={openManagerPanel}
+                  onOpenPolicy={openPolicyPanel}
+                  onOpenCfdi={openCfdiPanel}
                   onOpenChecklist={openChecklistPanel}
+                  onDownloadChecklistPdf={onDownloadChecklistPdf}
                   getManagerDisplayName={getManagerDisplayName}
                 />
               </div>

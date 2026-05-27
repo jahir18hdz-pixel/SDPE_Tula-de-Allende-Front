@@ -3,9 +3,7 @@
 ========================= */
 .cardNoteInline {
   width: 100%;
-
   border-radius: 16px;
-
   padding: 14px 16px;
 
   background: linear-gradient(
@@ -15,7 +13,6 @@
   );
 
   border: 1px solid rgba(230, 230, 234, 0.9);
-
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.05);
 }
 
@@ -30,7 +27,7 @@
 }
 
 /* =========================
-   CAJAS (Responsable / Póliza / CFDI)
+   CAJAS
 ========================= */
 .managerBox,
 .policyBox,
@@ -40,11 +37,9 @@
   gap: 4px;
 
   padding: 8px 10px;
-
   border-radius: 12px;
 
   background: rgba(255, 255, 255, 0.85);
-
   border: 1px solid rgba(220, 220, 224, 0.9);
 
   min-width: 160px;
@@ -52,12 +47,11 @@
   transition: all 0.15s ease;
 }
 
-/* hover sutil */
 .managerBox:hover,
 .policyBox:hover,
 .cfdiBox:hover {
   border-color: rgba(182, 138, 42, 0.5);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 /* =========================
@@ -70,12 +64,11 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-
   color: rgba(17, 24, 39, 0.6);
 }
 
 /* =========================
-   BOTONES (VALORES)
+   BOTONES VALORES
 ========================= */
 .managerHeaderName,
 .policyHeaderName,
@@ -85,11 +78,9 @@
 
   font-size: 14px;
   font-weight: 800;
-
   color: #111827;
 
   text-align: left;
-
   padding: 0;
 
   cursor: pointer;
@@ -103,7 +94,6 @@
   transition: all 0.15s ease;
 }
 
-/* hover */
 .managerHeaderName:hover:not(:disabled),
 .policyHeaderName:hover:not(:disabled),
 .cfdiHeaderName:hover:not(:disabled) {
@@ -111,7 +101,6 @@
   text-decoration: underline;
 }
 
-/* disabled */
 .managerHeaderName:disabled,
 .policyHeaderName:disabled,
 .cfdiHeaderName:disabled {
@@ -120,11 +109,21 @@
 }
 
 /* =========================
-   BOTÓN CHECKLIST
+   ACCIONES DEL HEADER
 ========================= */
-.headerEditChecklistBtn {
+.headerActions {
   margin-left: auto;
 
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* =========================
+   BOTONES PDF CHECK / EDITAR CHECKLIST
+========================= */
+.headerPdfCheckBtn,
+.headerEditChecklistBtn {
   height: 40px;
   padding: 0 14px;
 
@@ -133,6 +132,39 @@
   font-size: 13px;
   font-weight: 900;
 
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  white-space: nowrap;
+
+  transition: all 0.15s ease;
+}
+
+/* PDF CHECK */
+.headerPdfCheckBtn {
+  border: 1.5px solid rgba(37, 99, 235, 0.6);
+
+  background: linear-gradient(
+    180deg,
+    rgba(37, 99, 235, 0.12),
+    rgba(255, 255, 255, 0.95)
+  );
+
+  color: #1d4ed8;
+}
+
+.headerPdfCheckBtn:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.95);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+/* EDITAR CHECKLIST */
+.headerEditChecklistBtn {
   border: 1.5px solid rgba(101, 0, 31, 0.6);
 
   background: linear-gradient(
@@ -142,17 +174,8 @@
   );
 
   color: #65001f;
-
-  cursor: pointer;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  transition: all 0.15s ease;
 }
 
-/* hover */
 .headerEditChecklistBtn:hover:not(:disabled) {
   background: rgba(101, 0, 31, 0.9);
   color: #fff;
@@ -160,12 +183,14 @@
   box-shadow: 0 8px 18px rgba(101, 0, 31, 0.2);
 }
 
-/* active */
+/* ACTIVE */
+.headerPdfCheckBtn:active,
 .headerEditChecklistBtn:active {
   transform: scale(0.96);
 }
 
-/* disabled */
+/* DISABLED */
+.headerPdfCheckBtn:disabled,
 .headerEditChecklistBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -180,8 +205,28 @@
     align-items: stretch;
   }
 
-  .headerEditChecklistBtn {
+  .managerBox,
+  .policyBox,
+  .cfdiBox {
+    width: 100%;
+  }
+
+  .managerHeaderName,
+  .policyHeaderName,
+  .cfdiHeaderName {
+    max-width: 100%;
+  }
+
+  .headerActions {
     width: 100%;
     margin-left: 0;
+    display: flex;
+    gap: 10px;
+  }
+
+  .headerPdfCheckBtn,
+  .headerEditChecklistBtn {
+    flex: 1;
+    width: 100%;
   }
 }

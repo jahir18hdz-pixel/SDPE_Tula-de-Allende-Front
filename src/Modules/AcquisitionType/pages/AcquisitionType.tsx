@@ -1,4 +1,4 @@
-import  { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "../styles/AcquisitionType.module.css";
 
 import Toast from "../../../Components/layout/Toast";
@@ -71,25 +71,19 @@ export default function AcquisitionTypePage() {
   const selectedId = useMemo(() => getId(selected), [selected]);
   const selectedCode = useMemo(() => getCode(selected), [selected]);
 
-  const selectedCodeRef = useRef<number | null>(null);
   const modeRef = useRef<"view" | "create" | "edit">("view");
-
-  useEffect(() => {
-    selectedCodeRef.current = selectedCode;
-  }, [selectedCode]);
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
 
-  useEffect(() => {
-    void loadAll(null);
-  }, []);
-
   function extractList(payload: unknown): AcquisitionType[] {
     if (Array.isArray(payload)) return payload as AcquisitionType[];
 
-    if (isRecord(payload) && Array.isArray((payload as UnknownRecord).$values)) {
+    if (
+      isRecord(payload) &&
+      Array.isArray((payload as UnknownRecord).$values)
+    ) {
       return (payload as UnknownRecord).$values as AcquisitionType[];
     }
 
@@ -161,45 +155,55 @@ export default function AcquisitionTypePage() {
     });
   }
 
-  async function loadAll(keepSelectedCode?: number | null) {
-    setLoading(true);
-    try {
-      const result = await requestJson(API_BASE, {
-        method: "GET",
-      });
+  const loadAll = useCallback(
+    async (keepSelectedCode?: number | null) => {
+      setLoading(true);
+      try {
+        const result = await requestJson(API_BASE, {
+          method: "GET",
+        });
 
-      if (!result.ok) {
-        if (result.status === 401) {
-          showToast("error", "No hay token o tu sesión expiró. Inicia sesión nuevamente.");
-        } else {
-          showToast("error", result.error);
+        if (!result.ok) {
+          if (result.status === 401) {
+            showToast(
+              "error",
+              "No hay token o tu sesión expiró. Inicia sesión nuevamente.",
+            );
+          } else {
+            showToast("error", result.error);
+          }
+          setRows([]);
+          return;
         }
+
+        const list = extractList(result.data);
+        setRows(list);
+
+        if (keepSelectedCode != null) {
+          const found = list.find((r) => getCode(r) === keepSelectedCode) ?? null;
+          setSelected(found);
+
+          if (found && modeRef.current === "edit") {
+            setFormEdit({
+              code: String(getCode(found) ?? ""),
+              description: String(getDescription(found) ?? ""),
+              active: getActive(found) ?? true,
+            });
+          }
+        }
+      } catch (e: unknown) {
+        showToast("error", toErrorMessage(e));
         setRows([]);
-        return;
+      } finally {
+        setLoading(false);
       }
+    },
+    [showToast],
+  );
 
-      const list = extractList(result.data);
-      setRows(list);
-
-      if (keepSelectedCode != null) {
-        const found = list.find((r) => getCode(r) === keepSelectedCode) ?? null;
-        setSelected(found);
-
-        if (found && modeRef.current === "edit") {
-          setFormEdit({
-            code: String(getCode(found) ?? ""),
-            description: String(getDescription(found) ?? ""),
-            active: getActive(found) ?? true,
-          });
-        }
-      }
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    void loadAll(null);
+  }, [loadAll]);
 
   function normalizeCodeInput(value: string): string {
     return value.replace(/\D/g, "");
@@ -389,44 +393,6 @@ export default function AcquisitionTypePage() {
     }
   }
 
-  async function onToggleStatus() {
-    if (!selected) {
-      showToast("error", "Selecciona un tipo.");
-      return;
-    }
-
-    const code = getCode(selected);
-    if (code == null) {
-      showToast("error", "No se pudo resolver el Code.");
-      return;
-    }
-
-    const next = !(getActive(selected) ?? false);
-
-    setSaving(true);
-    try {
-      const result = await requestJson(`${API_BASE}/${code}/active`, {
-        method: "PATCH",
-        body: JSON.stringify(next),
-      });
-
-      if (!result.ok) {
-        showToast("error", result.error);
-        return;
-      }
-
-      showToast(
-        "success",
-        `Estatus actualizado: ${next ? "Activo" : "Inactivo"}`
-      );
-      await loadAll(code);
-    } catch (e: unknown) {
-      showToast("error", toErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const formDisabled = saving || loading;
 
   return (
@@ -503,7 +469,9 @@ export default function AcquisitionTypePage() {
               className={styles.btnGhost}
               type="button"
               onClick={toggleViewActiveInactive}
-              disabled={saving || loading || mode === "create" || mode === "edit"}
+              disabled={
+                saving || loading || mode === "create" || mode === "edit"
+              }
               title="Cambiar vista activos/inactivos"
             >
               {showInactive ? "Ver activos" : "Ver inactivos"}
@@ -602,7 +570,9 @@ export default function AcquisitionTypePage() {
                     const code = getCode(r);
                     const key = code != null ? String(code) : `row-${idx}`;
                     const isSelected =
-                      selectedCode != null && code != null && code === selectedCode;
+                      selectedCode != null &&
+                      code != null &&
+                      code === selectedCode;
                     const active = getActive(r) ?? false;
                     const fullDescription = getDescription(r);
 
@@ -688,7 +658,7 @@ export default function AcquisitionTypePage() {
                           setFormCreate((p) => ({
                             ...p,
                             description: breakTextEvery12Words(
-                              normalizeTextInput(e.target.value)
+                              normalizeTextInput(e.target.value),
                             ),
                           }))
                         }
@@ -777,7 +747,7 @@ export default function AcquisitionTypePage() {
                           setFormEdit((p) => ({
                             ...p,
                             description: breakTextEvery12Words(
-                              normalizeTextInput(e.target.value)
+                              normalizeTextInput(e.target.value),
                             ),
                           }))
                         }
@@ -866,16 +836,6 @@ export default function AcquisitionTypePage() {
                     disabled={formDisabled}
                   >
                     Editar
-                  </button>
-
-                  <button
-                    className={styles.btnDanger}
-                    type="button"
-                    onClick={() => void onToggleStatus()}
-                    disabled={formDisabled}
-                    title="Activar / Desactivar"
-                  >
-                    {getActive(selected) ? "Desactivar" : "Activar"}
                   </button>
                 </div>
               </div>

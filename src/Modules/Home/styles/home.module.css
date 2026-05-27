@@ -530,6 +530,17 @@
   color: rgba(15, 23, 42, 0.75);
 }
 
+.badgeReview {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #6d28d9;
+}
+
+.badgeObserved {
+  background: rgba(234, 179, 8, 0.18);
+  border-color: rgba(234, 179, 8, 0.4);
+  color: #854d0e;
+}
 .statusCell {
   text-align: center;
   white-space: nowrap;
@@ -571,10 +582,21 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 12px; /* ⬅️ más separación entre botones */
   flex-wrap: nowrap;
   width: 100%;
   min-width: 0;
+  padding-right: 6px; /* ⬅️ ligero espacio del borde */
+}
+
+/* mejora visual de todos los botones dentro */
+.actionsCell button {
+  margin: 0 2px;
+}
+
+/* opcional: mejora hover para que se sienta más suave */
+.actionsCell button:hover {
+  transform: translateY(-1px);
 }
 
 .deleteIconBtn {
@@ -1370,4 +1392,147 @@
 }
 .dateWrapper:hover .dateCustomIcon {
   transform: translateY(-50%) scale(1.1);
+}
+.searchWide {
+  flex: 1 1 420px;
+  min-width: 280px;
+}
+
+.classificationControl {
+  min-width: 190px;
+  max-width: 220px;
+}
+
+.classificationControl select {
+  width: 100%;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.refreshChip {
+  border: none;
+  cursor: pointer;
+  background: #ffffff;
+
+  display: flex;
+  flex-direction: column; /* 👈 esto pone texto arriba e icono abajo */
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.refreshChip:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.refreshChip:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.refreshIcon {
+  font-size: 18px;
+  color: #000000;
+}
+
+.refreshIconSpin {
+  font-size: 18px;
+  color: #000000; 
+  animation: spinRefresh 0.8s linear infinite;
+}
+
+@keyframes spinRefresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dateFilterControl {
+  gap: 10px;
+}
+
+.dateFilterWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dateFilterInput {
+  height: 34px;
+  min-width: 150px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 0 38px 0 10px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 800;
+  font-family: inherit;
+  outline: none;
+  color-scheme: light;
+}
+
+.dateFilterInput:focus {
+  border-color: rgba(91, 11, 36, 0.3);
+  box-shadow: 0 0 0 4px rgba(91, 11, 36, 0.08);
+}
+
+.dateFilterInput::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.dateFilterIcon {
+  position: absolute;
+  right: 12px;
+  color: var(--brand);
+  pointer-events: none;
+}
+
+.clearDateBtn {
+  border: 1px solid rgba(91, 11, 36, 0.16);
+  background: rgba(91, 11, 36, 0.05);
+  color: var(--brand);
+  border-radius: 10px;
+  height: 32px;
+  padding: 0 10px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pagination {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.paginationSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 6px;
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.7);
+  font-weight: 800;
+}
+
+.paginationSize select {
+  height: 34px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 800;
+  font-family: inherit;
+  outline: none;
 }

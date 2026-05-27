@@ -2,11 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { useLocation, useNavigate } from "react-router-dom";
 import styles from "../styles/home.module.css";
-import { FiSearch, FiTrash2, FiCalendar } from "react-icons/fi";
+import { FiSearch, FiTrash2, FiCalendar, FiRefreshCw } from "react-icons/fi";
 import Toast from "../../../Components/layout/Toast";
 import type { ToastType } from "../../../Components/layout/Toast";
 import NotificationToast from "../../../Components/layout/NotificationToast";
 import CfdiPanel from "../../ExpedientDocument/components/CfdiPanel";
+import PolicyPanel from "../../ExpedientDocument/components/PolicyPanel";
+import type {
+  PaymentPolicyOption,
+  PolicyFormState,
+} from "../../ExpedientDocument/types/expedient.types";
 import {
   BASE_URL,
   readToken,
@@ -90,9 +95,14 @@ type CfdiTarget = {
   cfdiActual: string;
 };
 
+type PolicyTarget = {
+  idRequest: number;
+  folio: string;
+  policyNumberActual: string;
+};
+
 const API_BASE = "/api/AcquisitionRequest";
 const PAYMENT_POLICY_API = "/api/PaymentPolicy/policies";
-const UPDATE_CFDI_API = `${API_BASE}/update-cfdi`;
 
 function getDaysUntil(dateValue?: string | null) {
   if (!dateValue) return null;
@@ -145,7 +155,12 @@ function getItemsFromUnknown<T>(value: unknown): T[] {
   return [];
 }
 
-type StatusFilter = "Todos" | "Completo" | "Incompleto";
+type StatusFilter =
+  | "Todos"
+  | "Completo"
+  | "Incompleto"
+  | "Observados"
+  | "En revisión";
 
 function hasValidClassification(label: string) {
   const t = (label ?? "").trim().toLowerCase();
@@ -164,6 +179,46 @@ function hasPolicy(value: string) {
 function hasCfdi(value: string) {
   const t = (value ?? "").trim().toLowerCase();
   return !!t && t !== "—" && t !== "sin cfdi";
+}
+
+function matchesObservedStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("observado") ||
+    estado.includes("observada") ||
+    estado.includes("observacion") ||
+    estado.includes("observación") ||
+    estado.includes("con observaciones")
+  );
+}
+
+function matchesReviewStatus(value: string) {
+  const estado = normalizeText(value);
+  return (
+    estado.includes("revision") ||
+    estado.includes("revisión") ||
+    estado.includes("en revision") ||
+    estado.includes("en revisión")
+  );
+}
+
+function matchesStatusFilter(estado: string, filter: StatusFilter) {
+  const value = normalizeText(estado);
+
+  switch (filter) {
+    case "Todos":
+      return true;
+    case "Completo":
+      return value === "completo";
+    case "Incompleto":
+      return value === "incompleto";
+    case "Observados":
+      return matchesObservedStatus(value);
+    case "En revisión":
+      return matchesReviewStatus(value);
+    default:
+      return false;
+  }
 }
 
 function getExtensionFromSource(source: string) {
@@ -227,11 +282,12 @@ function truncateClassification(text: string, maxWords = 3) {
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
+  const [classificationFilter, setClassificationFilter] = useState("Todas");
+  const [authorizationDateFilter, setAuthorizationDateFilter] = useState("");
 
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -261,7 +317,6 @@ export default function Home() {
     message: "",
     requestId: null,
   });
-  
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null);
@@ -287,6 +342,17 @@ export default function Home() {
   const [cfdiTarget, setCfdiTarget] = useState<CfdiTarget | null>(null);
   const [cfdiForm, setCfdiForm] = useState<CfdiFormState>({ cfdi: "" });
   const [savingCfdi, setSavingCfdi] = useState(false);
+
+  const [policyPanelOpen, setPolicyPanelOpen] = useState(false);
+  const [policyTarget, setPolicyTarget] = useState<PolicyTarget | null>(null);
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>({
+    idPaymentPolicy: null,
+  });
+  const [paymentPolicies, setPaymentPolicies] = useState<PaymentPolicyOption[]>(
+    [],
+  );
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
 
   const closeToast = () => setToast((t) => ({ ...t, open: false }));
 
@@ -378,6 +444,10 @@ export default function Home() {
     }
   }, [pageNumber, pageSize, showAppToast]);
 
+  const handleRefreshTable = useCallback(async () => {
+    await fetchData();
+  }, [fetchData]);
+
   const connectToHub = useCallback(async () => {
     try {
       if (connectionRef.current) return;
@@ -432,6 +502,10 @@ export default function Home() {
     };
   }, [connectToHub]);
 
+  useEffect(() => {
+    setPageNumber(1);
+  }, [query, statusFilter, classificationFilter, authorizationDateFilter]);
+
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
     setPreviewItem(null);
@@ -455,14 +529,16 @@ export default function Home() {
   }, []);
 
   const openCfdiPanel = useCallback((row: Row) => {
+    const currentCfdi = hasCfdi(row.cfdi) ? row.cfdi : "";
+
     setCfdiTarget({
       idRequest: row.idRequest,
       folio: row.folio,
-      cfdiActual: row.cfdi,
+      cfdiActual: currentCfdi,
     });
 
     setCfdiForm({
-      cfdi: hasCfdi(row.cfdi) ? row.cfdi : "",
+      cfdi: currentCfdi,
     });
 
     setCfdiPanelOpen(true);
@@ -471,9 +547,77 @@ export default function Home() {
   const closeCfdiPanel = useCallback(() => {
     if (savingCfdi) return;
     setCfdiPanelOpen(false);
-    setCfdiTarget(null);
     setCfdiForm({ cfdi: "" });
+    setCfdiTarget(null);
   }, [savingCfdi]);
+
+  const fetchPaymentPolicies = useCallback(async () => {
+    setLoadingPolicies(true);
+
+    try {
+      const res = (await requestJson(PAYMENT_POLICY_API, {
+        method: "GET",
+        headers: authHeaders(),
+      })) as RequestResult;
+
+      if (!res.ok) {
+        setPaymentPolicies([]);
+        showAppToast(
+          res.error || "No se pudieron cargar las pólizas disponibles.",
+          "error",
+        );
+        return;
+      }
+
+      const items = getItemsFromUnknown<PaymentPolicyPreviewRow>(res.data);
+
+      const mapped: PaymentPolicyOption[] = items
+        .map((item) => ({
+          idPaymentPolicy: item.idPaymentPolicy ?? item.IdPaymentPolicy ?? 0,
+          policyCode: (item.policyCode ?? item.PolicyCode ?? "").trim(),
+          description: item.description ?? item.Description ?? "",
+        }))
+        .filter((item) => item.idPaymentPolicy > 0 && !!item.policyCode);
+
+      mapped.sort((a, b) =>
+        a.policyCode.localeCompare(b.policyCode, "es", { sensitivity: "base" }),
+      );
+
+      setPaymentPolicies(mapped);
+    } catch {
+      setPaymentPolicies([]);
+      showAppToast("Error inesperado al cargar las pólizas.", "error");
+    } finally {
+      setLoadingPolicies(false);
+    }
+  }, [showAppToast]);
+
+  const openPolicyPanel = useCallback(
+    async (row: Row) => {
+      const currentPolicy = hasPolicy(row.poliza) ? row.poliza : "";
+
+      setPolicyTarget({
+        idRequest: row.idRequest,
+        folio: row.folio,
+        policyNumberActual: currentPolicy,
+      });
+
+      setPolicyForm({
+        idPaymentPolicy: null,
+      });
+
+      setPolicyPanelOpen(true);
+      await fetchPaymentPolicies();
+    },
+    [fetchPaymentPolicies],
+  );
+
+  const closePolicyPanel = useCallback(() => {
+    if (savingPolicy) return;
+    setPolicyPanelOpen(false);
+    setPolicyForm({ idPaymentPolicy: null });
+    setPolicyTarget(null);
+  }, [savingPolicy]);
 
   const onSaveMaxDate = useCallback(async () => {
     if (!editDateTarget) return;
@@ -524,43 +668,122 @@ export default function Home() {
   ]);
 
   const onSaveCfdi = useCallback(async () => {
-    if (!cfdiTarget) return;
+    if (!cfdiTarget?.idRequest) {
+      showAppToast(
+        "No se encontró la solicitud para actualizar el CFDI.",
+        "error",
+      );
+      return;
+    }
 
-    const cfdiValue = cfdiForm.cfdi.trim();
+    if (!cfdiForm.cfdi.trim()) {
+      showAppToast("Captura el CFDI.", "error");
+      return;
+    }
 
     setSavingCfdi(true);
 
     try {
-      const res = (await requestJson(UPDATE_CFDI_API, {
-        method: "PATCH",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          requestId: cfdiTarget.idRequest,
-          cfdi: cfdiValue,
-        }),
-      })) as RequestResult;
+      const res = (await requestJson(
+        `${API_BASE}/${cfdiTarget.idRequest}/CFDI`,
+        {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(cfdiForm.cfdi.trim()),
+        },
+      )) as RequestResult;
 
       if (!res.ok) {
-        showAppToast(res.error || "No se pudo actualizar el CFDI.", "error");
+        showAppToast(res.error || "No se pudo guardar el CFDI.", "error");
         return;
       }
 
-      showAppToast(
-        cfdiValue
-          ? "CFDI actualizado correctamente."
-          : "CFDI eliminado correctamente.",
-        "success",
-      );
+      showAppToast("CFDI guardado correctamente.", "success");
       closeCfdiPanel();
       await fetchData();
-    } catch {
+    } catch (error) {
+      console.error("Error al actualizar CFDI:", error);
       showAppToast("Error inesperado al actualizar el CFDI.", "error");
     } finally {
       setSavingCfdi(false);
     }
-  }, [cfdiTarget, cfdiForm, closeCfdiPanel, fetchData, showAppToast]);
+  }, [cfdiTarget, cfdiForm.cfdi, closeCfdiPanel, fetchData, showAppToast]);
+
+  const onSavePolicy = useCallback(async () => {
+    if (!policyTarget?.idRequest) {
+      showAppToast(
+        "No se encontró la solicitud para asignar la póliza.",
+        "error",
+      );
+      return;
+    }
+
+    if (!policyForm.idPaymentPolicy) {
+      showAppToast("Selecciona una póliza.", "error");
+      return;
+    }
+
+    setSavingPolicy(true);
+
+    const payload = {
+      requestId: policyTarget.idRequest,
+      idRequest: policyTarget.idRequest,
+      idPaymentPolicy: policyForm.idPaymentPolicy,
+    };
+
+    const requests = [
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/PaymentPolicy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/${policyTarget.idRequest}/payment-policy`,
+        body: JSON.stringify(policyForm.idPaymentPolicy),
+      },
+      {
+        url: `${API_BASE}/update-payment-policy`,
+        body: JSON.stringify(payload),
+      },
+    ];
+
+    try {
+      let lastError = "No se pudo guardar la póliza.";
+
+      for (const request of requests) {
+        const res = (await requestJson(request.url, {
+          method: "PATCH",
+          headers: authHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: request.body,
+        })) as RequestResult;
+
+        if (res.ok) {
+          showAppToast("Póliza guardada correctamente.", "success");
+          closePolicyPanel();
+          await fetchData();
+          return;
+        }
+
+        lastError = res.error || lastError;
+      }
+
+      showAppToast(lastError, "error");
+    } catch (error) {
+      console.error("Error al guardar póliza:", error);
+      showAppToast("Error inesperado al guardar la póliza.", "error");
+    } finally {
+      setSavingPolicy(false);
+    }
+  }, [
+    policyTarget,
+    policyForm.idPaymentPolicy,
+    closePolicyPanel,
+    fetchData,
+    showAppToast,
+  ]);
 
   const openUrl = useCallback((u: string) => {
     const url = normalizeUrlMaybe(u);
@@ -688,7 +911,8 @@ export default function Home() {
       !deleteModalOpen &&
       !classificationModalText &&
       !editDateModalOpen &&
-      !cfdiPanelOpen
+      !cfdiPanelOpen &&
+      !policyPanelOpen
     ) {
       return;
     }
@@ -711,6 +935,11 @@ export default function Home() {
         return;
       }
 
+      if (policyPanelOpen) {
+        closePolicyPanel();
+        return;
+      }
+
       if (classificationModalText) {
         setClassificationModalText(null);
         return;
@@ -729,18 +958,45 @@ export default function Home() {
     classificationModalText,
     editDateModalOpen,
     cfdiPanelOpen,
+    policyPanelOpen,
     closeDeleteModal,
     closeEditDateModal,
     closeCfdiPanel,
+    closePolicyPanel,
     closePreview,
   ]);
+
+  const classificationOptions = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        rows
+          .map((r) => r.adquisicion?.trim())
+          .filter((value): value is string => !!value && value !== "—"),
+      ),
+    );
+
+    unique.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+    return ["Todas", ...unique];
+  }, [rows]);
 
   const filtered = useMemo(() => {
     let list = [...rows];
 
     if (statusFilter !== "Todos") {
+      list = list.filter((r) => matchesStatusFilter(r.estado, statusFilter));
+    }
+
+    if (classificationFilter !== "Todas") {
       list = list.filter(
-        (r) => normalizeText(r.estado) === normalizeText(statusFilter),
+        (r) =>
+          normalizeText(r.adquisicion) === normalizeText(classificationFilter),
+      );
+    }
+
+    if (authorizationDateFilter) {
+      list = list.filter(
+        (r) => toInputDate(r.requestDateRaw) === authorizationDateFilter,
       );
     }
 
@@ -780,32 +1036,25 @@ export default function Home() {
     });
 
     return list;
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, classificationFilter, authorizationDateFilter]);
 
   const kpiTotal = filtered.length;
 
-const kpiCompleto = filtered.filter(
-  (r) => normalizeText(r.estado) === "completo",
-).length;
+  const kpiCompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "completo",
+  ).length;
 
-const kpiIncompleto = filtered.filter(
-  (r) => normalizeText(r.estado) === "incompleto",
-).length;
+  const kpiIncompleto = filtered.filter(
+    (r) => normalizeText(r.estado) === "incompleto",
+  ).length;
 
-const kpiObservados = filtered.filter((r) => {
-  const estado = normalizeText(r.estado);
-  return estado.includes("observado");
-}).length;
+  const kpiObservados = filtered.filter((r) =>
+    matchesObservedStatus(r.estado),
+  ).length;
 
-const kpiRevision = filtered.filter((r) => {
-  const estado = normalizeText(r.estado);
-  return (
-    estado.includes("revision") ||
-    estado.includes("revisión") ||
-    estado.includes("en revision") ||
-    estado.includes("en revisión")
-  );
-}).length;
+  const kpiRevision = filtered.filter((r) =>
+    matchesReviewStatus(r.estado),
+  ).length;
 
   function goRegister() {
     navigate("/adquisiciones/registrar");
@@ -828,7 +1077,8 @@ const kpiRevision = filtered.filter((r) => {
     deleteModalOpen ||
     !!classificationModalText ||
     editDateModalOpen ||
-    cfdiPanelOpen;
+    cfdiPanelOpen ||
+    policyPanelOpen;
 
   return (
     <div
@@ -870,6 +1120,23 @@ const kpiRevision = filtered.filter((r) => {
           </div>
 
           <div className={styles.kpis}>
+            <button
+              type="button"
+              className={`${styles.kpiChip} ${styles.refreshChip}`}
+              onClick={handleRefreshTable}
+              disabled={loading}
+              title="Actualizar tabla"
+            >
+              <span className={styles.kpiLabel}>
+                {loading ? "Actualizando" : "Actualizar"}
+              </span>
+
+              <FiRefreshCw
+                className={
+                  loading ? styles.refreshIconSpin : styles.refreshIcon
+                }
+              />
+            </button>
             <div className={styles.kpiChip}>
               <span className={styles.kpiLabel}>Total</span>
               <span className={styles.kpiValue}>{kpiTotal}</span>
@@ -885,12 +1152,12 @@ const kpiRevision = filtered.filter((r) => {
               <span className={styles.kpiValue}>{kpiIncompleto}</span>
             </div>
 
-            <div className={`${styles.kpiObserved} ${styles.kpiObserved}`}>
+            <div className={styles.kpiObserved}>
               <span className={styles.kpiLabel}>Observados</span>
               <span className={styles.kpiValue}>{kpiObservados}</span>
             </div>
 
-            <div className={`${styles.kpiReview} ${styles.kpiReview}`}>
+            <div className={styles.kpiReview}>
               <span className={styles.kpiLabel}>En revisión</span>
               <span className={styles.kpiValue}>{kpiRevision}</span>
             </div>
@@ -898,12 +1165,12 @@ const kpiRevision = filtered.filter((r) => {
         </div>
 
         <div className={styles.toolbar}>
-          <div className={styles.search}>
+          <div className={`${styles.search} ${styles.searchWide}`}>
             <FiSearch className={styles.searchIcon} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por folio, póliza, CFDI, clasificación, estado, fecha límite…"
+              placeholder="Buscar por folio, póliza o CFDI"
               aria-label="Buscar adquisición"
             />
           </div>
@@ -920,22 +1187,51 @@ const kpiRevision = filtered.filter((r) => {
                 <option value="Todos">Todos</option>
                 <option value="Completo">Completo</option>
                 <option value="Incompleto">Incompleto</option>
+                <option value="Observados">Observados</option>
+                <option value="En revisión">En revisión</option>
               </select>
             </label>
 
-            <label className={styles.control}>
-              <span>Tamaño</span>
+            <label
+              className={`${styles.control} ${styles.classificationControl}`}
+            >
+              <span>Clasificación</span>
               <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageNumber(1);
-                  setPageSize(Number(e.target.value));
-                }}
+                value={classificationFilter}
+                onChange={(e) => setClassificationFilter(e.target.value)}
               >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
+                {classificationOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
+            </label>
+
+            <label className={`${styles.control} ${styles.dateFilterControl}`}>
+              <span>Fecha autorización</span>
+
+              <div className={styles.dateFilterWrapper}>
+                <input
+                  type="date"
+                  value={authorizationDateFilter}
+                  onChange={(e) => setAuthorizationDateFilter(e.target.value)}
+                  className={styles.dateFilterInput}
+                  aria-label="Filtrar por fecha de autorización"
+                />
+                <FiCalendar className={styles.dateFilterIcon} />
+              </div>
+
+              {authorizationDateFilter && (
+                <button
+                  type="button"
+                  className={styles.clearDateBtn}
+                  onClick={() => setAuthorizationDateFilter("")}
+                  title="Limpiar fecha"
+                >
+                  Limpiar
+                </button>
+              )}
             </label>
 
             <button
@@ -960,13 +1256,13 @@ const kpiRevision = filtered.filter((r) => {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Folio</th>
-                  <th>Póliza</th>
-                  <th>CFDI</th>
-                  <th>Clasificación</th>
-                  <th>Fecha límite</th>
-                  <th>Estado</th>
-                  <th className={styles.thRight}>Acciones</th>
+                  <th className={styles.thCenter}>Folio</th>
+                  <th className={styles.thCenter}>Póliza</th>
+                  <th className={styles.thCenter}>CFDI</th>
+                  <th className={styles.thCenter}>Clasificación</th>
+                  <th className={styles.thCenter}>Fecha límite</th>
+                  <th className={styles.thCenter}>Estado</th>
+                  <th className={styles.thCenter}>Acciones</th>
                 </tr>
               </thead>
 
@@ -993,7 +1289,11 @@ const kpiRevision = filtered.filter((r) => {
                         ? styles.badgeOk
                         : st === "incompleto"
                           ? styles.badgeBad
-                          : styles.badgeNeutral;
+                          : matchesReviewStatus(st)
+                            ? styles.badgeReview
+                            : matchesObservedStatus(st)
+                              ? styles.badgeObserved
+                              : styles.badgeNeutral;
 
                     const policyExists = hasPolicy(r.poliza);
                     const cfdiExists = hasCfdi(r.cfdi);
@@ -1006,30 +1306,44 @@ const kpiRevision = filtered.filter((r) => {
 
                     return (
                       <tr key={r.idRequest}>
-                        <td className={styles.mono}>{r.folio}</td>
-
-                        <td>
-                          {policyExists ? (
-                            <button
-                              type="button"
-                              className={`${styles.policyBadge} ${styles.policyBadgeOk} ${styles.policyBadgeButton}`}
-                              title={`Ver póliza ${r.poliza}`}
-                              onClick={() => void openPolicyPreview(r.poliza)}
-                              disabled={loadingPreview}
-                            >
-                              {r.poliza}
-                            </button>
-                          ) : (
-                            <span
-                              className={`${styles.policyBadge} ${styles.policyBadgeEmpty}`}
-                              title="Sin póliza asignada"
-                            >
-                              Sin póliza
-                            </span>
-                          )}
+                        <td className={`${styles.mono} ${styles.tdCenter}`}>
+                          {r.folio}
                         </td>
 
-                        <td>
+                        <td className={styles.tdCenter}>
+                          <div className={styles.cellStack}>
+                            <button
+                              type="button"
+                              className={`${styles.policyBadge} ${
+                                policyExists
+                                  ? styles.policyBadgeOk
+                                  : styles.policyBadgeEmpty
+                              } ${styles.policyBadgeButton}`}
+                              title={
+                                policyExists
+                                  ? `Editar póliza ${r.poliza}`
+                                  : "Agregar póliza"
+                              }
+                              onClick={() => void openPolicyPanel(r)}
+                            >
+                              {policyExists ? r.poliza : "Sin póliza"}
+                            </button>
+
+                            {policyExists && (
+                              <button
+                                type="button"
+                                className={styles.linkBtn}
+                                title={`Ver archivo de póliza ${r.poliza}`}
+                                onClick={() => void openPolicyPreview(r.poliza)}
+                                disabled={loadingPreview}
+                              >
+                                Vista previa
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={styles.tdCenter}>
                           <button
                             type="button"
                             className={`${styles.policyBadge} ${
@@ -1048,7 +1362,7 @@ const kpiRevision = filtered.filter((r) => {
                           </button>
                         </td>
 
-                        <td>
+                        <td className={styles.tdCenter}>
                           {getWordCount(r.adquisicion) > 3 ? (
                             <button
                               type="button"
@@ -1070,7 +1384,9 @@ const kpiRevision = filtered.filter((r) => {
                           )}
                         </td>
 
-                        <td className={styles.statusCell}>
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
                           <button
                             type="button"
                             className={`${styles.badge} ${deadlineClass} ${styles.deadlineButton}`}
@@ -1081,13 +1397,15 @@ const kpiRevision = filtered.filter((r) => {
                           </button>
                         </td>
 
-                        <td className={styles.statusCell}>
+                        <td
+                          className={`${styles.statusCell} ${styles.tdCenter}`}
+                        >
                           <span className={`${styles.badge} ${badgeClass}`}>
                             {shownEstado}
                           </span>
                         </td>
 
-                        <td className={styles.tdRight}>
+                        <td className={styles.tdCenter}>
                           <div className={styles.actionsCell}>
                             <button
                               type="button"
@@ -1120,6 +1438,21 @@ const kpiRevision = filtered.filter((r) => {
           </div>
 
           <div className={styles.pagination}>
+            <label className={styles.paginationSize}>
+              <span>Mostrar</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageNumber(1);
+                  setPageSize(Number(e.target.value));
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+
             <span className={styles.pageInfo}>Página {pageNumber}</span>
 
             <button
@@ -1301,7 +1634,6 @@ const kpiRevision = filtered.filter((r) => {
                     onChange={(e) => setEditDateValue(e.target.value)}
                     disabled={savingDate}
                   />
-
                   <FiCalendar className={styles.dateCustomIcon} />
                 </div>
               </div>
@@ -1342,6 +1674,18 @@ const kpiRevision = filtered.filter((r) => {
         setCfdiForm={setCfdiForm}
         onClose={closeCfdiPanel}
         onSave={() => void onSaveCfdi()}
+      />
+
+      <PolicyPanel
+        open={policyPanelOpen}
+        savingPolicy={savingPolicy}
+        loadingPolicies={loadingPolicies}
+        paymentPolicies={paymentPolicies}
+        policyForm={policyForm}
+        setPolicyForm={setPolicyForm}
+        policyNumber={policyTarget?.policyNumberActual ?? ""}
+        onClose={closePolicyPanel}
+        onSave={() => void onSavePolicy()}
       />
 
       {deleteModalOpen && deleteTarget && (

@@ -3,6 +3,7 @@ import type { ManagerInfo } from "../types/expedient.types";
 
 type Props = {
   canUse: boolean;
+  requestId: number;
   loadingManager: boolean;
   manager: ManagerInfo | null;
   policyNumber: string;
@@ -11,15 +12,18 @@ type Props = {
   savingPolicy: boolean;
   savingCfdi: boolean;
   savingChecklist: boolean;
+  downloadingChecklistPdf?: boolean;
   onOpenManager: () => void;
   onOpenPolicy: () => void;
   onOpenCfdi: () => void;
   onOpenChecklist: () => void;
+  onDownloadChecklistPdf: () => void;
   getManagerDisplayName: (m: ManagerInfo | null) => string;
 };
 
 export default function ExpedientHeaderInfo({
   canUse,
+  requestId,
   loadingManager,
   manager,
   policyNumber,
@@ -28,10 +32,12 @@ export default function ExpedientHeaderInfo({
   savingPolicy,
   savingCfdi,
   savingChecklist,
+  downloadingChecklistPdf = false,
   onOpenManager,
   onOpenPolicy,
   onOpenCfdi,
   onOpenChecklist,
+  onDownloadChecklistPdf,
   getManagerDisplayName,
 }: Props) {
   const managerText = loadingManager
@@ -86,15 +92,27 @@ export default function ExpedientHeaderInfo({
           </button>
         </div>
 
-        <button
-          type="button"
-          className={styles.headerEditChecklistBtn}
-          onClick={onOpenChecklist}
-          disabled={!canUse || savingChecklist}
-        >
-          Editar checklist
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.headerPdfCheckBtn}
+            onClick={onDownloadChecklistPdf}
+            disabled={!canUse || !requestId || downloadingChecklistPdf}
+          >
+            {downloadingChecklistPdf ? "Descargando..." : "PDF CHECKLIST"}
+          </button>
+
+          <button
+            type="button"
+            className={styles.headerEditChecklistBtn}
+            onClick={onOpenChecklist}
+            disabled={!canUse || savingChecklist}
+          >
+            Editar checklist
+          </button>
+        </div>
       </div>
     </div>
   );
+  
 }
